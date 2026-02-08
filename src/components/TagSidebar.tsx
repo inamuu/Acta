@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 
 type TagStat = {
   tag: string;
@@ -14,9 +14,34 @@ type Props = {
 };
 
 export function TagSidebar({ selectedTag, totalCount, tagStats, untaggedCount, onSelectTag }: Props) {
+  const [tagQuery, setTagQuery] = useState("");
+
+  const visibleTagStats = useMemo(() => {
+    const q = tagQuery.trim().toLocaleLowerCase();
+    if (!q) return tagStats;
+    return tagStats.filter((t) => t.tag.toLocaleLowerCase().includes(q));
+  }, [tagQuery, tagStats]);
+
   return (
     <nav className="tagSidebar" aria-label="タグ">
       <div className="tagSidebarTitle">Tags</div>
+
+      <div className="tagSearch" role="search" aria-label="タグ検索">
+        <input
+          className="tagSearchInput"
+          value={tagQuery}
+          onChange={(e) => setTagQuery(e.target.value)}
+          placeholder="タグ検索"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setTagQuery("");
+          }}
+        />
+        {tagQuery ? (
+          <button className="tagSearchClear" type="button" onClick={() => setTagQuery("")} title="クリア">
+            ×
+          </button>
+        ) : null}
+      </div>
 
       <button
         className={`tagItem ${selectedTag === null ? "isSelected" : ""}`}
@@ -40,10 +65,10 @@ export function TagSidebar({ selectedTag, totalCount, tagStats, untaggedCount, o
 
       <div className="tagDivider" />
 
-      {tagStats.length === 0 ? (
+      {visibleTagStats.length === 0 ? (
         <div className="tagEmpty">まだタグがありません</div>
       ) : (
-        tagStats.map((t) => (
+        visibleTagStats.map((t) => (
           <button
             key={t.tag}
             className={`tagItem ${selectedTag === t.tag ? "isSelected" : ""}`}

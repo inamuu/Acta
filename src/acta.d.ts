@@ -1,4 +1,10 @@
-import type { ActaEntry, AddEntryPayload, ChooseDataDirResult } from "../shared/types";
+import type {
+  ActaEntry,
+  AddEntryPayload,
+  ChooseDataDirResult,
+  DeleteEntryPayload,
+  DeleteEntryResult
+} from "../shared/types";
 
 declare global {
   interface Window {
@@ -7,6 +13,7 @@ declare global {
       listEntries: () => Promise<ActaEntry[]>;
       addEntry: (payload: AddEntryPayload) => Promise<ActaEntry>;
       chooseDataDir: () => Promise<ChooseDataDirResult>;
+      deleteEntry: (payload: DeleteEntryPayload) => Promise<DeleteEntryResult>;
     };
   }
 }

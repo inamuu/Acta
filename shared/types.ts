@@ -17,3 +17,11 @@ export type ChooseDataDirResult = {
   canceled: boolean;
   dataDir: string;
 };
+
+export type DeleteEntryPayload = {
+  id: string;
+};
+
+export type DeleteEntryResult = {
+  deleted: boolean;
+};

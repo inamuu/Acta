@@ -169,6 +169,42 @@ function parseEntriesFromText(text, date, sourceFile) {
   return entries;
 }
 
+function removeEntryFromText(text, id) {
+  const t = normalizeNewlines(text);
+  const re = /<!--\s*acta:comment\s*\n([\s\S]*?)-->\n([\s\S]*?)\n<!--\s*\/acta:comment\s*-->\n*/g;
+
+  let changed = false;
+  let out = "";
+  let last = 0;
+
+  let match;
+  while ((match = re.exec(t)) !== null) {
+    const full = match[0] ?? "";
+    const metaBlock = match[1] ?? "";
+
+    const meta = {};
+    for (const line of metaBlock.split("\n")) {
+      const m = /^\s*([a-zA-Z0-9_]+)\s*:\s*(.*?)\s*$/.exec(line);
+      if (!m) continue;
+      meta[m[1]] = m[2];
+    }
+
+    const matchId = String(meta.id ?? "");
+
+    out += t.slice(last, match.index);
+    if (matchId === id) {
+      changed = true;
+      // omit this block
+    } else {
+      out += full;
+    }
+    last = re.lastIndex;
+  }
+
+  out += t.slice(last);
+  return { changed, nextText: out };
+}
+
 async function listEntries() {
   await ensureDataDir();
 
@@ -255,9 +291,44 @@ async function addEntry(payload) {
   return entry;
 }
 
+async function deleteEntry(payload) {
+  const id = String(payload?.id ?? "").trim();
+  if (!id) throw new Error("id が不正です");
+
+  await ensureDataDir();
+
+  let names = [];
+  try {
+    names = await fs.promises.readdir(getDataDir());
+  } catch {
+    return { deleted: false };
+  }
+
+  const files = names.filter((n) => DATE_FILE_RE.test(n)).sort();
+
+  for (const file of files) {
+    const p = path.join(getDataDir(), file);
+    let text = "";
+    try {
+      text = await fs.promises.readFile(p, "utf8");
+    } catch {
+      continue;
+    }
+
+    const { changed, nextText } = removeEntryFromText(text, id);
+    if (!changed) continue;
+
+    await fs.promises.writeFile(p, nextText, "utf8");
+    return { deleted: true };
+  }
+
+  return { deleted: false };
+}
+
 module.exports = {
   getDataDir,
   setDataDir,
   listEntries,
-  addEntry
+  addEntry,
+  deleteEntry
 };

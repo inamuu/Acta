@@ -83,11 +83,6 @@ body {
   font-size: 18px;
 }
 
-.appSubTitle {
-  font-size: 12px;
-  color: var(--muted);
-}
-
 .topbarCenter {
   display: flex;
   justify-content: center;
@@ -239,6 +234,45 @@ body {
   margin: 4px 8px 10px;
 }
 
+.tagSearch {
+  position: relative;
+  margin: 0 6px 10px;
+}
+
+.tagSearchInput {
+  width: 100%;
+  height: 34px;
+  padding: 0 36px 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  outline: none;
+}
+
+.tagSearchInput:focus {
+  border-color: rgba(11, 111, 255, 0.5);
+  box-shadow: 0 0 0 4px rgba(11, 111, 255, 0.12);
+}
+
+.tagSearchClear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 10px;
+  border: 0;
+  background: rgba(18, 26, 40, 0.06);
+  color: var(--fg1);
+  cursor: pointer;
+}
+
+.tagSearchClear:hover {
+  background: rgba(18, 26, 40, 0.1);
+}
+
 .tagItem {
   width: 100%;
   display: flex;
@@ -325,21 +359,6 @@ body {
   background: linear-gradient(to bottom, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78));
 }
 
-.avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: radial-gradient(26px 26px at 20% 30%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0)),
-    linear-gradient(135deg, rgba(11, 111, 255, 0.88), rgba(61, 190, 150, 0.82));
-  color: white;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 10px 20px rgba(11, 111, 255, 0.18);
-  flex: 0 0 auto;
-}
-
 .commentHeaderMain {
   display: flex;
   flex-direction: column;
@@ -354,9 +373,10 @@ body {
   gap: 12px;
 }
 
-.commentAuthor {
-  font-weight: 760;
-  font-size: 14px;
+.commentHeaderRight {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .commentMeta {
@@ -365,6 +385,20 @@ body {
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
+}
+
+.dangerGhostBtn {
+  border: 1px solid rgba(209, 36, 47, 0.22);
+  background: rgba(255, 255, 255, 0.65);
+  color: #8a0f19;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.dangerGhostBtn:hover {
+  background: rgba(209, 36, 47, 0.08);
 }
 
 .commentTags {
@@ -592,6 +626,8 @@ body {
   border-radius: var(--radius);
   overflow: hidden;
   min-height: 210px;
+  display: flex;
+  flex-direction: column;
 }
 
 .paneTitle {
@@ -605,8 +641,10 @@ body {
 
 .editor {
   width: 100%;
-  height: 210px;
-  resize: vertical;
+  flex: 1;
+  min-height: 210px;
+  max-height: 320px;
+  resize: none;
   border: 0;
   outline: none;
   background: transparent;
@@ -617,8 +655,10 @@ body {
 }
 
 .preview {
-  padding: 12px;
+  flex: 1;
+  min-height: 210px;
   max-height: 320px;
+  padding: 12px;
   overflow: auto;
 }
 

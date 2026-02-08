@@ -173,7 +173,6 @@ export function App() {
         <header className="topbar">
           <div className="topbarLeft">
             <div className="appTitle">Acta</div>
-            <div className="appSubTitle">GitHub issue風 Markdown ログ</div>
           </div>
 
           <div className="topbarCenter">
@@ -261,7 +260,34 @@ export function App() {
             ) : filteredEntries.length === 0 ? (
               <div className="empty">該当するコメントがありません</div>
             ) : (
-              visibleEntries.map((e) => <CommentCard key={e.id} entry={e} onClickTag={(t) => setSelectedTag(t)} />)
+              visibleEntries.map((e) => (
+                <CommentCard
+                  key={e.id}
+                  entry={e}
+                  onClickTag={(t) => setSelectedTag(t)}
+                  onDelete={async (entry) => {
+                    const ok = window.confirm("この投稿を削除しますか？");
+                    if (!ok) return;
+
+                    try {
+                      const res = await api.deleteEntry({ id: entry.id });
+                      if (!res?.deleted) {
+                        setAppError("削除対象が見つかりませんでした");
+                      } else {
+                        setAppError("");
+                      }
+                      await reload();
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : String(err);
+                      if (msg.includes("No handler registered")) {
+                        setAppError("アプリを再起動してください（更新が反映されていない可能性があります）");
+                      } else {
+                        setAppError(msg || "削除に失敗しました");
+                      }
+                    }
+                  }}
+                />
+              ))
             )}
           </div>
         </div>
