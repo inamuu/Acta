@@ -25,3 +25,13 @@ export type DeleteEntryPayload = {
 export type DeleteEntryResult = {
   deleted: boolean;
 };
+
+export type UpdateEntryPayload = {
+  id: string;
+  body: string;
+  tags: string[];
+};
+
+export type UpdateEntryResult = {
+  updated: boolean;
+};

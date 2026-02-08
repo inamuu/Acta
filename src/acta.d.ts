@@ -3,7 +3,9 @@ import type {
   AddEntryPayload,
   ChooseDataDirResult,
   DeleteEntryPayload,
-  DeleteEntryResult
+  DeleteEntryResult,
+  UpdateEntryPayload,
+  UpdateEntryResult
 } from "../shared/types";
 
 declare global {
@@ -14,6 +16,7 @@ declare global {
       addEntry: (payload: AddEntryPayload) => Promise<ActaEntry>;
       chooseDataDir: () => Promise<ChooseDataDirResult>;
       deleteEntry: (payload: DeleteEntryPayload) => Promise<DeleteEntryResult>;
+      updateEntry: (payload: UpdateEntryPayload) => Promise<UpdateEntryResult>;
     };
   }
 }

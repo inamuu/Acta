@@ -1,18 +1,44 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { markdownToHtml } from "../lib/markdown";
 import { TagInput } from "./TagInput";
 
 type Props = {
   onSubmit: (body: string, tags: string[]) => Promise<void>;
   tagSuggestions?: string[];
+  mode?: "create" | "edit";
+  draftKey?: string;
+  initialBody?: string;
+  initialTags?: string[];
+  onCancel?: () => void;
+  autoFocusEditor?: boolean;
 };
 
-export function Composer({ onSubmit, tagSuggestions }: Props) {
+export function Composer({
+  onSubmit,
+  tagSuggestions,
+  mode = "create",
+  draftKey,
+  initialBody,
+  initialTags,
+  onCancel,
+  autoFocusEditor
+}: Props) {
   const [tags, setTags] = useState<string[]>([]);
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
   const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setTags(Array.isArray(initialTags) ? initialTags : []);
+    setBody(typeof initialBody === "string" ? initialBody : "");
+    setError("");
+  }, [draftKey, initialBody, initialTags]);
+
+  useEffect(() => {
+    if (!autoFocusEditor) return;
+    editorRef.current?.focus();
+  }, [draftKey, autoFocusEditor]);
 
   const previewHtml = useMemo(() => markdownToHtml(body || " "), [body]);
   const canSubmit = body.trim().length > 0 && !submitting;
@@ -23,11 +49,17 @@ export function Composer({ onSubmit, tagSuggestions }: Props) {
     setError("");
     try {
       await onSubmit(body, tags);
-      setBody("");
-      setTags([]);
+      if (mode === "create") {
+        setBody("");
+        setTags([]);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(msg || "保存に失敗しました");
+      if (msg.includes("No handler registered")) {
+        setError("アプリを再起動してください（更新が反映されていない可能性があります）");
+      } else {
+        setError(msg || "保存に失敗しました");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -35,11 +67,27 @@ export function Composer({ onSubmit, tagSuggestions }: Props) {
 
   return (
     <div className="composer">
-      <div className="composerTop">
-        <div className="composerTitle">コメントを追加</div>
-        <button className="primaryBtn" type="button" disabled={!canSubmit} onClick={() => void submit()}>
-          {submitting ? "保存中..." : "追加 (⌘/Ctrl+Enter)"}
-        </button>
+      <div className={`composerTop ${mode === "edit" ? "" : "composerTopCompact"}`}>
+        {mode === "edit" ? <div className="composerTitle">編集中</div> : null}
+
+        <div className="composerActions">
+          {mode === "edit" ? (
+            <button
+              className="ghostBtn"
+              type="button"
+              onClick={() => {
+                setError("");
+                onCancel?.();
+              }}
+            >
+              キャンセル
+            </button>
+          ) : null}
+
+          <button className="primaryBtn" type="button" disabled={!canSubmit} onClick={() => void submit()}>
+            {submitting ? "保存中..." : mode === "edit" ? "更新 (⌘/Ctrl+Enter)" : "追加 (⌘/Ctrl+Enter)"}
+          </button>
+        </div>
       </div>
 
       {error ? <div className="composerError">{error}</div> : null}

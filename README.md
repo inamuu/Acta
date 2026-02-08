@@ -7,6 +7,7 @@ GitHub issue 風の「コメント」UIで、Markdown を日次ファイルへ�
 - タグ入力（区切り: `,` / `、`）→ タグでフィルター
 - 画面上部の検索（`Ctrl+F` / `Cmd+F` でフォーカス）
 - 追記保存（テキスト/Markdown）
+- 既存投稿の編集/削除
 
 ## 保存先
 既定: `~/Documents/Acta/YYYY-MM-DD.md`

@@ -64,6 +64,7 @@ app.whenReady().then(() => {
   ipcMain.handle("acta:listEntries", async () => storage.listEntries());
   ipcMain.handle("acta:addEntry", async (_event, payload) => storage.addEntry(payload));
   ipcMain.handle("acta:deleteEntry", async (_event, payload) => storage.deleteEntry(payload));
+  ipcMain.handle("acta:updateEntry", async (_event, payload) => storage.updateEntry(payload));
 
   createWindow();
 

@@ -5,6 +5,7 @@ import { markdownToHtml } from "../lib/markdown";
 type Props = {
   entry: ActaEntry;
   onClickTag?: (tag: string) => void;
+  onEdit?: (entry: ActaEntry) => void;
   onDelete?: (entry: ActaEntry) => void;
 };
 
@@ -23,7 +24,7 @@ function formatWhen(ms: number): string {
   }
 }
 
-export function CommentCard({ entry, onClickTag, onDelete }: Props) {
+export function CommentCard({ entry, onClickTag, onEdit, onDelete }: Props) {
   const html = useMemo(() => markdownToHtml(entry.body), [entry.body]);
   const when = formatWhen(entry.createdAtMs);
 
@@ -37,6 +38,9 @@ export function CommentCard({ entry, onClickTag, onDelete }: Props) {
                 <span className="commentDate">{entry.date}</span>
                 {when ? <span className="commentWhen">{when}</span> : null}
               </span>
+              <button className="ghostBtn" type="button" onClick={() => onEdit?.(entry)} title="編集">
+                編集
+              </button>
               <button
                 className="dangerGhostBtn"
                 type="button"

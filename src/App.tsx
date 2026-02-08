@@ -23,6 +23,7 @@ export function App() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [appError, setAppError] = useState<string>("");
+  const [editing, setEditing] = useState<ActaEntry | null>(null);
   const [limit, setLimit] = useState<number>(() => {
     try {
       const raw = localStorage.getItem("acta:limit");
@@ -113,7 +114,8 @@ export function App() {
       for (const t of e.tags || []) map.set(t, (map.get(t) || 0) + 1);
     }
     const stats: TagStat[] = Array.from(map.entries()).map(([tag, count]) => ({ tag, count }));
-    stats.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, "ja"));
+    // 使う場面が多いので、タグ一覧は名前順で固定。
+    stats.sort((a, b) => a.tag.localeCompare(b.tag, "ja"));
     return { tagStats: stats, untaggedCount: untagged };
   }, [entries]);
 
@@ -226,6 +228,7 @@ export function App() {
                     if (!res || res.canceled) return;
                     setDataDir(res.dataDir);
                     setSelectedTag(null);
+                    setEditing(null);
                     setAppError("");
                     await reload();
                   } catch (e) {
@@ -246,8 +249,20 @@ export function App() {
           {appError ? <div className="appError">{appError}</div> : null}
           <Composer
             tagSuggestions={tagSuggestions}
+            mode={editing ? "edit" : "create"}
+            draftKey={editing?.id || "create"}
+            initialBody={editing?.body || ""}
+            initialTags={editing?.tags || []}
+            autoFocusEditor={Boolean(editing)}
+            onCancel={() => setEditing(null)}
             onSubmit={async (body, tags) => {
-              await api.addEntry({ body, tags });
+              if (editing) {
+                const res = await api.updateEntry({ id: editing.id, body, tags });
+                if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
+                setEditing(null);
+              } else {
+                await api.addEntry({ body, tags });
+              }
               await reload();
             }}
           />
@@ -265,11 +280,16 @@ export function App() {
                   key={e.id}
                   entry={e}
                   onClickTag={(t) => setSelectedTag(t)}
+                  onEdit={(entry) => {
+                    setEditing(entry);
+                    setAppError("");
+                  }}
                   onDelete={async (entry) => {
                     const ok = window.confirm("この投稿を削除しますか？");
                     if (!ok) return;
 
                     try {
+                      if (editing?.id === entry.id) setEditing(null);
                       const res = await api.deleteEntry({ id: entry.id });
                       if (!res?.deleted) {
                         setAppError("削除対象が見つかりませんでした");

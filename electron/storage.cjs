@@ -205,6 +205,50 @@ function removeEntryFromText(text, id) {
   return { changed, nextText: out };
 }
 
+function updateEntryInText(text, id, nextBody, nextTags) {
+  const t = normalizeNewlines(text);
+  const re = /<!--\s*acta:comment\s*\n([\s\S]*?)-->\n([\s\S]*?)\n<!--\s*\/acta:comment\s*-->\n*/g;
+
+  let changed = false;
+  let out = "";
+  let last = 0;
+
+  let match;
+  while ((match = re.exec(t)) !== null) {
+    const full = match[0] ?? "";
+    const metaBlock = match[1] ?? "";
+
+    const meta = {};
+    for (const line of metaBlock.split("\n")) {
+      const m = /^\s*([a-zA-Z0-9_]+)\s*:\s*(.*?)\s*$/.exec(line);
+      if (!m) continue;
+      meta[m[1]] = m[2];
+    }
+
+    const matchId = String(meta.id ?? "");
+
+    out += t.slice(last, match.index);
+    if (matchId === id) {
+      changed = true;
+      const created = meta.created || "";
+      const createdAtMs = Number(meta.created_ms) || parseCreatedToMs(created) || 0;
+      out += formatEntryBlock({
+        id,
+        created: created || "",
+        createdAtMs,
+        tags: Array.isArray(nextTags) ? nextTags : [],
+        body: nextBody
+      });
+    } else {
+      out += full;
+    }
+    last = re.lastIndex;
+  }
+
+  out += t.slice(last);
+  return { changed, nextText: out };
+}
+
 async function listEntries() {
   await ensureDataDir();
 
@@ -325,10 +369,50 @@ async function deleteEntry(payload) {
   return { deleted: false };
 }
 
+async function updateEntry(payload) {
+  const id = String(payload?.id ?? "").trim();
+  const body = String(payload?.body ?? "").trim();
+  const tags = Array.isArray(payload?.tags) ? payload.tags : [];
+  const cleanTags = Array.from(new Set(tags.map(normalizeTag).filter(Boolean)));
+
+  if (!id) throw new Error("id が不正です");
+  if (!body) throw new Error("本文が空です");
+
+  await ensureDataDir();
+
+  let names = [];
+  try {
+    names = await fs.promises.readdir(getDataDir());
+  } catch {
+    return { updated: false };
+  }
+
+  const files = names.filter((n) => DATE_FILE_RE.test(n)).sort();
+
+  for (const file of files) {
+    const p = path.join(getDataDir(), file);
+    let text = "";
+    try {
+      text = await fs.promises.readFile(p, "utf8");
+    } catch {
+      continue;
+    }
+
+    const { changed, nextText } = updateEntryInText(text, id, body, cleanTags);
+    if (!changed) continue;
+
+    await fs.promises.writeFile(p, nextText, "utf8");
+    return { updated: true };
+  }
+
+  return { updated: false };
+}
+
 module.exports = {
   getDataDir,
   setDataDir,
   listEntries,
   addEntry,
-  deleteEntry
+  deleteEntry,
+  updateEntry
 };

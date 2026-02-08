@@ -65,8 +65,10 @@ export function TagSidebar({ selectedTag, totalCount, tagStats, untaggedCount, o
 
       <div className="tagDivider" />
 
-      {visibleTagStats.length === 0 ? (
+      {tagStats.length === 0 ? (
         <div className="tagEmpty">まだタグがありません</div>
+      ) : visibleTagStats.length === 0 ? (
+        <div className="tagEmpty">該当するタグがありません</div>
       ) : (
         visibleTagStats.map((t) => (
           <button
