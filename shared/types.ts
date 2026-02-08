@@ -13,3 +13,7 @@ export type AddEntryPayload = {
   tags: string[];
 };
 
+export type ChooseDataDirResult = {
+  canceled: boolean;
+  dataDir: string;
+};

@@ -4,6 +4,15 @@ const crypto = require("node:crypto");
 const { app } = require("electron");
 
 const DATE_FILE_RE = /^\d{4}-\d{2}-\d{2}\.md$/;
+const SETTINGS_FILE = "acta-settings.json";
+
+function safeJsonParse(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
 
 function pad2(n) {
   return String(n).padStart(2, "0");
@@ -65,9 +74,50 @@ function parseTags(raw) {
   return Array.from(new Set(parts));
 }
 
-function getDataDir() {
+function getDefaultDataDir() {
   // Keep files user-visible.
   return path.join(app.getPath("documents"), "Acta");
+}
+
+function getSettingsPath() {
+  return path.join(app.getPath("userData"), SETTINGS_FILE);
+}
+
+let cachedSettings = null;
+
+function loadSettings() {
+  if (cachedSettings) return cachedSettings;
+  try {
+    const raw = fs.readFileSync(getSettingsPath(), "utf8");
+    const parsed = safeJsonParse(raw);
+    cachedSettings = parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    cachedSettings = {};
+  }
+  return cachedSettings;
+}
+
+function saveSettings(next) {
+  cachedSettings = next && typeof next === "object" ? next : {};
+  fs.mkdirSync(path.dirname(getSettingsPath()), { recursive: true });
+  fs.writeFileSync(getSettingsPath(), JSON.stringify(cachedSettings, null, 2), "utf8");
+}
+
+function getDataDir() {
+  const s = loadSettings();
+  const dir = typeof s.dataDir === "string" ? s.dataDir.trim() : "";
+  return dir ? dir : getDefaultDataDir();
+}
+
+async function setDataDir(dir) {
+  const nextDir = String(dir ?? "").trim();
+  if (!nextDir) throw new Error("保存先が不正です");
+
+  await fs.promises.mkdir(nextDir, { recursive: true });
+
+  const s = loadSettings();
+  saveSettings({ ...s, dataDir: nextDir });
+  return getDataDir();
 }
 
 async function ensureDataDir() {
@@ -207,6 +257,7 @@ async function addEntry(payload) {
 
 module.exports = {
   getDataDir,
+  setDataDir,
   listEntries,
   addEntry
 };

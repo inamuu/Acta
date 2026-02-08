@@ -1,16 +1,18 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { markdownToHtml } from "../lib/markdown";
 import { TagInput } from "./TagInput";
 
 type Props = {
   onSubmit: (body: string, tags: string[]) => Promise<void>;
+  tagSuggestions?: string[];
 };
 
-export function Composer({ onSubmit }: Props) {
+export function Composer({ onSubmit, tagSuggestions }: Props) {
   const [tags, setTags] = useState<string[]>([]);
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
+  const editorRef = useRef<HTMLTextAreaElement>(null);
 
   const previewHtml = useMemo(() => markdownToHtml(body || " "), [body]);
   const canSubmit = body.trim().length > 0 && !submitting;
@@ -42,12 +44,18 @@ export function Composer({ onSubmit }: Props) {
 
       {error ? <div className="composerError">{error}</div> : null}
 
-      <TagInput tags={tags} onChangeTags={setTags} />
+      <TagInput
+        tags={tags}
+        onChangeTags={setTags}
+        suggestions={tagSuggestions}
+        onTabToNext={() => editorRef.current?.focus()}
+      />
 
       <div className="composerGrid">
         <div className="pane">
           <div className="paneTitle">Write</div>
           <textarea
+            ref={editorRef}
             className="editor"
             value={body}
             onChange={(e) => setBody(e.target.value)}

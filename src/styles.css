@@ -93,6 +93,14 @@ body {
   justify-content: center;
 }
 
+.topbarControls {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
 .topbarRight {
   display: flex;
   flex-direction: column;
@@ -104,6 +112,12 @@ body {
 .dataDirLabel {
   font-size: 11px;
   color: var(--muted);
+}
+
+.dataDirHeader {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .dataDirValue {
@@ -154,6 +168,46 @@ body {
 
 .searchClear:hover {
   background: rgba(18, 26, 40, 0.1);
+}
+
+.limitPicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.9);
+  height: 40px;
+}
+
+.limitLabel {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 720;
+}
+
+.limitSelect {
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: var(--fg1);
+  cursor: pointer;
+}
+
+.ghostBtn {
+  border: 1px solid rgba(18, 26, 40, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--fg1);
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.ghostBtn:hover {
+  background: rgba(18, 26, 40, 0.06);
 }
 
 .scrollArea {
@@ -387,10 +441,20 @@ body {
 
 /* composer */
 .composerArea {
-  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(12px);
   padding: 14px 20px 18px;
+}
+
+.appError {
+  border: 1px solid rgba(209, 36, 47, 0.22);
+  background: rgba(209, 36, 47, 0.06);
+  color: #8a0f19;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 12px;
 }
 
 .composer {
@@ -456,6 +520,27 @@ body {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.tagSuggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tagSuggestionPill {
+  border: 1px dashed rgba(11, 111, 255, 0.28);
+  background: rgba(11, 111, 255, 0.06);
+  color: var(--tagFg);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tagSuggestionPill:hover {
+  background: rgba(11, 111, 255, 0.12);
 }
 
 .tagChip {
@@ -579,6 +664,17 @@ body {
   }
   .topbar {
     grid-template-columns: 1fr;
+  }
+  .topbarControls {
+    max-width: none;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .search {
+    max-width: none;
+  }
+  .limitPicker {
+    justify-content: space-between;
   }
   .topbarRight {
     align-items: flex-start;

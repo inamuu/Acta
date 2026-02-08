@@ -22,13 +22,31 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [appError, setAppError] = useState<string>("");
+  const [limit, setLimit] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem("acta:limit");
+      const n = raw ? Number(raw) : 20;
+      const ok = [0, 10, 20, 50, 100].includes(n);
+      return ok ? n : 20;
+    } catch {
+      return 20;
+    }
+  });
 
   const searchRef = useRef<HTMLInputElement>(null);
 
   async function reload() {
     if (!api) return;
-    const list = await api.listEntries();
-    setEntries(list);
+    try {
+      const list = await api.listEntries();
+      setEntries(list);
+      setAppError("");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setEntries([]);
+      setAppError(msg || "読み込みに失敗しました");
+    }
   }
 
   useEffect(() => {
@@ -37,11 +55,24 @@ export function App() {
     async function boot() {
       if (!api) return;
       setLoading(true);
+      setAppError("");
       try {
-        const [dir, list] = await Promise.all([api.getDataDir(), api.listEntries()]);
+        const [dirRes, listRes] = await Promise.allSettled([api.getDataDir(), api.listEntries()]);
         if (cancelled) return;
-        setDataDir(dir);
-        setEntries(list);
+
+        if (dirRes.status === "fulfilled") {
+          setDataDir(dirRes.value);
+        } else {
+          setDataDir("");
+        }
+
+        if (listRes.status === "fulfilled") {
+          setEntries(listRes.value);
+        } else {
+          const msg = listRes.reason instanceof Error ? listRes.reason.message : String(listRes.reason);
+          setEntries([]);
+          setAppError(msg || "起動に失敗しました");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -52,6 +83,14 @@ export function App() {
       cancelled = true;
     };
   }, [api]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("acta:limit", String(limit));
+    } catch {
+      // ignore
+    }
+  }, [limit]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -98,6 +137,13 @@ export function App() {
     });
   }, [entries, query, selectedTag]);
 
+  const visibleEntries = useMemo(() => {
+    if (!limit || limit <= 0) return filteredEntries;
+    return filteredEntries.slice(0, limit);
+  }, [filteredEntries, limit]);
+
+  const tagSuggestions = useMemo(() => tagStats.map((t) => t.tag), [tagStats]);
+
   if (!api) {
     return (
       <div className="noApi">
@@ -131,27 +177,82 @@ export function App() {
           </div>
 
           <div className="topbarCenter">
-            <div className="search">
-              <input
-                ref={searchRef}
-                className="searchInput"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="検索 (Ctrl+F)"
-              />
-              {query ? (
-                <button className="searchClear" type="button" onClick={() => setQuery("")} title="クリア">
-                  ×
-                </button>
-              ) : null}
+            <div className="topbarControls">
+              <div className="search">
+                <input
+                  ref={searchRef}
+                  className="searchInput"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="検索 (Ctrl+F)"
+                />
+                {query ? (
+                  <button
+                    className="searchClear"
+                    type="button"
+                    onClick={() => setQuery("")}
+                    title="クリア"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="limitPicker" title="表示件数">
+                <div className="limitLabel">表示</div>
+                <select
+                  className="limitSelect"
+                  value={String(limit)}
+                  onChange={(e) => setLimit(Number(e.target.value))}
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="0">すべて</option>
+                </select>
+              </div>
             </div>
           </div>
 
           <div className="topbarRight" title={dataDir}>
-            <div className="dataDirLabel">保存先</div>
+            <div className="dataDirHeader">
+              <div className="dataDirLabel">保存先</div>
+              <button
+                className="ghostBtn"
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await api.chooseDataDir();
+                    if (!res || res.canceled) return;
+                    setDataDir(res.dataDir);
+                    setSelectedTag(null);
+                    setAppError("");
+                    await reload();
+                  } catch (e) {
+                    const msg = e instanceof Error ? e.message : String(e);
+                    setAppError(msg || "保存先の変更に失敗しました");
+                  }
+                }}
+                title="保存先を変更"
+              >
+                変更
+              </button>
+            </div>
             <div className="dataDirValue">{dataDir || "..."}</div>
           </div>
         </header>
+
+        <section className="composerArea">
+          {appError ? <div className="appError">{appError}</div> : null}
+          <Composer
+            tagSuggestions={tagSuggestions}
+            onSubmit={async (body, tags) => {
+              await api.addEntry({ body, tags });
+              await reload();
+            }}
+          />
+        </section>
 
         <div className="scrollArea">
           <div className="commentList">
@@ -160,21 +261,10 @@ export function App() {
             ) : filteredEntries.length === 0 ? (
               <div className="empty">該当するコメントがありません</div>
             ) : (
-              filteredEntries.map((e) => (
-                <CommentCard key={e.id} entry={e} onClickTag={(t) => setSelectedTag(t)} />
-              ))
+              visibleEntries.map((e) => <CommentCard key={e.id} entry={e} onClickTag={(t) => setSelectedTag(t)} />)
             )}
           </div>
         </div>
-
-        <footer className="composerArea">
-          <Composer
-            onSubmit={async (body, tags) => {
-              await api.addEntry({ body, tags });
-              await reload();
-            }}
-          />
-        </footer>
       </main>
     </div>
   );

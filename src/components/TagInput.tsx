@@ -14,9 +14,11 @@ function splitBySeparators(raw: string): string[] {
 type Props = {
   tags: string[];
   onChangeTags: (tags: string[]) => void;
+  suggestions?: string[];
+  onTabToNext?: () => void;
 };
 
-export function TagInput({ tags, onChangeTags }: Props) {
+export function TagInput({ tags, onChangeTags, suggestions, onTabToNext }: Props) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -43,6 +45,12 @@ export function TagInput({ tags, onChangeTags }: Props) {
     if (t) onChangeTags(addTagToList(tags, t));
     setDraft("");
   }
+
+  const q = normalizeTag(draft).toLowerCase();
+  const visibleSuggestions = (suggestions || [])
+    .filter((t) => !tags.includes(t))
+    .filter((t) => (q ? t.toLowerCase().includes(q) : true))
+    .slice(0, 18);
 
   return (
     <div className="tagInputWrap" onClick={() => inputRef.current?.focus()}>
@@ -78,9 +86,15 @@ export function TagInput({ tags, onChangeTags }: Props) {
           }}
           onBlur={() => commitCurrent()}
           onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === "Tab") {
+            if (e.key === "Enter") {
               e.preventDefault();
               commitCurrent();
+              return;
+            }
+            if (e.key === "Tab" && !e.shiftKey) {
+              e.preventDefault();
+              commitCurrent();
+              onTabToNext?.();
               return;
             }
             if (e.key === "Backspace" && draft.length === 0 && tags.length > 0) {
@@ -91,6 +105,32 @@ export function TagInput({ tags, onChangeTags }: Props) {
           placeholder={tags.length === 0 ? "例: 日記, 仕事、メモ" : ""}
         />
       </div>
+
+      {visibleSuggestions.length > 0 ? (
+        <div className="tagSuggestions" aria-label="既存タグ候補">
+          {visibleSuggestions.map((t) => (
+            <button
+              key={t}
+              type="button"
+              className="tagSuggestionPill"
+              onMouseDown={(e) => {
+                // Keep focus on the input (avoid triggering input blur commit).
+                e.preventDefault();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onChangeTags(addTagToList(tags, t));
+                setDraft("");
+                inputRef.current?.focus();
+              }}
+              title="クリックで追加"
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const path = require("node:path");
 const storage = require("./storage.cjs");
 
@@ -42,6 +42,25 @@ function createWindow() {
 
 app.whenReady().then(() => {
   ipcMain.handle("acta:getDataDir", async () => storage.getDataDir());
+  ipcMain.handle("acta:chooseDataDir", async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const res = await dialog.showOpenDialog(win, {
+      title: "保存先フォルダを選択",
+      properties: ["openDirectory", "createDirectory"]
+    });
+
+    if (res.canceled) {
+      return { canceled: true, dataDir: storage.getDataDir() };
+    }
+
+    const dir = res.filePaths?.[0];
+    if (!dir) {
+      return { canceled: true, dataDir: storage.getDataDir() };
+    }
+
+    await storage.setDataDir(dir);
+    return { canceled: false, dataDir: storage.getDataDir() };
+  });
   ipcMain.handle("acta:listEntries", async () => storage.listEntries());
   ipcMain.handle("acta:addEntry", async (_event, payload) => storage.addEntry(payload));
 
