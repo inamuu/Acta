@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ActaEntry } from "../shared/types";
 import { CommentCard } from "./components/CommentCard";
 import { Composer } from "./components/Composer";
+import { SettingsModal } from "./components/SettingsModal";
 import { TagSidebar } from "./components/TagSidebar";
 import { installDragScroll } from "./lib/dragScroll";
+import { setTaskCheckedOnLine } from "./lib/taskList";
 
 type TagStat = { tag: string; count: number };
 
@@ -21,10 +23,13 @@ export function App() {
   const [dataDir, setDataDir] = useState<string>("");
   const [entries, setEntries] = useState<ActaEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [untaggedOnly, setUntaggedOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [appError, setAppError] = useState<string>("");
   const [editing, setEditing] = useState<ActaEntry | null>(null);
+  const [draft, setDraft] = useState<{ key: string; body: string; tags: string[] } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [limit, setLimit] = useState<number>(() => {
     try {
       const raw = localStorage.getItem("acta:limit");
@@ -40,12 +45,12 @@ export function App() {
   const sidebarRef = useRef<HTMLElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  async function reload() {
+  async function reload(opts?: { keepError?: boolean }) {
     if (!api) return;
     try {
       const list = await api.listEntries();
       setEntries(list);
-      setAppError("");
+      if (!opts?.keepError) setAppError("");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setEntries([]);
@@ -134,10 +139,12 @@ export function App() {
   const filteredEntries = useMemo(() => {
     const q = normalizeQuery(query);
     return entries.filter((e) => {
-      if (selectedTag === "__UNTAGGED__") {
+      if (untaggedOnly) {
         if (e.tags.length !== 0) return false;
-      } else if (selectedTag) {
-        if (!e.tags.includes(selectedTag)) return false;
+      } else if (selectedTags.length > 0) {
+        for (const t of selectedTags) {
+          if (!e.tags.includes(t)) return false;
+        }
       }
 
       if (!q) return true;
@@ -149,7 +156,7 @@ export function App() {
         includesLoose(e.created, q)
       );
     });
-  }, [entries, query, selectedTag]);
+  }, [entries, query, selectedTags, untaggedOnly]);
 
   const visibleEntries = useMemo(() => {
     if (!limit || limit <= 0) return filteredEntries;
@@ -157,6 +164,29 @@ export function App() {
   }, [filteredEntries, limit]);
 
   const tagSuggestions = useMemo(() => tagStats.map((t) => t.tag), [tagStats]);
+  const popularTagSuggestions = useMemo(() => {
+    const copy = [...tagStats];
+    copy.sort((a, b) => {
+      if (a.count !== b.count) return b.count - a.count;
+      return a.tag.localeCompare(b.tag, "ja");
+    });
+    return copy.slice(0, 10).map((t) => t.tag);
+  }, [tagStats]);
+
+  function clearTagFilter() {
+    setSelectedTags([]);
+    setUntaggedOnly(false);
+  }
+
+  function toggleUntaggedFilter() {
+    setSelectedTags([]);
+    setUntaggedOnly((v) => !v);
+  }
+
+  function toggleTagFilter(tag: string) {
+    setUntaggedOnly(false);
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }
 
   if (!api) {
     return (
@@ -175,11 +205,14 @@ export function App() {
     <div className="shell">
       <aside className="sidebar dragScroll" ref={sidebarRef}>
         <TagSidebar
-          selectedTag={selectedTag}
+          selectedTags={selectedTags}
+          untaggedOnly={untaggedOnly}
           totalCount={entries.length}
           tagStats={tagStats}
           untaggedCount={untaggedCount}
-          onSelectTag={setSelectedTag}
+          onToggleTag={toggleTagFilter}
+          onSelectAll={clearTagFilter}
+          onToggleUntagged={toggleUntaggedFilter}
         />
       </aside>
 
@@ -231,27 +264,6 @@ export function App() {
           <div className="topbarRight" title={dataDir}>
             <div className="dataDirHeader">
               <div className="dataDirLabel">保存先</div>
-              <button
-                className="ghostBtn"
-                type="button"
-                onClick={async () => {
-                  try {
-                    const res = await api.chooseDataDir();
-                    if (!res || res.canceled) return;
-                    setDataDir(res.dataDir);
-                    setSelectedTag(null);
-                    setEditing(null);
-                    setAppError("");
-                    await reload();
-                  } catch (e) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    setAppError(msg || "保存先の変更に失敗しました");
-                  }
-                }}
-                title="保存先を変更"
-              >
-                変更
-              </button>
             </div>
             <div className="dataDirValue">{dataDir || "..."}</div>
           </div>
@@ -261,11 +273,12 @@ export function App() {
           {appError ? <div className="appError">{appError}</div> : null}
           <Composer
             tagSuggestions={tagSuggestions}
+            popularTagSuggestions={popularTagSuggestions}
             mode={editing ? "edit" : "create"}
-            draftKey={editing?.id || "create"}
-            initialBody={editing?.body || ""}
-            initialTags={editing?.tags || []}
-            autoFocusEditor={Boolean(editing)}
+            draftKey={editing?.id ?? draft?.key ?? "create"}
+            initialBody={editing?.body ?? draft?.body ?? ""}
+            initialTags={editing?.tags ?? draft?.tags ?? []}
+            autoFocusEditor={Boolean(editing || draft)}
             onCancel={() => setEditing(null)}
             onSubmit={async (body, tags) => {
               if (editing) {
@@ -275,6 +288,7 @@ export function App() {
               } else {
                 await api.addEntry({ body, tags });
               }
+              setDraft(null);
               await reload();
             }}
           />
@@ -291,10 +305,34 @@ export function App() {
                 <CommentCard
                   key={e.id}
                   entry={e}
-                  onClickTag={(t) => setSelectedTag(t)}
+                  onClickTag={(t) => toggleTagFilter(t)}
                   onEdit={(entry) => {
                     setEditing(entry);
+                    setDraft(null);
                     setAppError("");
+                  }}
+                  onCopy={(entry) => {
+                    setEditing(null);
+                    setDraft({ key: `copy:${entry.id}:${Date.now()}`, body: entry.body, tags: entry.tags });
+                    setAppError("");
+                  }}
+                  onToggleTask={async (entry, line0, checked) => {
+                    const nextBody = setTaskCheckedOnLine(entry.body, line0, checked);
+                    if (!nextBody) return;
+                    try {
+                      const res = await api.updateEntry({ id: entry.id, body: nextBody, tags: entry.tags });
+                      if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
+                      setAppError("");
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : String(err);
+                      if (msg.includes("No handler registered")) {
+                        setAppError("アプリを再起動してください（更新が反映されていない可能性があります）");
+                      } else {
+                        setAppError(msg || "更新に失敗しました");
+                      }
+                    } finally {
+                      await reload({ keepError: true });
+                    }
                   }}
                   onDelete={async (entry) => {
                     const ok = window.confirm("この投稿を削除しますか？");
@@ -324,6 +362,33 @@ export function App() {
           </div>
         </div>
       </main>
+
+      <button className="settingsFab" type="button" onClick={() => setSettingsOpen(true)} title="設定">
+        設定
+      </button>
+
+              {settingsOpen ? (
+        <SettingsModal
+          dataDir={dataDir}
+          onClose={() => setSettingsOpen(false)}
+          onChooseDataDir={async () => {
+            try {
+              const res = await api.chooseDataDir();
+              if (!res || res.canceled) return;
+              setDataDir(res.dataDir);
+              clearTagFilter();
+              setEditing(null);
+              setDraft(null);
+              setAppError("");
+              setSettingsOpen(false);
+              await reload();
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              setAppError(msg || "保存先の変更に失敗しました");
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

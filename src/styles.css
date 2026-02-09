@@ -92,7 +92,7 @@ a:focus-visible {
 
 .sidebar {
   border-right: 1px solid var(--borderSoft);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.52));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.44));
   backdrop-filter: blur(14px) saturate(1.15);
   padding: 18px 14px;
   overflow: auto;
@@ -111,7 +111,7 @@ a:focus-visible {
   align-items: center;
   padding: 16px 20px;
   border-bottom: 1px solid var(--borderSoft);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.58));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.5));
   backdrop-filter: blur(14px) saturate(1.2);
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.07);
   /* Allow dragging the window on macOS when using titleBarStyle hidden/hiddenInset. */
@@ -192,7 +192,7 @@ a:focus-visible {
   padding: 0 44px 0 14px;
   border-radius: 999px;
   border: 1px solid var(--borderSoft);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.72);
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
   font-size: 14px;
   outline: none;
@@ -229,7 +229,7 @@ a:focus-visible {
   padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid var(--borderSoft);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.72);
   height: 40px;
 }
 
@@ -426,15 +426,92 @@ a:focus-visible {
   font-size: 13px;
 }
 
+.tagGroup {
+  margin: 0 0 10px;
+}
+
+.tagGroupHeader {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.46);
+  border-radius: 12px;
+  padding: 8px 10px 8px 12px;
+  cursor: pointer;
+  color: var(--fg1);
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.tagGroupHeader:hover {
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(15, 23, 42, 0.1);
+  transform: translateY(-1px);
+}
+
+.tagGroupHeader::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(15, 23, 42, 0.44);
+  border-bottom: 2px solid rgba(15, 23, 42, 0.44);
+  transform: rotate(-45deg);
+  border-radius: 1px;
+}
+
+.tagGroupHeader.isOpen::before {
+  transform: rotate(45deg);
+}
+
+.tagGroupHeader.isActive {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.18);
+}
+
+.tagGroupHeader.isActive::before {
+  border-right-color: rgba(37, 99, 235, 0.7);
+  border-bottom-color: rgba(37, 99, 235, 0.7);
+}
+
+.tagGroupHeader.isActive .tagGroupName {
+  color: var(--accent);
+}
+
+.tagGroupHeader.isActive .tagCount {
+  border-color: rgba(37, 99, 235, 0.16);
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--accent);
+}
+
+.tagGroupName {
+  flex: 1;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 760;
+  color: var(--fg1);
+  letter-spacing: 0.03em;
+}
+
+.tagGroup .tagItem {
+  padding-left: 26px;
+}
+
+.tagGroup .tagItem.isSelected::before {
+  left: 18px;
+}
+
 /* comment cards */
 .commentCard {
   border-radius: var(--radius);
   border: 1px solid transparent;
-  background: linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.76)) padding-box,
+  background: linear-gradient(rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.64)) padding-box,
     linear-gradient(135deg, rgba(6, 182, 212, 0.35), rgba(37, 99, 235, 0.2), rgba(61, 190, 150, 0.18))
       border-box;
   box-shadow: var(--shadowSm);
   overflow: hidden;
+  backdrop-filter: blur(16px) saturate(1.15);
   animation: riseIn 220ms ease-out both;
   transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
@@ -460,7 +537,7 @@ a:focus-visible {
   gap: 12px;
   padding: 14px 16px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.76));
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.68));
 }
 
 .commentHeaderMain {
@@ -568,6 +645,17 @@ a:focus-visible {
   border-radius: 6px;
 }
 
+.md li.taskListItem {
+  list-style: none;
+}
+
+.md input.taskListCheckbox {
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin-right: 0.45em;
+  transform: translateY(1px);
+}
+
 .md .mermaid {
   background: rgba(15, 23, 42, 0.05);
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -607,7 +695,7 @@ a:focus-visible {
 /* composer */
 .composerArea {
   border-bottom: 1px solid var(--borderSoft);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.78));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(255, 255, 255, 0.7));
   backdrop-filter: blur(16px) saturate(1.2);
   padding: 14px 20px 18px;
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
@@ -649,6 +737,7 @@ a:focus-visible {
 .composerTitle {
   font-weight: 760;
   letter-spacing: -0.01em;
+  margin: 2px 0 2px;
 }
 
 .composerError {
@@ -692,10 +781,11 @@ a:focus-visible {
 
 .tagInputWrap {
   border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.78);
   border-radius: var(--radius);
   padding: 10px 12px;
   box-shadow: var(--shadowSm);
+  backdrop-filter: blur(14px) saturate(1.15);
   transition: box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
@@ -785,6 +875,7 @@ a:focus-visible {
   gap: 8px;
   max-height: 120px;
   overflow: auto;
+  margin-top: 10px;
   padding: 6px;
   border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -875,14 +966,23 @@ a:focus-visible {
 
 .pane {
   border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.76);
   border-radius: var(--radius);
   overflow: hidden;
   min-height: 210px;
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadowSm);
+  backdrop-filter: blur(16px) saturate(1.15);
   transition: box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.paneWrite {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.7));
+}
+
+.panePreview {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.64));
 }
 
 .pane:focus-within {
@@ -905,13 +1005,26 @@ a:focus-visible {
   min-height: 320px;
   max-height: 520px;
   resize: none;
-  border: 0;
+  border: 1px solid rgba(15, 23, 42, 0.08);
   outline: none;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.9);
   padding: 12px;
   font-size: 13px;
   line-height: 1.6;
   font-family: var(--mono);
+}
+
+.paneWrite:focus-within .editor {
+  border-color: rgba(37, 99, 235, 0.22);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.previewWrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .preview {
@@ -920,6 +1033,156 @@ a:focus-visible {
   max-height: 520px;
   padding: 12px;
   overflow: auto;
+  padding-bottom: 64px;
+}
+
+.previewActions {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px) saturate(1.15);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+}
+
+.settingsFab {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 60;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--fg1);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 760;
+  backdrop-filter: blur(14px) saturate(1.1);
+  box-shadow: var(--shadowSm);
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.settingsFab:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(15, 23, 42, 0.18);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.settingsFab:active {
+  transform: translateY(0);
+  box-shadow: var(--shadowSm);
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(6px);
+}
+
+.modalCard {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadowLg);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.74));
+}
+
+.modalTitle {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.modalClose {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--fg1);
+  cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.modalClose:hover {
+  background: rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.modalBody {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settingBlock {
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(15, 23, 42, 0.03);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.settingLabel {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 760;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.settingRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.settingValue {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg1);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+  border-radius: 12px;
+  padding: 8px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingHint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 0 4px;
 }
 
 /* noApi */
@@ -959,12 +1222,15 @@ a:focus-visible {
   }
 
   .tagItem,
+  .tagGroupHeader,
   .ghostBtn,
   .primaryBtn,
   .tagPill,
   .dangerGhostBtn,
   .tagSuggestionPill,
-  .tagPickerMore {
+  .tagPickerMore,
+  .modalClose,
+  .settingsFab {
     transition: none;
   }
 }

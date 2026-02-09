@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { markdownToHtml } from "../lib/markdown";
 import { renderMermaid } from "../lib/mermaid";
+import { setTaskCheckedOnLine } from "../lib/taskList";
 import { TagInput } from "./TagInput";
 
 type Props = {
   onSubmit: (body: string, tags: string[]) => Promise<void>;
   tagSuggestions?: string[];
+  popularTagSuggestions?: string[];
   mode?: "create" | "edit";
   draftKey?: string;
   initialBody?: string;
@@ -17,6 +19,7 @@ type Props = {
 export function Composer({
   onSubmit,
   tagSuggestions,
+  popularTagSuggestions,
   mode = "create",
   draftKey,
   initialBody,
@@ -75,28 +78,7 @@ export function Composer({
 
   return (
     <div className="composer">
-      <div className={`composerTop ${mode === "edit" ? "" : "composerTopCompact"}`}>
-        {mode === "edit" ? <div className="composerTitle">編集中</div> : null}
-
-        <div className="composerActions">
-          {mode === "edit" ? (
-            <button
-              className="ghostBtn"
-              type="button"
-              onClick={() => {
-                setError("");
-                onCancel?.();
-              }}
-            >
-              キャンセル
-            </button>
-          ) : null}
-
-          <button className="primaryBtn" type="button" disabled={!canSubmit} onClick={() => void submit()}>
-            {submitting ? "保存中..." : mode === "edit" ? "更新 (⌘/Ctrl+Enter)" : "追加 (⌘/Ctrl+Enter)"}
-          </button>
-        </div>
-      </div>
+      {mode === "edit" ? <div className="composerTitle">編集中</div> : null}
 
       {error ? <div className="composerError">{error}</div> : null}
 
@@ -104,11 +86,12 @@ export function Composer({
         tags={tags}
         onChangeTags={setTags}
         suggestions={tagSuggestions}
+        popularSuggestions={popularTagSuggestions}
         onTabToNext={() => editorRef.current?.focus()}
       />
 
       <div className="composerGrid">
-        <div className="pane">
+        <div className="pane paneWrite">
           <div className="paneTitle">Write</div>
           <textarea
             ref={editorRef}
@@ -127,9 +110,49 @@ export function Composer({
           />
         </div>
 
-        <div className="pane">
+        <div className="pane panePreview">
           <div className="paneTitle">Preview</div>
-          <div ref={previewRef} className="preview md" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          <div className="previewWrap">
+            <div
+              ref={previewRef}
+              className="preview md"
+              onChange={(e) => {
+                const t = e.target;
+                if (!(t instanceof HTMLInputElement)) return;
+                if (t.type !== "checkbox") return;
+                const line0 = Number(t.dataset.taskLine);
+                if (!Number.isFinite(line0)) return;
+                const next = setTaskCheckedOnLine(body, line0, t.checked);
+                if (typeof next === "string") setBody(next);
+              }}
+              dangerouslySetInnerHTML={{ __html: previewHtml }}
+            />
+
+            <div className="previewActions">
+              {mode === "edit" ? (
+                <button
+                  className="ghostBtn"
+                  type="button"
+                  onClick={() => {
+                    setError("");
+                    onCancel?.();
+                  }}
+                >
+                  キャンセル
+                </button>
+              ) : null}
+
+              <button
+                className="primaryBtn"
+                type="button"
+                title="⌘/Ctrl+Enter でも保存できます"
+                disabled={!canSubmit}
+                onClick={() => void submit()}
+              >
+                {submitting ? "保存中..." : mode === "edit" ? "更新" : "追加"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

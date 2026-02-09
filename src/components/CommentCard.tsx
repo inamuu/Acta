@@ -7,7 +7,9 @@ type Props = {
   entry: ActaEntry;
   onClickTag?: (tag: string) => void;
   onEdit?: (entry: ActaEntry) => void;
+  onCopy?: (entry: ActaEntry) => void;
   onDelete?: (entry: ActaEntry) => void;
+  onToggleTask?: (entry: ActaEntry, line0: number, checked: boolean) => void | Promise<void>;
 };
 
 function formatWhen(ms: number): string {
@@ -25,7 +27,7 @@ function formatWhen(ms: number): string {
   }
 }
 
-export function CommentCard({ entry, onClickTag, onEdit, onDelete }: Props) {
+export function CommentCard({ entry, onClickTag, onEdit, onCopy, onDelete, onToggleTask }: Props) {
   const html = useMemo(() => markdownToHtml(entry.body), [entry.body]);
   const when = formatWhen(entry.createdAtMs);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -48,6 +50,14 @@ export function CommentCard({ entry, onClickTag, onEdit, onDelete }: Props) {
               </span>
               <button className="ghostBtn" type="button" onClick={() => onEdit?.(entry)} title="編集">
                 編集
+              </button>
+              <button
+                className="ghostBtn"
+                type="button"
+                onClick={() => onCopy?.(entry)}
+                title="入力欄にコピー"
+              >
+                コピー
               </button>
               <button
                 className="dangerGhostBtn"
@@ -79,7 +89,19 @@ export function CommentCard({ entry, onClickTag, onEdit, onDelete }: Props) {
       </div>
 
       <div className="commentBody">
-        <div ref={bodyRef} className="md" dangerouslySetInnerHTML={{ __html: html }} />
+        <div
+          ref={bodyRef}
+          className="md"
+          onChange={(e) => {
+            const t = e.target;
+            if (!(t instanceof HTMLInputElement)) return;
+            if (t.type !== "checkbox") return;
+            const line0 = Number(t.dataset.taskLine);
+            if (!Number.isFinite(line0)) return;
+            void onToggleTask?.(entry, line0, t.checked);
+          }}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
       </div>
     </article>
   );

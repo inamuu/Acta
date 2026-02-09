@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 
 function normalizeTag(raw: string): string {
   return String(raw ?? "")
@@ -15,13 +15,13 @@ type Props = {
   tags: string[];
   onChangeTags: (tags: string[]) => void;
   suggestions?: string[];
+  popularSuggestions?: string[];
   onTabToNext?: () => void;
 };
 
-export function TagInput({ tags, onChangeTags, suggestions, onTabToNext }: Props) {
+export function TagInput({ tags, onChangeTags, suggestions, popularSuggestions, onTabToNext }: Props) {
   const [draft, setDraft] = useState("");
-  const [pickerQuery, setPickerQuery] = useState("");
-  const [pickerLimit, setPickerLimit] = useState(60);
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function addTagToList(list: string[], raw: string): string[] {
@@ -48,10 +48,6 @@ export function TagInput({ tags, onChangeTags, suggestions, onTabToNext }: Props
     setDraft("");
   }
 
-  useEffect(() => {
-    setPickerLimit(60);
-  }, [pickerQuery]);
-
   const pickerItemsAll = useMemo(() => {
     const list = (suggestions || []).map((t) => normalizeTag(t)).filter(Boolean);
     const uniq = Array.from(new Set(list));
@@ -59,23 +55,38 @@ export function TagInput({ tags, onChangeTags, suggestions, onTabToNext }: Props
     return uniq;
   }, [suggestions]);
 
-  const pickerTotal = useMemo(() => {
-    const q = pickerQuery.trim().toLocaleLowerCase();
-    const filtered = pickerItemsAll.filter((t) => !tags.includes(t)).filter((t) => (q ? t.toLocaleLowerCase().includes(q) : true));
-    return filtered.length;
-  }, [pickerItemsAll, pickerQuery, tags]);
+  const popularItems = useMemo(() => {
+    const list = (popularSuggestions || []).map((t) => normalizeTag(t)).filter(Boolean);
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const t of list) {
+      if (seen.has(t)) continue;
+      seen.add(t);
+      out.push(t);
+    }
+    return out;
+  }, [popularSuggestions]);
+
+  const pickerQuery = useMemo(() => normalizeTag(draft).toLocaleLowerCase(), [draft]);
 
   const pickerItems = useMemo(() => {
-    const q = pickerQuery.trim().toLocaleLowerCase();
+    if (!isFocused) return [];
+    if (!pickerQuery) {
+      const base = popularItems.length > 0 ? popularItems : pickerItemsAll;
+      return base.filter((t) => !tags.includes(t)).slice(0, 10);
+    }
+
     return pickerItemsAll
       .filter((t) => !tags.includes(t))
-      .filter((t) => (q ? t.toLocaleLowerCase().includes(q) : true))
-      .slice(0, pickerLimit);
-  }, [pickerItemsAll, pickerLimit, pickerQuery, tags]);
+      .filter((t) => t.toLocaleLowerCase().includes(pickerQuery))
+      .slice(0, 12);
+  }, [isFocused, pickerItemsAll, pickerQuery, popularItems, tags]);
+
+  const showPicker = isFocused && (pickerQuery.length > 0 || popularItems.length > 0);
 
   return (
     <div className="tagInputWrap" onClick={() => inputRef.current?.focus()}>
-      <div className="tagInputLabel">タグ（`,` / `、` で区切り）</div>
+      <div className="tagInputLabel">タグ</div>
 
       <div className="tagChips">
         {tags.map((t) => (
@@ -105,7 +116,11 @@ export function TagInput({ tags, onChangeTags, suggestions, onTabToNext }: Props
             const v = e.target.value;
             if (!commitFromDraft(v)) setDraft(v);
           }}
-          onBlur={() => commitCurrent()}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => {
+            commitCurrent();
+            setIsFocused(false);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -127,69 +142,33 @@ export function TagInput({ tags, onChangeTags, suggestions, onTabToNext }: Props
         />
       </div>
 
-      {pickerItemsAll.length > 0 ? (
-        <div className="tagPicker" aria-label="既存タグから追加">
-          <div className="tagPickerTop">
-            <div className="tagPickerTitle">既存タグ</div>
-
-            <div className="tagPickerSearch">
-              <input
-                className="tagPickerInput"
-                value={pickerQuery}
-                onChange={(e) => setPickerQuery(e.target.value)}
-                placeholder="検索して追加"
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") setPickerQuery("");
+      {showPicker ? (
+        <div className="tagPickerList" aria-label="タグ候補">
+          {pickerItems.length === 0 ? (
+            pickerQuery ? <div className="tagPickerEmpty">該当するタグがありません</div> : null
+          ) : (
+            pickerItems.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className="tagSuggestionPill"
+                onMouseDown={(e) => {
+                  // Keep focus on the input (avoid triggering input blur commit).
+                  e.preventDefault();
                 }}
-              />
-              {pickerQuery ? (
-                <button className="tagPickerClear" type="button" onClick={() => setPickerQuery("")} title="クリア">
-                  ×
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="tagPickerList">
-            {pickerItems.length === 0 ? (
-              <div className="tagPickerEmpty">該当するタグがありません</div>
-            ) : (
-              pickerItems.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className="tagSuggestionPill"
-                  onMouseDown={(e) => {
-                    // Keep focus on the input (avoid triggering input blur commit).
-                    e.preventDefault();
-                  }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onChangeTags(addTagToList(tags, t));
-                    inputRef.current?.focus();
-                  }}
-                  title="クリックで追加"
-                >
-                  {t}
-                </button>
-              ))
-            )}
-          </div>
-
-          {pickerTotal > pickerItems.length ? (
-            <button
-              className="tagPickerMore"
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setPickerLimit((n) => n + 60);
-              }}
-            >
-              さらに表示
-            </button>
-          ) : null}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onChangeTags(addTagToList(tags, t));
+                  setDraft("");
+                  inputRef.current?.focus();
+                }}
+                title="クリックで追加"
+              >
+                {t}
+              </button>
+            ))
+          )}
         </div>
       ) : null}
     </div>

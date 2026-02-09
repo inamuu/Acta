@@ -23,6 +23,45 @@ const md = new MarkdownIt({
   }
 });
 
+function taskListPlugin(markdownIt: MarkdownIt) {
+  markdownIt.core.ruler.after("inline", "acta_task_list", (state) => {
+    const tokens = state.tokens;
+
+    for (let i = 2; i < tokens.length; i++) {
+      const inline = tokens[i];
+      if (inline.type !== "inline") continue;
+      if (!inline.children || inline.children.length === 0) continue;
+
+      const paragraphOpen = tokens[i - 1];
+      const listItemOpen = tokens[i - 2];
+      if (paragraphOpen?.type !== "paragraph_open") continue;
+      if (listItemOpen?.type !== "list_item_open") continue;
+
+      const first = inline.children[0];
+      if (!first || first.type !== "text") continue;
+
+      const m = first.content.match(/^\[([ xX])\]\s+/);
+      if (!m) continue;
+
+      const checked = m[1].toLowerCase() === "x";
+      const line0 = inline.map?.[0] ?? listItemOpen.map?.[0] ?? -1;
+
+      first.content = first.content.replace(/^\[[ xX]\]\s+/, "");
+      inline.content = inline.content.replace(/^\[[ xX]\]\s+/, "");
+
+      const checkbox = new state.Token("html_inline", "", 0);
+      checkbox.content = `<input class="taskListCheckbox" type="checkbox" data-task-line="${line0}"${
+        checked ? " checked" : ""
+      } aria-label="task" /> `;
+      inline.children.unshift(checkbox);
+
+      listItemOpen.attrJoin("class", "taskListItem");
+    }
+  });
+}
+
+md.use(taskListPlugin);
+
 const defaultFence =
   md.renderer.rules.fence ??
   ((tokens, idx, options, env, slf) => slf.renderToken(tokens, idx, options));
@@ -42,5 +81,9 @@ md.renderer.rules.fence = (tokens, idx, options, env, slf) => {
 
 export function markdownToHtml(markdown: string): string {
   const raw = md.render(markdown);
-  return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
+  return DOMPurify.sanitize(raw, {
+    USE_PROFILES: { html: true },
+    ADD_TAGS: ["input"],
+    ADD_ATTR: ["type", "checked", "data-task-line", "aria-label"]
+  });
 }
