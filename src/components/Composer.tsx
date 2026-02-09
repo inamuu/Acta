@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { markdownToHtml } from "../lib/markdown";
+import { renderMermaid } from "../lib/mermaid";
 import { TagInput } from "./TagInput";
 
 type Props = {
@@ -28,6 +29,7 @@ export function Composer({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setTags(Array.isArray(initialTags) ? initialTags : []);
@@ -42,6 +44,12 @@ export function Composer({
 
   const previewHtml = useMemo(() => markdownToHtml(body || " "), [body]);
   const canSubmit = body.trim().length > 0 && !submitting;
+
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    void renderMermaid(el);
+  }, [previewHtml]);
 
   async function submit() {
     if (!canSubmit) return;
@@ -121,7 +129,7 @@ export function Composer({
 
         <div className="pane">
           <div className="paneTitle">Preview</div>
-          <div className="preview md" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          <div ref={previewRef} className="preview md" dangerouslySetInnerHTML={{ __html: previewHtml }} />
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import type { ActaEntry } from "../../shared/types";
 import { markdownToHtml } from "../lib/markdown";
+import { renderMermaid } from "../lib/mermaid";
 
 type Props = {
   entry: ActaEntry;
@@ -27,6 +28,13 @@ function formatWhen(ms: number): string {
 export function CommentCard({ entry, onClickTag, onEdit, onDelete }: Props) {
   const html = useMemo(() => markdownToHtml(entry.body), [entry.body]);
   const when = formatWhen(entry.createdAtMs);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    void renderMermaid(el);
+  }, [html]);
 
   return (
     <article className="commentCard">
@@ -71,7 +79,7 @@ export function CommentCard({ entry, onClickTag, onEdit, onDelete }: Props) {
       </div>
 
       <div className="commentBody">
-        <div className="md" dangerouslySetInnerHTML={{ __html: html }} />
+        <div ref={bodyRef} className="md" dangerouslySetInnerHTML={{ __html: html }} />
       </div>
     </article>
   );

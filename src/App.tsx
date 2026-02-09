@@ -3,6 +3,7 @@ import type { ActaEntry } from "../shared/types";
 import { CommentCard } from "./components/CommentCard";
 import { Composer } from "./components/Composer";
 import { TagSidebar } from "./components/TagSidebar";
+import { installDragScroll } from "./lib/dragScroll";
 
 type TagStat = { tag: string; count: number };
 
@@ -36,6 +37,8 @@ export function App() {
   });
 
   const searchRef = useRef<HTMLInputElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   async function reload() {
     if (!api) return;
@@ -106,6 +109,15 @@ export function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    const cleanups: Array<() => void> = [];
+    if (sidebarRef.current) cleanups.push(installDragScroll(sidebarRef.current, { axis: "y" }));
+    if (scrollAreaRef.current) cleanups.push(installDragScroll(scrollAreaRef.current, { axis: "y" }));
+    return () => {
+      for (const fn of cleanups) fn();
+    };
+  }, []);
+
   const { tagStats, untaggedCount } = useMemo(() => {
     const map = new Map<string, number>();
     let untagged = 0;
@@ -161,7 +173,7 @@ export function App() {
 
   return (
     <div className="shell">
-      <aside className="sidebar">
+      <aside className="sidebar dragScroll" ref={sidebarRef}>
         <TagSidebar
           selectedTag={selectedTag}
           totalCount={entries.length}
@@ -268,7 +280,7 @@ export function App() {
           />
         </section>
 
-        <div className="scrollArea">
+        <div className="scrollArea dragScroll" ref={scrollAreaRef}>
           <div className="commentList">
             {loading ? (
               <div className="empty">読み込み中...</div>
