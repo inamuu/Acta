@@ -42,7 +42,7 @@ body {
   background-image: radial-gradient(900px 700px at 12% 0%, rgba(37, 99, 235, 0.18), transparent 60%),
     radial-gradient(900px 700px at 88% 12%, rgba(6, 182, 212, 0.16), transparent 58%),
     radial-gradient(900px 700px at 30% 110%, rgba(61, 190, 150, 0.14), transparent 62%),
-    radial-gradient(rgba(15, 23, 42, 0.045) 1px, transparent 1px);
+    radial-gradient(rgba(15, 23, 42, 0.032) 1px, transparent 1px);
   background-size: auto, auto, auto, 24px 24px;
 }
 
@@ -92,8 +92,9 @@ a:focus-visible {
 
 .sidebar {
   border-right: 1px solid var(--borderSoft);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.44));
-  backdrop-filter: blur(14px) saturate(1.15);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.44), rgba(255, 255, 255, 0.22));
+  backdrop-filter: blur(40px) saturate(1.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
   padding: 18px 14px;
   overflow: auto;
 }
@@ -111,9 +112,9 @@ a:focus-visible {
   align-items: center;
   padding: 16px 20px;
   border-bottom: 1px solid var(--borderSoft);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.5));
-  backdrop-filter: blur(14px) saturate(1.2);
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.07);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(255, 255, 255, 0.26));
+  backdrop-filter: blur(40px) saturate(1.35);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.62);
   /* Allow dragging the window on macOS when using titleBarStyle hidden/hiddenInset. */
   -webkit-app-region: drag;
 }
@@ -192,8 +193,9 @@ a:focus-visible {
   padding: 0 44px 0 14px;
   border-radius: 999px;
   border: 1px solid var(--borderSoft);
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
+  background: rgba(255, 255, 255, 0.54);
+  backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.62);
   font-size: 14px;
   outline: none;
   transition: box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
@@ -229,7 +231,8 @@ a:focus-visible {
   padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid var(--borderSoft);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.54);
+  backdrop-filter: blur(24px) saturate(1.2);
   height: 40px;
 }
 
@@ -250,7 +253,8 @@ a:focus-visible {
 
 .ghostBtn {
   border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.56);
+  backdrop-filter: blur(18px) saturate(1.15);
   color: var(--fg1);
   padding: 4px 10px;
   border-radius: 999px;
@@ -260,7 +264,7 @@ a:focus-visible {
 }
 
 .ghostBtn:hover {
-  background: rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.66);
   transform: translateY(-1px);
 }
 
@@ -322,7 +326,9 @@ a:focus-visible {
   padding: 0 36px 0 12px;
   border-radius: 12px;
   border: 1px solid var(--borderSoft);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.54);
+  backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
   font-size: 13px;
   outline: none;
   transition: box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
@@ -368,7 +374,7 @@ a:focus-visible {
 }
 
 .tagItem:hover {
-  background: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.46);
   border-color: rgba(15, 23, 42, 0.08);
   transform: translateY(-1px);
 }
@@ -437,7 +443,9 @@ a:focus-visible {
   align-items: center;
   gap: 8px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.46);
+  background: rgba(255, 255, 255, 0.38);
+  backdrop-filter: blur(22px) saturate(1.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
   border-radius: 12px;
   padding: 8px 10px 8px 12px;
   cursor: pointer;
@@ -446,7 +454,7 @@ a:focus-visible {
 }
 
 .tagGroupHeader:hover {
-  background: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.5);
   border-color: rgba(15, 23, 42, 0.1);
   transform: translateY(-1px);
 }
@@ -506,19 +514,19 @@ a:focus-visible {
 .commentCard {
   border-radius: var(--radius);
   border: 1px solid transparent;
-  background: linear-gradient(rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.64)) padding-box,
+  background: linear-gradient(rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.38)) padding-box,
     linear-gradient(135deg, rgba(6, 182, 212, 0.35), rgba(37, 99, 235, 0.2), rgba(61, 190, 150, 0.18))
       border-box;
-  box-shadow: var(--shadowSm);
+  box-shadow: var(--shadowSm), inset 0 1px 0 rgba(255, 255, 255, 0.64);
   overflow: hidden;
-  backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: blur(36px) saturate(1.3);
   animation: riseIn 220ms ease-out both;
   transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
 .commentCard:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.64);
 }
 
 @keyframes riseIn {
@@ -537,7 +545,7 @@ a:focus-visible {
   gap: 12px;
   padding: 14px 16px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.68));
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.5));
 }
 
 .commentHeaderMain {
@@ -570,7 +578,8 @@ a:focus-visible {
 
 .dangerGhostBtn {
   border: 1px solid rgba(209, 36, 47, 0.22);
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.54);
+  backdrop-filter: blur(18px) saturate(1.15);
   color: #8a0f19;
   padding: 4px 10px;
   border-radius: 999px;
@@ -695,10 +704,10 @@ a:focus-visible {
 /* composer */
 .composerArea {
   border-bottom: 1px solid var(--borderSoft);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(255, 255, 255, 0.7));
-  backdrop-filter: blur(16px) saturate(1.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.5));
+  backdrop-filter: blur(40px) saturate(1.35);
   padding: 14px 20px 18px;
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.58);
 }
 
 .appError {
@@ -781,17 +790,17 @@ a:focus-visible {
 
 .tagInputWrap {
   border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.54);
   border-radius: var(--radius);
   padding: 10px 12px;
-  box-shadow: var(--shadowSm);
-  backdrop-filter: blur(14px) saturate(1.15);
+  box-shadow: var(--shadowSm), inset 0 1px 0 rgba(255, 255, 255, 0.64);
+  backdrop-filter: blur(34px) saturate(1.28);
   transition: box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
 .tagInputWrap:focus-within {
   border-color: rgba(37, 99, 235, 0.22);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1), var(--shadowSm);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1), var(--shadowSm), inset 0 1px 0 rgba(255, 255, 255, 0.64);
 }
 
 .tagInputLabel {
@@ -879,7 +888,8 @@ a:focus-visible {
   padding: 6px;
   border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.64));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.44));
+  backdrop-filter: blur(22px) saturate(1.2);
 }
 
 .tagPickerEmpty {
@@ -928,7 +938,9 @@ a:focus-visible {
   padding: 5px 10px;
   border-radius: 999px;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  background: rgba(15, 23, 42, 0.03);
+  background: rgba(255, 255, 255, 0.34);
+  backdrop-filter: blur(18px) saturate(1.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
   font-size: 12px;
 }
 
@@ -966,28 +978,28 @@ a:focus-visible {
 
 .pane {
   border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.52);
   border-radius: var(--radius);
   overflow: hidden;
   min-height: 210px;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadowSm);
-  backdrop-filter: blur(16px) saturate(1.15);
+  box-shadow: var(--shadowSm), inset 0 1px 0 rgba(255, 255, 255, 0.64);
+  backdrop-filter: blur(40px) saturate(1.3);
   transition: box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
 .paneWrite {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.7));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.62));
 }
 
 .panePreview {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.64));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.56));
 }
 
 .pane:focus-within {
   border-color: rgba(37, 99, 235, 0.22);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1), var(--shadowSm);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1), var(--shadowSm), inset 0 1px 0 rgba(255, 255, 255, 0.64);
 }
 
 .paneTitle {
@@ -996,7 +1008,7 @@ a:focus-visible {
   font-weight: 720;
   color: var(--muted);
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.68));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.52));
 }
 
 .editor {
@@ -1007,7 +1019,8 @@ a:focus-visible {
   resize: none;
   border: 1px solid rgba(15, 23, 42, 0.08);
   outline: none;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(26px) saturate(1.2);
   padding: 12px;
   font-size: 13px;
   line-height: 1.6;
@@ -1046,9 +1059,9 @@ a:focus-visible {
   padding: 8px;
   border-radius: 999px;
   border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(12px) saturate(1.15);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(32px) saturate(1.25);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.58);
 }
 
 .settingsFab {
@@ -1060,21 +1073,21 @@ a:focus-visible {
   padding: 0 14px;
   border-radius: 999px;
   border: 1px solid rgba(15, 23, 42, 0.14);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.54);
   color: var(--fg1);
   cursor: pointer;
   font-size: 12px;
   font-weight: 760;
-  backdrop-filter: blur(14px) saturate(1.1);
-  box-shadow: var(--shadowSm);
+  backdrop-filter: blur(32px) saturate(1.25);
+  box-shadow: var(--shadowSm), inset 0 1px 0 rgba(255, 255, 255, 0.58);
   transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .settingsFab:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.62);
   border-color: rgba(15, 23, 42, 0.18);
   transform: translateY(-1px);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.58);
 }
 
 .settingsFab:active {
@@ -1090,8 +1103,8 @@ a:focus-visible {
   align-items: flex-end;
   justify-content: flex-start;
   padding: 16px;
-  background: rgba(15, 23, 42, 0.22);
-  backdrop-filter: blur(6px);
+  background: rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(16px);
 }
 
 .modalCard {
@@ -1100,8 +1113,9 @@ a:focus-visible {
   overflow: auto;
   border-radius: 16px;
   border: 1px solid rgba(15, 23, 42, 0.14);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: var(--shadowLg);
+  background: rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(44px) saturate(1.35);
+  box-shadow: var(--shadowLg), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .modalHeader {
@@ -1111,7 +1125,7 @@ a:focus-visible {
   gap: 12px;
   padding: 12px 14px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.74));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.56));
 }
 
 .modalTitle {
@@ -1124,7 +1138,8 @@ a:focus-visible {
   height: 34px;
   border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.56);
+  backdrop-filter: blur(18px) saturate(1.15);
   color: var(--fg1);
   cursor: pointer;
   transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
@@ -1144,7 +1159,9 @@ a:focus-visible {
 
 .settingBlock {
   border: 1px solid rgba(15, 23, 42, 0.1);
-  background: rgba(15, 23, 42, 0.03);
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
   border-radius: 14px;
   padding: 12px;
 }
@@ -1170,7 +1187,8 @@ a:focus-visible {
   font-size: 12px;
   color: var(--fg1);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.56);
+  backdrop-filter: blur(18px) saturate(1.15);
   border-radius: 12px;
   padding: 8px 10px;
   overflow: hidden;

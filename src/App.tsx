@@ -260,13 +260,6 @@ export function App() {
               </div>
             </div>
           </div>
-
-          <div className="topbarRight" title={dataDir}>
-            <div className="dataDirHeader">
-              <div className="dataDirLabel">保存先</div>
-            </div>
-            <div className="dataDirValue">{dataDir || "..."}</div>
-          </div>
         </header>
 
         <section className="composerArea">
