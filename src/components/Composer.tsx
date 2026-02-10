@@ -104,6 +104,22 @@ export function Composer({
                 e.preventDefault();
                 void submit();
               }
+              if (e.key === "Tab" && !e.shiftKey) {
+                e.preventDefault();
+
+                const el = e.currentTarget;
+                const start = el.selectionStart ?? 0;
+                const end = el.selectionEnd ?? 0;
+                const current = el.value;
+                const next = current.slice(0, start) + "\t" + current.slice(end);
+                setBody(next);
+
+                const nextPos = start + 1;
+                requestAnimationFrame(() => {
+                  editorRef.current?.focus();
+                  editorRef.current?.setSelectionRange(nextPos, nextPos);
+                });
+              }
             }}
             placeholder={"Markdownで書けます。\n例:\n- 今日やったこと\n- 次やること\n\n```ts\nconsole.log('hello')\n```"}
             spellCheck={false}

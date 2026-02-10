@@ -17,6 +17,25 @@ function includesLoose(haystack: string, needle: string): boolean {
   return haystack.toLowerCase().includes(needle);
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function formatDateYYYYMMDD(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function lowerBound(list: string[], value: string): number {
+  let lo = 0;
+  let hi = list.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (list[mid] < value) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
 export function App() {
   const api = window.acta;
 
@@ -26,6 +45,7 @@ export function App() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [untaggedOnly, setUntaggedOnly] = useState(false);
   const [query, setQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState<string>("");
   const [appError, setAppError] = useState<string>("");
   const [editing, setEditing] = useState<ActaEntry | null>(null);
   const [draft, setDraft] = useState<{ key: string; body: string; tags: string[] } | null>(null);
@@ -123,6 +143,40 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    // 日付フィルタを切り替えたら先頭に戻す（遡り操作の体験を安定させる）。
+    scrollAreaRef.current?.scrollTo({ top: 0 });
+  }, [dateFilter]);
+
+  const availableDatesAsc = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of entries) {
+      if (e?.date) set.add(e.date);
+    }
+    const list = Array.from(set);
+    list.sort(); // YYYY-MM-DD は文字列ソートで日付順になる
+    return list;
+  }, [entries]);
+
+  const { prevAvailableDate, nextAvailableDate } = useMemo(() => {
+    if (!dateFilter) return { prevAvailableDate: "", nextAvailableDate: "" };
+    if (availableDatesAsc.length === 0) return { prevAvailableDate: "", nextAvailableDate: "" };
+
+    const idx = availableDatesAsc.indexOf(dateFilter);
+    if (idx >= 0) {
+      return {
+        prevAvailableDate: idx > 0 ? availableDatesAsc[idx - 1] : "",
+        nextAvailableDate: idx < availableDatesAsc.length - 1 ? availableDatesAsc[idx + 1] : ""
+      };
+    }
+
+    const insertAt = lowerBound(availableDatesAsc, dateFilter);
+    return {
+      prevAvailableDate: insertAt > 0 ? availableDatesAsc[insertAt - 1] : "",
+      nextAvailableDate: insertAt < availableDatesAsc.length ? availableDatesAsc[insertAt] : ""
+    };
+  }, [availableDatesAsc, dateFilter]);
+
   const { tagStats, untaggedCount } = useMemo(() => {
     const map = new Map<string, number>();
     let untagged = 0;
@@ -139,6 +193,8 @@ export function App() {
   const filteredEntries = useMemo(() => {
     const q = normalizeQuery(query);
     return entries.filter((e) => {
+      if (dateFilter && e.date !== dateFilter) return false;
+
       if (untaggedOnly) {
         if (e.tags.length !== 0) return false;
       } else if (selectedTags.length > 0) {
@@ -156,12 +212,13 @@ export function App() {
         includesLoose(e.created, q)
       );
     });
-  }, [entries, query, selectedTags, untaggedOnly]);
+  }, [dateFilter, entries, query, selectedTags, untaggedOnly]);
 
   const visibleEntries = useMemo(() => {
+    if (dateFilter) return filteredEntries;
     if (!limit || limit <= 0) return filteredEntries;
     return filteredEntries.slice(0, limit);
-  }, [filteredEntries, limit]);
+  }, [dateFilter, filteredEntries, limit]);
 
   const tagSuggestions = useMemo(() => tagStats.map((t) => t.tag), [tagStats]);
   const popularTagSuggestions = useMemo(() => {
@@ -258,6 +315,54 @@ export function App() {
                   <option value="0">すべて</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          <div className="topbarRight">
+            <div className="datePicker" title="日付で絞り込み">
+              <div className="dateLabel">日付</div>
+
+              <button
+                className="dateNavBtn"
+                type="button"
+                disabled={!prevAvailableDate}
+                title={prevAvailableDate ? `${prevAvailableDate} へ` : "前の日付がありません"}
+                onClick={() => prevAvailableDate && setDateFilter(prevAvailableDate)}
+              >
+                ←
+              </button>
+
+              <input
+                className="dateInput"
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+              />
+
+              <button
+                className="dateNavBtn"
+                type="button"
+                disabled={!nextAvailableDate}
+                title={nextAvailableDate ? `${nextAvailableDate} へ` : "次の日付がありません"}
+                onClick={() => nextAvailableDate && setDateFilter(nextAvailableDate)}
+              >
+                →
+              </button>
+
+              <button
+                className="dateQuickBtn"
+                type="button"
+                title="今日"
+                onClick={() => setDateFilter(formatDateYYYYMMDD(new Date()))}
+              >
+                今日
+              </button>
+
+              {dateFilter ? (
+                <button className="dateClearBtn" type="button" title="クリア" onClick={() => setDateFilter("")}>
+                  ×
+                </button>
+              ) : null}
             </div>
           </div>
         </header>
