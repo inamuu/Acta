@@ -48,6 +48,8 @@ body {
 
 ::selection {
   background: rgba(6, 182, 212, 0.22);
+  color: var(--fg0);
+  text-shadow: none;
 }
 
 button,
@@ -1103,8 +1105,17 @@ a:focus-visible {
   font-size: 13px;
   line-height: 1.6;
   font-family: var(--mono);
+  color: var(--fg0);
+  -webkit-text-fill-color: var(--fg0);
+  caret-color: var(--fg0);
   tab-size: 2;
   -moz-tab-size: 2;
+}
+
+.editor::selection {
+  background: rgba(37, 99, 235, 0.22);
+  color: var(--fg0);
+  -webkit-text-fill-color: var(--fg0);
 }
 
 .paneWrite:focus-within .editor {
