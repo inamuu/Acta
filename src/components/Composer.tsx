@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { markdownToHtml } from "../lib/markdown";
 import { renderMermaid } from "../lib/mermaid";
 import { setTaskCheckedOnLine } from "../lib/taskList";
@@ -31,8 +31,10 @@ export function Composer({
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
+  const [previewHtml, setPreviewHtml] = useState<string>(() => markdownToHtml(" "));
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const previewJobIdRef = useRef(0);
 
   useEffect(() => {
     setTags(Array.isArray(initialTags) ? initialTags : []);
@@ -45,7 +47,30 @@ export function Composer({
     editorRef.current?.focus();
   }, [draftKey, autoFocusEditor]);
 
-  const previewHtml = useMemo(() => markdownToHtml(body || " "), [body]);
+  useEffect(() => {
+    // Markdown conversion + syntax highlight + sanitize can be expensive for long text.
+    // Run it "later" (idle/debounced) so typing stays responsive.
+    const w = window as any;
+    const schedule =
+      typeof w.requestIdleCallback === "function"
+        ? (fn: () => void) => w.requestIdleCallback(() => fn(), { timeout: 500 })
+        : (fn: () => void) => window.setTimeout(fn, 200);
+    const cancel =
+      typeof w.cancelIdleCallback === "function"
+        ? (id: unknown) => w.cancelIdleCallback(id)
+        : (id: unknown) => window.clearTimeout(id as number);
+
+    previewJobIdRef.current += 1;
+    const jobId = previewJobIdRef.current;
+    const handle = schedule(() => {
+      const html = markdownToHtml(body || " ");
+      if (previewJobIdRef.current !== jobId) return;
+      setPreviewHtml(html);
+    });
+
+    return () => cancel(handle);
+  }, [body]);
+
   const canSubmit = body.trim().length > 0 && !submitting;
 
   useEffect(() => {
@@ -139,7 +164,11 @@ export function Composer({
                 const line0 = Number(t.dataset.taskLine);
                 if (!Number.isFinite(line0)) return;
                 const next = setTaskCheckedOnLine(body, line0, t.checked);
-                if (typeof next === "string") setBody(next);
+                if (typeof next === "string") {
+                  setBody(next);
+                  // Checkbox toggles are deliberate; update preview immediately for correctness.
+                  setPreviewHtml(markdownToHtml(next || " "));
+                }
               }}
               dangerouslySetInnerHTML={{ __html: previewHtml }}
             />

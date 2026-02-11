@@ -43,6 +43,7 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "electron/assets/icon.png",
       "target": [
         "dmg"
       ]

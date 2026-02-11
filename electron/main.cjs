@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const path = require("node:path");
 const storage = require("./storage.cjs");
+const iconPath = path.join(__dirname, "assets", "icon.png");
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -9,6 +10,7 @@ function createWindow() {
     minWidth: 980,
     minHeight: 640,
     backgroundColor: "#f6f7fb",
+    icon: iconPath,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -41,6 +43,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === "darwin") {
+    app.dock.setIcon(iconPath);
+  }
+
   ipcMain.handle("acta:getDataDir", async () => storage.getDataDir());
   ipcMain.handle("acta:chooseDataDir", async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
