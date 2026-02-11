@@ -731,19 +731,16 @@ a:focus-visible {
 
 .md li.taskListItem {
   list-style: none;
-  position: relative;
 }
 
 .md input.taskListCheckbox {
   accent-color: var(--accent);
   cursor: pointer;
-  transform: translateY(1px);
 }
 
-.md li.taskListItem input.taskListCheckbox {
-  position: absolute;
-  left: -1.35em;
-  margin: 0;
+.md li.taskListItem > input.taskListCheckbox {
+  margin: 0 0.5em 0.14em -1.28em;
+  vertical-align: middle;
 }
 
 .md .mermaid {

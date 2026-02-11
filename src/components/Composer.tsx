@@ -5,6 +5,7 @@ import { setTaskCheckedOnLine } from "../lib/taskList";
 import { TagInput } from "./TagInput";
 
 const PREVIEW_DEBOUNCE_MS = 320;
+const EMPTY_PREVIEW_SOURCE = " ";
 
 type Props = {
   onSubmit: (body: string, tags: string[]) => Promise<void>;
@@ -29,21 +30,57 @@ export function Composer({
   onCancel,
   autoFocusEditor
 }: Props) {
+  const initialBodyValue = typeof initialBody === "string" ? initialBody : "";
   const [tags, setTags] = useState<string[]>([]);
-  const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [isBodyEmpty, setIsBodyEmpty] = useState(() => initialBodyValue.trim().length === 0);
   const [error, setError] = useState<string>("");
-  const [previewHtml, setPreviewHtml] = useState<string>(() => markdownToHtml(" "));
+  const [previewHtml, setPreviewHtml] = useState<string>(() => markdownToHtml(initialBodyValue || EMPTY_PREVIEW_SOURCE));
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const lastPreviewBodyRef = useRef<string>("");
+  const bodyRef = useRef<string>(initialBodyValue);
+  const isBodyEmptyRef = useRef(initialBodyValue.trim().length === 0);
+  const previewTimerRef = useRef<number | null>(null);
+  const lastPreviewBodyRef = useRef<string>(initialBodyValue);
+
+  function updateBody(nextBody: string) {
+    bodyRef.current = nextBody;
+
+    const nextIsEmpty = nextBody.trim().length === 0;
+    if (isBodyEmptyRef.current !== nextIsEmpty) {
+      isBodyEmptyRef.current = nextIsEmpty;
+      setIsBodyEmpty(nextIsEmpty);
+    }
+  }
+
+  function cancelScheduledPreview() {
+    if (previewTimerRef.current === null) return;
+    window.clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = null;
+  }
+
+  function renderPreviewNow(nextBody: string) {
+    cancelScheduledPreview();
+    lastPreviewBodyRef.current = nextBody;
+    setPreviewHtml(markdownToHtml(nextBody || EMPTY_PREVIEW_SOURCE));
+  }
+
+  function schedulePreview(nextBody: string) {
+    cancelScheduledPreview();
+    previewTimerRef.current = window.setTimeout(() => {
+      previewTimerRef.current = null;
+      if (lastPreviewBodyRef.current === nextBody) return;
+      lastPreviewBodyRef.current = nextBody;
+      setPreviewHtml(markdownToHtml(nextBody || EMPTY_PREVIEW_SOURCE));
+    }, PREVIEW_DEBOUNCE_MS);
+  }
 
   useEffect(() => {
     const nextBody = typeof initialBody === "string" ? initialBody : "";
     setTags(Array.isArray(initialTags) ? initialTags : []);
-    setBody(nextBody);
-    lastPreviewBodyRef.current = nextBody;
-    setPreviewHtml(markdownToHtml(nextBody || " "));
+    updateBody(nextBody);
+    if (editorRef.current) editorRef.current.value = nextBody;
+    renderPreviewNow(nextBody);
     setError("");
   }, [draftKey, initialBody, initialTags]);
 
@@ -53,20 +90,10 @@ export function Composer({
   }, [draftKey, autoFocusEditor]);
 
   useEffect(() => {
-    // Markdown conversion + syntax highlight + sanitize can be expensive for long text.
-    // Update preview only after typing pauses to keep editor input responsive.
-    const currentBody = body;
-    const handle = window.setTimeout(() => {
-      if (lastPreviewBodyRef.current === currentBody) return;
-      const html = markdownToHtml(currentBody || " ");
-      lastPreviewBodyRef.current = currentBody;
-      setPreviewHtml(html);
-    }, PREVIEW_DEBOUNCE_MS);
+    return () => cancelScheduledPreview();
+  }, []);
 
-    return () => window.clearTimeout(handle);
-  }, [body]);
-
-  const canSubmit = body.trim().length > 0 && !submitting;
+  const canSubmit = !isBodyEmpty && !submitting;
 
   useEffect(() => {
     const el = previewRef.current;
@@ -75,16 +102,17 @@ export function Composer({
   }, [previewHtml]);
 
   async function submit() {
-    if (!canSubmit) return;
+    const currentBody = bodyRef.current;
+    if (currentBody.trim().length === 0 || submitting) return;
     setSubmitting(true);
     setError("");
     try {
-      await onSubmit(body, tags);
+      await onSubmit(currentBody, tags);
       if (mode === "create") {
-        setBody("");
         setTags([]);
-        lastPreviewBodyRef.current = "";
-        setPreviewHtml(markdownToHtml(" "));
+        updateBody("");
+        if (editorRef.current) editorRef.current.value = "";
+        renderPreviewNow("");
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -118,8 +146,12 @@ export function Composer({
           <textarea
             ref={editorRef}
             className="editor"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
+            defaultValue={bodyRef.current}
+            onChange={(e) => {
+              const nextBody = e.currentTarget.value;
+              updateBody(nextBody);
+              schedulePreview(nextBody);
+            }}
             onKeyDown={(e) => {
               const isSubmit = (e.metaKey || e.ctrlKey) && e.key === "Enter";
               if (isSubmit) {
@@ -134,7 +166,9 @@ export function Composer({
                 const end = el.selectionEnd ?? 0;
                 const current = el.value;
                 const next = current.slice(0, start) + "\t" + current.slice(end);
-                setBody(next);
+                el.value = next;
+                updateBody(next);
+                schedulePreview(next);
 
                 const nextPos = start + 1;
                 requestAnimationFrame(() => {
@@ -160,12 +194,12 @@ export function Composer({
                 if (t.type !== "checkbox") return;
                 const line0 = Number(t.dataset.taskLine);
                 if (!Number.isFinite(line0)) return;
-                const next = setTaskCheckedOnLine(body, line0, t.checked);
+                const next = setTaskCheckedOnLine(bodyRef.current, line0, t.checked);
                 if (typeof next === "string") {
-                  setBody(next);
+                  updateBody(next);
+                  if (editorRef.current) editorRef.current.value = next;
                   // Checkbox toggles are deliberate; update preview immediately for correctness.
-                  lastPreviewBodyRef.current = next;
-                  setPreviewHtml(markdownToHtml(next || " "));
+                  renderPreviewNow(next);
                 }
               }}
               dangerouslySetInnerHTML={{ __html: previewHtml }}

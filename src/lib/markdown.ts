@@ -52,7 +52,7 @@ function taskListPlugin(markdownIt: MarkdownIt) {
       const checkbox = new state.Token("html_inline", "", 0);
       checkbox.content = `<input class="taskListCheckbox" type="checkbox" data-task-line="${line0}"${
         checked ? " checked" : ""
-      } aria-label="task" /> `;
+      } aria-label="task" />`;
       inline.children.unshift(checkbox);
 
       listItemOpen.attrJoin("class", "taskListItem");
