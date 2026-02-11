@@ -5,7 +5,21 @@ import { setTaskCheckedOnLine } from "../lib/taskList";
 import { TagInput } from "./TagInput";
 
 const PREVIEW_DEBOUNCE_MS = 320;
+const PREVIEW_DEBOUNCE_LARGE_DOC_MS = 520;
+const PREVIEW_LARGE_DOC_THRESHOLD = 6000;
+const PREVIEW_IDLE_TIMEOUT_MS = 320;
+const MERMAID_RENDER_DEBOUNCE_MS = 1200;
 const EMPTY_PREVIEW_SOURCE = " ";
+
+type IdleDeadline = {
+  didTimeout: boolean;
+  timeRemaining: () => number;
+};
+
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: (deadline: IdleDeadline) => void, options?: { timeout?: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
 
 type Props = {
   onSubmit: (body: string, tags: string[]) => Promise<void>;
@@ -41,7 +55,10 @@ export function Composer({
   const bodyRef = useRef<string>(initialBodyValue);
   const isBodyEmptyRef = useRef(initialBodyValue.trim().length === 0);
   const previewTimerRef = useRef<number | null>(null);
+  const previewIdleRef = useRef<number | null>(null);
+  const mermaidTimerRef = useRef<number | null>(null);
   const lastPreviewBodyRef = useRef<string>(initialBodyValue);
+  const isComposingRef = useRef(false);
 
   function updateBody(nextBody: string) {
     bodyRef.current = nextBody;
@@ -54,31 +71,81 @@ export function Composer({
   }
 
   function cancelScheduledPreview() {
-    if (previewTimerRef.current === null) return;
-    window.clearTimeout(previewTimerRef.current);
-    previewTimerRef.current = null;
+    if (previewTimerRef.current !== null) {
+      window.clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    const idleWindow = window as IdleWindow;
+    if (previewIdleRef.current !== null && typeof idleWindow.cancelIdleCallback === "function") {
+      idleWindow.cancelIdleCallback(previewIdleRef.current);
+    } else if (previewIdleRef.current !== null) {
+      window.clearTimeout(previewIdleRef.current);
+    }
+    previewIdleRef.current = null;
   }
 
-  function renderPreviewNow(nextBody: string) {
-    cancelScheduledPreview();
+  function cancelScheduledMermaid() {
+    if (mermaidTimerRef.current === null) return;
+    window.clearTimeout(mermaidTimerRef.current);
+    mermaidTimerRef.current = null;
+  }
+
+  function commitPreview(nextBody: string) {
+    if (lastPreviewBodyRef.current === nextBody) return;
     lastPreviewBodyRef.current = nextBody;
     setPreviewHtml(markdownToHtml(nextBody || EMPTY_PREVIEW_SOURCE));
   }
 
+  function renderPreviewNow(nextBody: string) {
+    cancelScheduledPreview();
+    commitPreview(nextBody);
+  }
+
+  function schedulePreviewCommit(nextBody: string) {
+    const idleWindow = window as IdleWindow;
+    if (typeof idleWindow.requestIdleCallback === "function") {
+      previewIdleRef.current = idleWindow.requestIdleCallback(
+        () => {
+          previewIdleRef.current = null;
+          commitPreview(nextBody);
+        },
+        { timeout: PREVIEW_IDLE_TIMEOUT_MS }
+      );
+      return;
+    }
+
+    previewIdleRef.current = window.setTimeout(() => {
+      previewIdleRef.current = null;
+      commitPreview(nextBody);
+    }, 0);
+  }
+
   function schedulePreview(nextBody: string) {
     cancelScheduledPreview();
+    const delay =
+      nextBody.length >= PREVIEW_LARGE_DOC_THRESHOLD ? PREVIEW_DEBOUNCE_LARGE_DOC_MS : PREVIEW_DEBOUNCE_MS;
     previewTimerRef.current = window.setTimeout(() => {
       previewTimerRef.current = null;
-      if (lastPreviewBodyRef.current === nextBody) return;
-      lastPreviewBodyRef.current = nextBody;
-      setPreviewHtml(markdownToHtml(nextBody || EMPTY_PREVIEW_SOURCE));
-    }, PREVIEW_DEBOUNCE_MS);
+      schedulePreviewCommit(nextBody);
+    }, delay);
+  }
+
+  function scheduleMermaidRender() {
+    cancelScheduledMermaid();
+    mermaidTimerRef.current = window.setTimeout(() => {
+      mermaidTimerRef.current = null;
+      const el = previewRef.current;
+      if (!el) return;
+      if (!el.querySelector(".mermaid")) return;
+      void renderMermaid(el);
+    }, MERMAID_RENDER_DEBOUNCE_MS);
   }
 
   useEffect(() => {
     const nextBody = typeof initialBody === "string" ? initialBody : "";
     setTags(Array.isArray(initialTags) ? initialTags : []);
     updateBody(nextBody);
+    isComposingRef.current = false;
     if (editorRef.current) editorRef.current.value = nextBody;
     renderPreviewNow(nextBody);
     setError("");
@@ -90,7 +157,10 @@ export function Composer({
   }, [draftKey, autoFocusEditor]);
 
   useEffect(() => {
-    return () => cancelScheduledPreview();
+    return () => {
+      cancelScheduledPreview();
+      cancelScheduledMermaid();
+    };
   }, []);
 
   const canSubmit = !isBodyEmpty && !submitting;
@@ -98,7 +168,11 @@ export function Composer({
   useEffect(() => {
     const el = previewRef.current;
     if (!el) return;
-    void renderMermaid(el);
+    if (!el.querySelector(".mermaid")) {
+      cancelScheduledMermaid();
+      return;
+    }
+    scheduleMermaidRender();
   }, [previewHtml]);
 
   async function submit() {
@@ -147,9 +221,20 @@ export function Composer({
             ref={editorRef}
             className="editor"
             defaultValue={bodyRef.current}
+            onCompositionStart={() => {
+              isComposingRef.current = true;
+              cancelScheduledPreview();
+            }}
+            onCompositionEnd={(e) => {
+              isComposingRef.current = false;
+              const nextBody = e.currentTarget.value;
+              updateBody(nextBody);
+              schedulePreview(nextBody);
+            }}
             onChange={(e) => {
               const nextBody = e.currentTarget.value;
               updateBody(nextBody);
+              if (isComposingRef.current) return;
               schedulePreview(nextBody);
             }}
             onKeyDown={(e) => {
