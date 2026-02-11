@@ -19,7 +19,7 @@ type Props = {
   onTabToNext?: () => void;
 };
 
-export function TagInput({ tags, onChangeTags, suggestions, popularSuggestions, onTabToNext }: Props) {
+function TagInputInner({ tags, onChangeTags, suggestions, popularSuggestions, onTabToNext }: Props) {
   const [draft, setDraft] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -174,3 +174,7 @@ export function TagInput({ tags, onChangeTags, suggestions, popularSuggestions, 
     </div>
   );
 }
+
+TagInputInner.displayName = "TagInput";
+
+export const TagInput = React.memo(TagInputInner);

@@ -4,6 +4,8 @@ import { renderMermaid } from "../lib/mermaid";
 import { setTaskCheckedOnLine } from "../lib/taskList";
 import { TagInput } from "./TagInput";
 
+const PREVIEW_DEBOUNCE_MS = 320;
+
 type Props = {
   onSubmit: (body: string, tags: string[]) => Promise<void>;
   tagSuggestions?: string[];
@@ -34,11 +36,14 @@ export function Composer({
   const [previewHtml, setPreviewHtml] = useState<string>(() => markdownToHtml(" "));
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const previewJobIdRef = useRef(0);
+  const lastPreviewBodyRef = useRef<string>("");
 
   useEffect(() => {
+    const nextBody = typeof initialBody === "string" ? initialBody : "";
     setTags(Array.isArray(initialTags) ? initialTags : []);
-    setBody(typeof initialBody === "string" ? initialBody : "");
+    setBody(nextBody);
+    lastPreviewBodyRef.current = nextBody;
+    setPreviewHtml(markdownToHtml(nextBody || " "));
     setError("");
   }, [draftKey, initialBody, initialTags]);
 
@@ -49,26 +54,16 @@ export function Composer({
 
   useEffect(() => {
     // Markdown conversion + syntax highlight + sanitize can be expensive for long text.
-    // Run it "later" (idle/debounced) so typing stays responsive.
-    const w = window as any;
-    const schedule =
-      typeof w.requestIdleCallback === "function"
-        ? (fn: () => void) => w.requestIdleCallback(() => fn(), { timeout: 500 })
-        : (fn: () => void) => window.setTimeout(fn, 200);
-    const cancel =
-      typeof w.cancelIdleCallback === "function"
-        ? (id: unknown) => w.cancelIdleCallback(id)
-        : (id: unknown) => window.clearTimeout(id as number);
-
-    previewJobIdRef.current += 1;
-    const jobId = previewJobIdRef.current;
-    const handle = schedule(() => {
-      const html = markdownToHtml(body || " ");
-      if (previewJobIdRef.current !== jobId) return;
+    // Update preview only after typing pauses to keep editor input responsive.
+    const currentBody = body;
+    const handle = window.setTimeout(() => {
+      if (lastPreviewBodyRef.current === currentBody) return;
+      const html = markdownToHtml(currentBody || " ");
+      lastPreviewBodyRef.current = currentBody;
       setPreviewHtml(html);
-    });
+    }, PREVIEW_DEBOUNCE_MS);
 
-    return () => cancel(handle);
+    return () => window.clearTimeout(handle);
   }, [body]);
 
   const canSubmit = body.trim().length > 0 && !submitting;
@@ -88,6 +83,8 @@ export function Composer({
       if (mode === "create") {
         setBody("");
         setTags([]);
+        lastPreviewBodyRef.current = "";
+        setPreviewHtml(markdownToHtml(" "));
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -167,6 +164,7 @@ export function Composer({
                 if (typeof next === "string") {
                   setBody(next);
                   // Checkbox toggles are deliberate; update preview immediately for correctness.
+                  lastPreviewBodyRef.current = next;
                   setPreviewHtml(markdownToHtml(next || " "));
                 }
               }}
