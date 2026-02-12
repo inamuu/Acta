@@ -39,8 +39,8 @@ body {
   color: var(--fg0);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  background-color: transparent;
-  background-image: none;
+  background-color: var(--bg0);
+  background-image: linear-gradient(180deg, #eef4ff 0%, #f7faff 52%, #f3f7fd 100%);
 }
 
 ::selection {
@@ -1321,45 +1321,97 @@ a:focus-visible {
   font-family: var(--mono);
 }
 
-/* Keep utility surfaces mostly transparent. */
-.ghostBtn,
-.dangerGhostBtn,
-.previewActions,
-.settingsFab,
-.modalCard,
-.modalHeader,
-.modalClose,
-.settingBlock,
-.settingValue,
-.noApiCard {
-  background: var(--glassClear) !important;
-  box-shadow: none;
+/* Opaque, modern UI theme */
+:root {
+  --bg0: #eef4ff;
+  --bg1: #ffffff;
+  --fg0: #0f172a;
+  --fg1: #334155;
+  --muted: #64748b;
+  --accent: #2563eb;
+  --accent2: #0891b2;
+  --tagBg: #e0f2fe;
+  --tagFg: #0c4a6e;
+  --border: #cfd8e5;
+  --borderSoft: #dde6f1;
 }
 
-/* Requested: keep core work surfaces non-transparent. */
 .sidebar,
 .topbar,
-.limitPicker,
-.datePicker,
 .composerArea,
-.tagInputWrap,
-.tagPickerList,
-.tagPickerMore,
-.tagChip,
-.tagGroupHeader,
-.tagItem,
+.commentCard,
 .pane,
 .paneWrite,
 .panePreview,
 .paneTitle,
-.commentCard,
-.commentHeader {
-  background: rgba(255, 255, 255, 0.88) !important;
+.modalCard,
+.settingBlock,
+.tagInputWrap,
+.tagPickerList,
+.noApiCard {
+  background: #ffffff !important;
+  border-color: var(--borderSoft) !important;
+  backdrop-filter: none !important;
 }
 
-.commentCard {
-  border-color: rgba(15, 23, 42, 0.12);
-  box-shadow: var(--shadowSm), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+.topbar,
+.composerArea,
+.sidebar {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06) !important;
+}
+
+.searchInput,
+.tagSearchInput,
+.tagPickerInput,
+.editor,
+.settingValue {
+  background: #f8fbff !important;
+  border-color: var(--borderSoft) !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.ghostBtn,
+.dangerGhostBtn,
+.limitPicker,
+.datePicker,
+.tagGroupHeader,
+.previewActions,
+.settingsFab,
+.modalClose,
+.tagChip,
+.tagPickerMore,
+.tagCount {
+  background: #f3f7ff !important;
+  border-color: var(--borderSoft) !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.tagItem {
+  background: #ffffff !important;
+  border-color: transparent !important;
+}
+
+.tagItem:hover {
+  background: #f6f9ff !important;
+  border-color: var(--borderSoft) !important;
+}
+
+.tagItem.isSelected,
+.tagGroupHeader.isActive {
+  background: #e9f1ff !important;
+  border-color: #bcd2ff !important;
+}
+
+.commentHeader,
+.modalHeader {
+  background: #f8fbff !important;
+}
+
+.modalOverlay {
+  background: #1e293b;
+  backdrop-filter: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

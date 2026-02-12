@@ -4,16 +4,15 @@ const storage = require("./storage.cjs");
 const iconPath = path.join(__dirname, "assets", "icon.png");
 
 function createWindow() {
-  const isMac = process.platform === "darwin";
   const win = new BrowserWindow({
     width: 1180,
     height: 760,
     minWidth: 980,
     minHeight: 640,
-    backgroundColor: isMac ? "#00000000" : "#f6f7fb",
-    transparent: isMac,
+    backgroundColor: "#eef4ff",
+    transparent: false,
     icon: iconPath,
-    titleBarStyle: isMac ? "hiddenInset" : "default",
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
