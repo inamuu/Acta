@@ -28,3 +28,12 @@ npm run dev
 npm install
 npm run dist
 ```
+
+## リリース自動化（タグ push）
+`v*` タグを push すると GitHub Actions で以下を実行します。
+- DMG をビルド
+- GitHub Release を作成して DMG を添付
+- `inamuu/homebrew-tap` の `Casks/acta.rb` を更新して push
+
+事前に、このリポジトリの Actions secrets に `HOMEBREW_TAP_TOKEN` を設定してください。  
+必要権限は `inamuu/homebrew-tap` への push（`contents:write`）です。

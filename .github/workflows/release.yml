@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve version from tag
+        id: vars
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          if [ -z "${VERSION}" ]; then
+            echo "Failed to resolve version from tag: ${TAG}"
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Sync package version to tag
+        run: npm version "${{ steps.vars.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Build macOS DMG
+        run: npm run dist
+
+      - name: Collect artifact metadata
+        id: artifact
+        run: |
+          DMG_PATH="$(find release -maxdepth 1 -type f -name '*.dmg' | head -n 1)"
+          if [ -z "${DMG_PATH}" ]; then
+            echo "DMG file was not found in release/"
+            exit 1
+          fi
+
+          DMG_NAME="$(basename "${DMG_PATH}")"
+          SHA256="$(shasum -a 256 "${DMG_PATH}" | awk '{print $1}')"
+
+          echo "dmg_path=${DMG_PATH}" >> "${GITHUB_OUTPUT}"
+          echo "dmg_name=${DMG_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "sha256=${SHA256}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          generate_release_notes: true
+          files: ${{ steps.artifact.outputs.dmg_path }}
+
+      - name: Check Homebrew tap token
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "${HOMEBREW_TAP_TOKEN}" ]; then
+            echo "Secret HOMEBREW_TAP_TOKEN is required."
+            exit 1
+          fi
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: inamuu/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update cask file
+        run: |
+          mkdir -p homebrew-tap/Casks
+          cat > homebrew-tap/Casks/acta.rb <<EOF
+          cask "acta" do
+            version "${{ steps.vars.outputs.version }}"
+            sha256 "${{ steps.artifact.outputs.sha256 }}"
+
+            url "https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/${{ steps.artifact.outputs.dmg_name }}"
+            name "Acta"
+            desc "GitHub issue style markdown log editor"
+            homepage "https://github.com/${{ github.repository }}"
+
+            app "Acta.app"
+          end
+          EOF
+
+      - name: Commit and push cask update
+        working-directory: homebrew-tap
+        run: |
+          if git diff --quiet -- Casks/acta.rb; then
+            echo "No changes in Casks/acta.rb"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/acta.rb
+          git commit -m "acta: update to ${{ steps.vars.outputs.version }}"
+          git push
