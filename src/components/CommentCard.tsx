@@ -92,7 +92,7 @@ export function CommentCard({ entry, onClickTag, onEdit, onCopy, onDelete, onTog
         <div
           ref={bodyRef}
           className="md"
-          onChange={(e) => {
+          onClick={(e) => {
             const t = e.target;
             if (!(t instanceof HTMLInputElement)) return;
             if (t.type !== "checkbox") return;

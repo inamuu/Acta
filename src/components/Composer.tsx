@@ -273,7 +273,7 @@ export function Composer({
             <div
               ref={previewRef}
               className="preview md"
-              onChange={(e) => {
+              onClick={(e) => {
                 const t = e.target;
                 if (!(t instanceof HTMLInputElement)) return;
                 if (t.type !== "checkbox") return;
