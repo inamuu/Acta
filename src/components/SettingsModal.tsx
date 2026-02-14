@@ -6,7 +6,6 @@ type Props = {
   aiCliPath: string;
   aiInstructionMarkdown: string;
   onChooseDataDir: () => Promise<void>;
-  onChooseAiCliPath: () => Promise<string | null>;
   onSaveAiSettings: (payload: SaveAiSettingsPayload) => Promise<void>;
   onClose: () => void;
 };
@@ -16,7 +15,6 @@ export function SettingsModal({
   aiCliPath,
   aiInstructionMarkdown,
   onChooseDataDir,
-  onChooseAiCliPath,
   onSaveAiSettings,
   onClose
 }: Props) {
@@ -88,19 +86,14 @@ export function SettingsModal({
 
           <div className="settingBlock">
             <div className="settingLabel">生成AI CLI</div>
-            <div className="settingRow">
-              <div className="settingValue">{cliPath || "未設定"}</div>
-              <button
-                className="ghostBtn"
-                type="button"
-                onClick={async () => {
-                  const next = await onChooseAiCliPath();
-                  if (next) setCliPath(next);
-                }}
-              >
-                選択
-              </button>
-            </div>
+            <input
+              className="settingTextInput"
+              type="text"
+              value={cliPath}
+              onChange={(e) => setCliPath(e.target.value)}
+              placeholder="/opt/homebrew/bin/codex"
+              spellCheck={false}
+            />
 
             <div className="settingCol">
               <div className="settingSubLabel">指示 (Markdown)</div>

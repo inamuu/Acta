@@ -535,17 +535,6 @@ export function App() {
               setAppError(msg || "保存先の変更に失敗しました");
             }
           }}
-          onChooseAiCliPath={async () => {
-            try {
-              const res = await api.chooseAiCliPath();
-              if (!res || res.canceled) return null;
-              return res.cliPath;
-            } catch (e) {
-              const msg = e instanceof Error ? e.message : String(e);
-              setAppError(msg || "CLIパスの選択に失敗しました");
-              return null;
-            }
-          }}
           onSaveAiSettings={async (payload) => {
             const saved = await api.saveAiSettings(payload);
             setAiSettings(saved);

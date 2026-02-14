@@ -43,11 +43,6 @@ export type ActaAiSettings = {
 
 export type SaveAiSettingsPayload = ActaAiSettings;
 
-export type ChooseCliPathResult = {
-  canceled: boolean;
-  cliPath: string;
-};
-
 export type AiStartSessionPayload = {
   cliPath: string;
 };

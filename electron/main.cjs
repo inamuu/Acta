@@ -51,6 +51,12 @@ async function readFileIfExists(filePath) {
   }
 }
 
+function detectAiCliKind(cliPath) {
+  const binName = path.basename(String(cliPath ?? "")).toLowerCase();
+  if (binName.includes("claude")) return "claude";
+  return "codex";
+}
+
 function startAiSession(cliPath) {
   const binPath = String(cliPath ?? "").trim();
   if (!binPath) throw new Error("CLIパスが未設定です");
@@ -80,7 +86,12 @@ function runAiTurn(session, input) {
 
   const prompt = buildAiPrompt(session, input);
   const outPath = path.join(app.getPath("temp"), `acta-ai-${session.id}-${Date.now()}.txt`);
-  const args = ["exec", "--skip-git-repo-check", "-C", dataDir, "--color", "never", "-o", outPath, "-"];
+  const cliKind = detectAiCliKind(session.cliPath);
+  const args =
+    cliKind === "claude"
+      ? ["--print"]
+      : ["exec", "--skip-git-repo-check", "-C", dataDir, "--color", "never", "-o", outPath, "-"];
+  const useOutputFile = cliKind !== "claude";
 
   session.busy = true;
   session.exitCode = null;
@@ -115,11 +126,16 @@ function runAiTurn(session, input) {
 
   child.on("close", (code) => {
     void (async () => {
-      const answer = (await readFileIfExists(outPath)).trim();
-      try {
-        await fs.promises.unlink(outPath);
-      } catch {
-        // ignore
+      let answer = "";
+      if (useOutputFile) {
+        answer = (await readFileIfExists(outPath)).trim();
+        try {
+          await fs.promises.unlink(outPath);
+        } catch {
+          // ignore
+        }
+      } else {
+        answer = stdoutText.trim();
       }
 
       session.exitCode = typeof code === "number" ? code : null;
@@ -263,23 +279,6 @@ app.whenReady().then(() => {
 
     await storage.setDataDir(dir);
     return { canceled: false, dataDir: storage.getDataDir() };
-  });
-  ipcMain.handle("acta:chooseAiCliPath", async (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    const res = await dialog.showOpenDialog(win, {
-      title: "生成AI CLI を選択",
-      properties: ["openFile"]
-    });
-
-    if (res.canceled) {
-      return { canceled: true, cliPath: "" };
-    }
-
-    const cliPath = String(res.filePaths?.[0] ?? "").trim();
-    if (!cliPath) {
-      return { canceled: true, cliPath: "" };
-    }
-    return { canceled: false, cliPath };
   });
   ipcMain.handle("acta:listEntries", async () => storage.listEntries());
   ipcMain.handle("acta:addEntry", async (_event, payload) => storage.addEntry(payload));

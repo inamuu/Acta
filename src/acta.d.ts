@@ -9,7 +9,6 @@ import type {
   AiStartSessionResult,
   AiStopSessionPayload,
   ChooseDataDirResult,
-  ChooseCliPathResult,
   DeleteEntryPayload,
   DeleteEntryResult,
   SaveAiSettingsPayload,
@@ -26,7 +25,6 @@ declare global {
       listEntries: () => Promise<ActaEntry[]>;
       addEntry: (payload: AddEntryPayload) => Promise<ActaEntry>;
       chooseDataDir: () => Promise<ChooseDataDirResult>;
-      chooseAiCliPath: () => Promise<ChooseCliPathResult>;
       deleteEntry: (payload: DeleteEntryPayload) => Promise<DeleteEntryResult>;
       updateEntry: (payload: UpdateEntryPayload) => Promise<UpdateEntryResult>;
       aiStartSession: (payload: AiStartSessionPayload) => Promise<AiStartSessionResult>;
