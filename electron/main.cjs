@@ -1,7 +1,201 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { spawn } = require("node:child_process");
+const crypto = require("node:crypto");
+const fs = require("node:fs");
 const path = require("node:path");
 const storage = require("./storage.cjs");
 const iconPath = path.join(__dirname, "assets", "icon.png");
+const aiSessions = new Map();
+
+function getAiSessionOrThrow(id) {
+  const key = String(id ?? "").trim();
+  if (!key) throw new Error("sessionId が不正です");
+
+  const session = aiSessions.get(key);
+  if (!session) throw new Error("AIセッションが見つかりません");
+  return session;
+}
+
+function buildAiPrompt(session, input) {
+  const recent = session.history.slice(-20);
+  const lines = [];
+
+  if (session.systemInstruction) {
+    lines.push("# 事前指示");
+    lines.push(session.systemInstruction);
+    lines.push("");
+  }
+
+  if (recent.length > 0) {
+    lines.push("# 会話履歴");
+    for (const turn of recent) {
+      lines.push(`ユーザー: ${turn.user}`);
+      lines.push(`アシスタント: ${turn.assistant}`);
+      lines.push("");
+    }
+  }
+
+  lines.push("# 今回のユーザー入力");
+  lines.push(input);
+  lines.push("");
+  lines.push("日本語で回答してください。");
+
+  return lines.join("\n");
+}
+
+async function readFileIfExists(filePath) {
+  try {
+    return await fs.promises.readFile(filePath, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function startAiSession(cliPath) {
+  const binPath = String(cliPath ?? "").trim();
+  if (!binPath) throw new Error("CLIパスが未設定です");
+
+  const sessionId = crypto.randomUUID();
+  const session = {
+    id: sessionId,
+    cliPath: binPath,
+    systemInstruction: "",
+    needsBootstrap: true,
+    history: [],
+    chunks: [],
+    alive: true,
+    busy: false,
+    worker: null,
+    exitCode: null,
+    error: ""
+  };
+  aiSessions.set(sessionId, session);
+
+  return { sessionId };
+}
+
+function runAiTurn(session, input) {
+  const dataDir = storage.getDataDir();
+  fs.mkdirSync(dataDir, { recursive: true });
+
+  const prompt = buildAiPrompt(session, input);
+  const outPath = path.join(app.getPath("temp"), `acta-ai-${session.id}-${Date.now()}.txt`);
+  const args = ["exec", "--skip-git-repo-check", "-C", dataDir, "--color", "never", "-o", outPath, "-"];
+
+  session.busy = true;
+  session.exitCode = null;
+  session.error = "";
+
+  const child = spawn(session.cliPath, args, {
+    cwd: dataDir,
+    stdio: ["pipe", "pipe", "pipe"],
+    env: {
+      ...process.env
+    }
+  });
+  session.worker = child;
+
+  let stdoutText = "";
+  let stderrText = "";
+  child.stdout?.on("data", (chunk) => {
+    stdoutText += String(chunk ?? "");
+  });
+  child.stderr?.on("data", (chunk) => {
+    stderrText += String(chunk ?? "");
+  });
+
+  child.on("error", (err) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    session.error = msg || "実行に失敗しました";
+    session.chunks.push(`\n[エラー] ${session.error}\n`);
+    session.busy = false;
+    session.exitCode = 1;
+    session.worker = null;
+  });
+
+  child.on("close", (code) => {
+    void (async () => {
+      const answer = (await readFileIfExists(outPath)).trim();
+      try {
+        await fs.promises.unlink(outPath);
+      } catch {
+        // ignore
+      }
+
+      session.exitCode = typeof code === "number" ? code : null;
+      session.busy = false;
+      session.worker = null;
+
+      if (!session.alive) return;
+
+      if (session.exitCode === 0 && answer) {
+        session.history.push({ user: input, assistant: answer });
+        session.chunks.push(`${answer}\n`);
+        return;
+      }
+
+      const fallback = answer || stderrText.trim() || stdoutText.trim();
+      if (fallback) {
+        session.chunks.push(`\n[実行ログ]\n${fallback}\n`);
+      }
+      if (session.exitCode !== 0) {
+        session.chunks.push(`\n[AI実行失敗: code=${session.exitCode ?? "?"}]\n`);
+      }
+    })();
+  });
+
+  child.stdin.write(prompt);
+  child.stdin.end();
+}
+
+function stopAiSession(sessionId) {
+  const session = getAiSessionOrThrow(sessionId);
+  session.alive = false;
+  session.busy = false;
+
+  if (session.worker) {
+    try {
+      session.worker.kill("SIGTERM");
+    } catch {
+      // ignore
+    }
+  }
+  aiSessions.delete(session.id);
+  return { stopped: true };
+}
+
+function readAiSession(sessionId) {
+  const session = getAiSessionOrThrow(sessionId);
+  const chunk = session.chunks.join("");
+  session.chunks.length = 0;
+
+  const res = {
+    chunk,
+    alive: session.alive,
+    busy: Boolean(session.busy),
+    exitCode: session.exitCode,
+    error: session.error || undefined
+  };
+  return res;
+}
+
+function writeAiSessionInput(sessionId, input) {
+  const session = getAiSessionOrThrow(sessionId);
+  if (!session.alive) throw new Error("AIセッションは終了しています");
+  if (session.busy) throw new Error("前回の応答を待ってから送信してください");
+
+  const text = String(input ?? "");
+  if (!text.trim()) return { sent: false };
+
+  if (session.needsBootstrap) {
+    session.systemInstruction = text;
+    session.needsBootstrap = false;
+    return { sent: true };
+  }
+
+  runAiTurn(session, text);
+  return { sent: true };
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -49,6 +243,8 @@ app.whenReady().then(() => {
   }
 
   ipcMain.handle("acta:getDataDir", async () => storage.getDataDir());
+  ipcMain.handle("acta:getAiSettings", async () => storage.getAiSettings());
+  ipcMain.handle("acta:saveAiSettings", async (_event, payload) => storage.setAiSettings(payload));
   ipcMain.handle("acta:chooseDataDir", async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     const res = await dialog.showOpenDialog(win, {
@@ -68,10 +264,31 @@ app.whenReady().then(() => {
     await storage.setDataDir(dir);
     return { canceled: false, dataDir: storage.getDataDir() };
   });
+  ipcMain.handle("acta:chooseAiCliPath", async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const res = await dialog.showOpenDialog(win, {
+      title: "生成AI CLI を選択",
+      properties: ["openFile"]
+    });
+
+    if (res.canceled) {
+      return { canceled: true, cliPath: "" };
+    }
+
+    const cliPath = String(res.filePaths?.[0] ?? "").trim();
+    if (!cliPath) {
+      return { canceled: true, cliPath: "" };
+    }
+    return { canceled: false, cliPath };
+  });
   ipcMain.handle("acta:listEntries", async () => storage.listEntries());
   ipcMain.handle("acta:addEntry", async (_event, payload) => storage.addEntry(payload));
   ipcMain.handle("acta:deleteEntry", async (_event, payload) => storage.deleteEntry(payload));
   ipcMain.handle("acta:updateEntry", async (_event, payload) => storage.updateEntry(payload));
+  ipcMain.handle("acta:aiStartSession", async (_event, payload) => startAiSession(payload?.cliPath));
+  ipcMain.handle("acta:aiSendInput", async (_event, payload) => writeAiSessionInput(payload?.sessionId, payload?.input));
+  ipcMain.handle("acta:aiReadOutput", async (_event, payload) => readAiSession(payload?.sessionId));
+  ipcMain.handle("acta:aiStopSession", async (_event, payload) => stopAiSession(payload?.sessionId));
 
   createWindow();
 
@@ -81,5 +298,15 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  for (const session of aiSessions.values()) {
+    if (session.worker) {
+      try {
+        session.worker.kill("SIGTERM");
+      } catch {
+        // ignore
+      }
+    }
+  }
+  aiSessions.clear();
   if (process.platform !== "darwin") app.quit();
 });

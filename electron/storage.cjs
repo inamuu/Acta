@@ -5,6 +5,7 @@ const { app } = require("electron");
 
 const DATE_FILE_RE = /^\d{4}-\d{2}-\d{2}\.md$/;
 const SETTINGS_FILE = "acta-settings.json";
+const DEFAULT_AI_CLI_PATH = "/opt/homebrew/bin/codex";
 
 function safeJsonParse(text) {
   try {
@@ -107,6 +108,43 @@ function getDataDir() {
   const s = loadSettings();
   const dir = typeof s.dataDir === "string" ? s.dataDir.trim() : "";
   return dir ? dir : getDefaultDataDir();
+}
+
+function buildDefaultAiInstruction(dataDir) {
+  const dir = String(dataDir ?? "").trim() || getDefaultDataDir();
+  return [
+    `<data>${dir}</data> の中身を読み込んでください。`,
+    "例えば、今日から一週間分のサマリーを作成してと言われたら、今日の日付から一週間分の内容を読み込んでサマリーを作成して、他のファイルと同じように今の日時でファイルを作成、またはすでにファイルがあれば追記するようにしてください。",
+    "作成してと言われたファイルはすべて、上記 data に保存するようにしてください。"
+  ].join("\n");
+}
+
+function getAiSettings() {
+  const s = loadSettings();
+  const cliPath = typeof s.aiCliPath === "string" ? s.aiCliPath.trim() : "";
+  const instructionMarkdown =
+    typeof s.aiInstructionMarkdown === "string" && s.aiInstructionMarkdown.trim().length > 0
+      ? s.aiInstructionMarkdown
+      : buildDefaultAiInstruction(getDataDir());
+
+  return {
+    cliPath: cliPath || DEFAULT_AI_CLI_PATH,
+    instructionMarkdown
+  };
+}
+
+function setAiSettings(payload) {
+  const cliPath = String(payload?.cliPath ?? "").trim() || DEFAULT_AI_CLI_PATH;
+  const instructionMarkdown = String(payload?.instructionMarkdown ?? "").trim() || buildDefaultAiInstruction(getDataDir());
+
+  const s = loadSettings();
+  saveSettings({
+    ...s,
+    aiCliPath: cliPath,
+    aiInstructionMarkdown: instructionMarkdown
+  });
+
+  return getAiSettings();
 }
 
 async function setDataDir(dir) {
@@ -411,6 +449,8 @@ async function updateEntry(payload) {
 module.exports = {
   getDataDir,
   setDataDir,
+  getAiSettings,
+  setAiSettings,
   listEntries,
   addEntry,
   deleteEntry,

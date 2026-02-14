@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { ActaEntry } from "../shared/types";
+import type { ActaAiSettings, ActaEntry } from "../shared/types";
+import { AiConsole } from "./components/AiConsole";
 import { CommentCard } from "./components/CommentCard";
 import { Composer } from "./components/Composer";
 import { SettingsModal } from "./components/SettingsModal";
@@ -50,6 +51,11 @@ export function App() {
   const [editing, setEditing] = useState<ActaEntry | null>(null);
   const [draft, setDraft] = useState<{ key: string; body: string; tags: string[] } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activeView, setActiveView] = useState<"journal" | "ai">("journal");
+  const [aiSettings, setAiSettings] = useState<ActaAiSettings>({
+    cliPath: "/opt/homebrew/bin/codex",
+    instructionMarkdown: ""
+  });
   const [limit, setLimit] = useState<number>(() => {
     try {
       const raw = localStorage.getItem("acta:limit");
@@ -86,7 +92,11 @@ export function App() {
       setLoading(true);
       setAppError("");
       try {
-        const [dirRes, listRes] = await Promise.allSettled([api.getDataDir(), api.listEntries()]);
+        const [dirRes, listRes, aiRes] = await Promise.allSettled([
+          api.getDataDir(),
+          api.listEntries(),
+          api.getAiSettings()
+        ]);
         if (cancelled) return;
 
         if (dirRes.status === "fulfilled") {
@@ -101,6 +111,10 @@ export function App() {
           const msg = listRes.reason instanceof Error ? listRes.reason.message : String(listRes.reason);
           setEntries([]);
           setAppError(msg || "起動に失敗しました");
+        }
+
+        if (aiRes.status === "fulfilled") {
+          setAiSettings(aiRes.value);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -124,7 +138,7 @@ export function App() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const key = e.key.toLowerCase();
-      if ((e.ctrlKey || e.metaKey) && key === "f") {
+      if ((e.ctrlKey || e.metaKey) && key === "f" && activeView === "journal") {
         e.preventDefault();
         searchRef.current?.focus();
         searchRef.current?.select();
@@ -132,7 +146,7 @@ export function App() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [activeView]);
 
   useEffect(() => {
     const cleanups: Array<() => void> = [];
@@ -277,197 +291,233 @@ export function App() {
         <header className="topbar">
           <div className="topbarLeft">
             <div className="appTitle">Acta</div>
+            <div className="viewTabs">
+              <button
+                className={`viewTab ${activeView === "journal" ? "isActive" : ""}`}
+                type="button"
+                onClick={() => setActiveView("journal")}
+              >
+                記録
+              </button>
+              <button
+                className={`viewTab ${activeView === "ai" ? "isActive" : ""}`}
+                type="button"
+                onClick={() => setActiveView("ai")}
+              >
+                AI対話
+              </button>
+            </div>
           </div>
 
-          <div className="topbarCenter">
-            <div className="topbarControls">
-              <div className="search">
-                <input
-                  ref={searchRef}
-                  className="searchInput"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="検索 (Ctrl+F)"
-                />
-                {query ? (
-                  <button
-                    className="searchClear"
-                    type="button"
-                    onClick={() => setQuery("")}
-                    title="クリア"
+          {activeView === "journal" ? (
+            <div className="topbarCenter">
+              <div className="topbarControls">
+                <div className="search">
+                  <input
+                    ref={searchRef}
+                    className="searchInput"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="検索 (Ctrl+F)"
+                  />
+                  {query ? (
+                    <button
+                      className="searchClear"
+                      type="button"
+                      onClick={() => setQuery("")}
+                      title="クリア"
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="limitPicker" title="表示件数">
+                  <div className="limitLabel">表示</div>
+                  <select
+                    className="limitSelect"
+                    value={String(limit)}
+                    onChange={(e) => setLimit(Number(e.target.value))}
                   >
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="0">すべて</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="topbarCenter">
+              <div className="aiTopHint">設定で指定した CLI と指示 Markdown を使って対話します。</div>
+            </div>
+          )}
+
+          {activeView === "journal" ? (
+            <div className="topbarRight">
+              <div className="datePicker" title="日付で絞り込み">
+                <div className="dateLabel">日付</div>
+
+                <button
+                  className="dateNavBtn"
+                  type="button"
+                  disabled={!prevAvailableDate}
+                  title={prevAvailableDate ? `${prevAvailableDate} へ` : "前の日付がありません"}
+                  onClick={() => prevAvailableDate && setDateFilter(prevAvailableDate)}
+                >
+                  ←
+                </button>
+
+                <input
+                  className="dateInput"
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                />
+
+                <button
+                  className="dateNavBtn"
+                  type="button"
+                  disabled={!nextAvailableDate}
+                  title={nextAvailableDate ? `${nextAvailableDate} へ` : "次の日付がありません"}
+                  onClick={() => nextAvailableDate && setDateFilter(nextAvailableDate)}
+                >
+                  →
+                </button>
+
+                <button
+                  className="dateQuickBtn"
+                  type="button"
+                  title="今日"
+                  onClick={() => setDateFilter(formatDateYYYYMMDD(new Date()))}
+                >
+                  今日
+                </button>
+
+                {dateFilter ? (
+                  <button className="dateClearBtn" type="button" title="クリア" onClick={() => setDateFilter("")}>
                     ×
                   </button>
                 ) : null}
               </div>
-
-              <div className="limitPicker" title="表示件数">
-                <div className="limitLabel">表示</div>
-                <select
-                  className="limitSelect"
-                  value={String(limit)}
-                  onChange={(e) => setLimit(Number(e.target.value))}
-                >
-                  <option value="10">10</option>
-                  <option value="20">20</option>
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                  <option value="0">すべて</option>
-                </select>
-              </div>
             </div>
-          </div>
-
-          <div className="topbarRight">
-            <div className="datePicker" title="日付で絞り込み">
-              <div className="dateLabel">日付</div>
-
-              <button
-                className="dateNavBtn"
-                type="button"
-                disabled={!prevAvailableDate}
-                title={prevAvailableDate ? `${prevAvailableDate} へ` : "前の日付がありません"}
-                onClick={() => prevAvailableDate && setDateFilter(prevAvailableDate)}
-              >
-                ←
-              </button>
-
-              <input
-                className="dateInput"
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-              />
-
-              <button
-                className="dateNavBtn"
-                type="button"
-                disabled={!nextAvailableDate}
-                title={nextAvailableDate ? `${nextAvailableDate} へ` : "次の日付がありません"}
-                onClick={() => nextAvailableDate && setDateFilter(nextAvailableDate)}
-              >
-                →
-              </button>
-
-              <button
-                className="dateQuickBtn"
-                type="button"
-                title="今日"
-                onClick={() => setDateFilter(formatDateYYYYMMDD(new Date()))}
-              >
-                今日
-              </button>
-
-              {dateFilter ? (
-                <button className="dateClearBtn" type="button" title="クリア" onClick={() => setDateFilter("")}>
-                  ×
-                </button>
-              ) : null}
-            </div>
-          </div>
+          ) : (
+            <div className="topbarRight" />
+          )}
         </header>
 
-        <section className="composerArea">
-          {appError ? <div className="appError">{appError}</div> : null}
-          <Composer
-            tagSuggestions={tagSuggestions}
-            popularTagSuggestions={popularTagSuggestions}
-            mode={editing ? "edit" : "create"}
-            draftKey={editing?.id ?? draft?.key ?? "create"}
-            initialBody={editing?.body ?? draft?.body ?? ""}
-            initialTags={editing?.tags ?? draft?.tags ?? []}
-            autoFocusEditor={Boolean(editing || draft)}
-            onCancel={() => setEditing(null)}
-            onSubmit={async (body, tags) => {
-              if (editing) {
-                const res = await api.updateEntry({ id: editing.id, body, tags });
-                if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
-                setEditing(null);
-              } else {
-                await api.addEntry({ body, tags });
-              }
-              setDraft(null);
-              await reload();
-            }}
-          />
-        </section>
-
-        <div className="scrollArea dragScroll" ref={scrollAreaRef}>
-          <div className="commentList">
-            {loading ? (
-              <div className="empty">読み込み中...</div>
-            ) : filteredEntries.length === 0 ? (
-              <div className="empty">該当するコメントがありません</div>
-            ) : (
-              visibleEntries.map((e) => (
-                <CommentCard
-                  key={e.id}
-                  entry={e}
-                  onClickTag={(t) => toggleTagFilter(t)}
-                  onEdit={(entry) => {
-                    setEditing(entry);
-                    setDraft(null);
-                    setAppError("");
-                  }}
-                  onCopy={(entry) => {
+        {activeView === "journal" ? (
+          <>
+            <section className="composerArea">
+              {appError ? <div className="appError">{appError}</div> : null}
+              <Composer
+                tagSuggestions={tagSuggestions}
+                popularTagSuggestions={popularTagSuggestions}
+                mode={editing ? "edit" : "create"}
+                draftKey={editing?.id ?? draft?.key ?? "create"}
+                initialBody={editing?.body ?? draft?.body ?? ""}
+                initialTags={editing?.tags ?? draft?.tags ?? []}
+                autoFocusEditor={Boolean(editing || draft)}
+                onCancel={() => setEditing(null)}
+                onSubmit={async (body, tags) => {
+                  if (editing) {
+                    const res = await api.updateEntry({ id: editing.id, body, tags });
+                    if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
                     setEditing(null);
-                    setDraft({ key: `copy:${entry.id}:${Date.now()}`, body: entry.body, tags: entry.tags });
-                    setAppError("");
-                  }}
-                  onToggleTask={async (entry, line0, checked) => {
-                    const nextBody = setTaskCheckedOnLine(entry.body, line0, checked);
-                    if (!nextBody) return;
-                    try {
-                      const res = await api.updateEntry({ id: entry.id, body: nextBody, tags: entry.tags });
-                      if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
-                      setAppError("");
-                    } catch (err) {
-                      const msg = err instanceof Error ? err.message : String(err);
-                      if (msg.includes("No handler registered")) {
-                        setAppError("アプリを再起動してください（更新が反映されていない可能性があります）");
-                      } else {
-                        setAppError(msg || "更新に失敗しました");
-                      }
-                    } finally {
-                      await reload({ keepError: true });
-                    }
-                  }}
-                  onDelete={async (entry) => {
-                    const ok = window.confirm("この投稿を削除しますか？");
-                    if (!ok) return;
+                  } else {
+                    await api.addEntry({ body, tags });
+                  }
+                  setDraft(null);
+                  await reload();
+                }}
+              />
+            </section>
 
-                    try {
-                      if (editing?.id === entry.id) setEditing(null);
-                      const res = await api.deleteEntry({ id: entry.id });
-                      if (!res?.deleted) {
-                        setAppError("削除対象が見つかりませんでした");
-                      } else {
+            <div className="scrollArea dragScroll" ref={scrollAreaRef}>
+              <div className="commentList">
+                {loading ? (
+                  <div className="empty">読み込み中...</div>
+                ) : filteredEntries.length === 0 ? (
+                  <div className="empty">該当するコメントがありません</div>
+                ) : (
+                  visibleEntries.map((e) => (
+                    <CommentCard
+                      key={e.id}
+                      entry={e}
+                      onClickTag={(t) => toggleTagFilter(t)}
+                      onEdit={(entry) => {
+                        setEditing(entry);
+                        setDraft(null);
                         setAppError("");
-                      }
-                      await reload();
-                    } catch (err) {
-                      const msg = err instanceof Error ? err.message : String(err);
-                      if (msg.includes("No handler registered")) {
-                        setAppError("アプリを再起動してください（更新が反映されていない可能性があります）");
-                      } else {
-                        setAppError(msg || "削除に失敗しました");
-                      }
-                    }
-                  }}
-                />
-              ))
-            )}
-          </div>
-        </div>
+                      }}
+                      onCopy={(entry) => {
+                        setEditing(null);
+                        setDraft({ key: `copy:${entry.id}:${Date.now()}`, body: entry.body, tags: entry.tags });
+                        setAppError("");
+                      }}
+                      onToggleTask={async (entry, line0, checked) => {
+                        const nextBody = setTaskCheckedOnLine(entry.body, line0, checked);
+                        if (!nextBody) return;
+                        try {
+                          const res = await api.updateEntry({ id: entry.id, body: nextBody, tags: entry.tags });
+                          if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
+                          setAppError("");
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : String(err);
+                          if (msg.includes("No handler registered")) {
+                            setAppError("アプリを再起動してください（更新が反映されていない可能性があります）");
+                          } else {
+                            setAppError(msg || "更新に失敗しました");
+                          }
+                        } finally {
+                          await reload({ keepError: true });
+                        }
+                      }}
+                      onDelete={async (entry) => {
+                        const ok = window.confirm("この投稿を削除しますか？");
+                        if (!ok) return;
+
+                        try {
+                          if (editing?.id === entry.id) setEditing(null);
+                          const res = await api.deleteEntry({ id: entry.id });
+                          if (!res?.deleted) {
+                            setAppError("削除対象が見つかりませんでした");
+                          } else {
+                            setAppError("");
+                          }
+                          await reload();
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : String(err);
+                          if (msg.includes("No handler registered")) {
+                            setAppError("アプリを再起動してください（更新が反映されていない可能性があります）");
+                          } else {
+                            setAppError(msg || "削除に失敗しました");
+                          }
+                        }
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        <section className={`aiArea ${activeView === "ai" ? "" : "isHidden"}`}>
+          <AiConsole settings={aiSettings} dataDir={dataDir} />
+        </section>
       </main>
 
       <button className="settingsFab" type="button" onClick={() => setSettingsOpen(true)} title="設定">
         設定
       </button>
 
-              {settingsOpen ? (
+      {settingsOpen ? (
         <SettingsModal
           dataDir={dataDir}
+          aiCliPath={aiSettings.cliPath}
+          aiInstructionMarkdown={aiSettings.instructionMarkdown}
           onClose={() => setSettingsOpen(false)}
           onChooseDataDir={async () => {
             try {
@@ -484,6 +534,21 @@ export function App() {
               const msg = e instanceof Error ? e.message : String(e);
               setAppError(msg || "保存先の変更に失敗しました");
             }
+          }}
+          onChooseAiCliPath={async () => {
+            try {
+              const res = await api.chooseAiCliPath();
+              if (!res || res.canceled) return null;
+              return res.cliPath;
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              setAppError(msg || "CLIパスの選択に失敗しました");
+              return null;
+            }
+          }}
+          onSaveAiSettings={async (payload) => {
+            const saved = await api.saveAiSettings(payload);
+            setAiSettings(saved);
           }}
         />
       ) : null}
