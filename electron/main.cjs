@@ -57,6 +57,27 @@ function detectAiCliKind(cliPath) {
   return "codex";
 }
 
+function parseJsonLine(line) {
+  const text = String(line ?? "").trim();
+  if (!text || !text.startsWith("{") || !text.endsWith("}")) return null;
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function captureCodexThreadIdFromLine(session, line) {
+  const event = parseJsonLine(line);
+  if (!event) return;
+
+  if (event.type === "thread.started") {
+    const id = String(event.thread_id ?? "").trim();
+    if (id) session.codexThreadId = id;
+  }
+}
+
 function startAiSession(cliPath) {
   const binPath = String(cliPath ?? "").trim();
   if (!binPath) throw new Error("CLIパスが未設定です");
@@ -67,6 +88,7 @@ function startAiSession(cliPath) {
     cliPath: binPath,
     systemInstruction: "",
     needsBootstrap: true,
+    codexThreadId: "",
     history: [],
     chunks: [],
     alive: true,
@@ -84,14 +106,25 @@ function runAiTurn(session, input) {
   const dataDir = storage.getDataDir();
   fs.mkdirSync(dataDir, { recursive: true });
 
-  const prompt = buildAiPrompt(session, input);
+  let prompt = buildAiPrompt(session, input);
   const outPath = path.join(app.getPath("temp"), `acta-ai-${session.id}-${Date.now()}.txt`);
   const cliKind = detectAiCliKind(session.cliPath);
-  const args =
-    cliKind === "claude"
-      ? ["--print"]
-      : ["exec", "--skip-git-repo-check", "-C", dataDir, "--color", "never", "-o", outPath, "-"];
-  const useOutputFile = cliKind !== "claude";
+  let args = [];
+  let useOutputFile = false;
+  let parseThreadIdFromStdout = false;
+
+  if (cliKind === "claude") {
+    args = ["--print"];
+  } else if (session.codexThreadId) {
+    // Reuse remote thread state to avoid re-sending long local history each turn.
+    args = ["exec", "resume", "--skip-git-repo-check", session.codexThreadId, "-"];
+    prompt = input;
+  } else {
+    // First turn: create a thread and capture its id from JSON events.
+    args = ["exec", "--skip-git-repo-check", "-C", dataDir, "--color", "never", "--json", "-o", outPath, "-"];
+    useOutputFile = true;
+    parseThreadIdFromStdout = true;
+  }
 
   session.busy = true;
   session.exitCode = null;
@@ -108,8 +141,20 @@ function runAiTurn(session, input) {
 
   let stdoutText = "";
   let stderrText = "";
+  let stdoutPending = "";
   child.stdout?.on("data", (chunk) => {
-    stdoutText += String(chunk ?? "");
+    const text = String(chunk ?? "");
+    stdoutText += text;
+    if (!parseThreadIdFromStdout) return;
+
+    stdoutPending += text;
+    while (true) {
+      const idx = stdoutPending.indexOf("\n");
+      if (idx < 0) break;
+      const line = stdoutPending.slice(0, idx);
+      stdoutPending = stdoutPending.slice(idx + 1);
+      captureCodexThreadIdFromLine(session, line);
+    }
   });
   child.stderr?.on("data", (chunk) => {
     stderrText += String(chunk ?? "");
@@ -126,6 +171,10 @@ function runAiTurn(session, input) {
 
   child.on("close", (code) => {
     void (async () => {
+      if (parseThreadIdFromStdout && stdoutPending) {
+        captureCodexThreadIdFromLine(session, stdoutPending);
+      }
+
       let answer = "";
       if (useOutputFile) {
         answer = (await readFileIfExists(outPath)).trim();
@@ -148,6 +197,11 @@ function runAiTurn(session, input) {
         session.history.push({ user: input, assistant: answer });
         session.chunks.push(`${answer}\n`);
         return;
+      }
+
+      if (cliKind === "codex") {
+        // If resume execution failed, retry from a fresh thread next turn.
+        session.codexThreadId = "";
       }
 
       const fallback = answer || stderrText.trim() || stdoutText.trim();

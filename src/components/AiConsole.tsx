@@ -120,7 +120,7 @@ export function AiConsole({ settings, dataDir }: Props) {
       } finally {
         pollingRef.current = false;
       }
-    }, 220);
+    }, 120);
 
     return () => {
       cancelled = true;
