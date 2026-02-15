@@ -6,6 +6,18 @@ const { app } = require("electron");
 const DATE_FILE_RE = /^\d{4}-\d{2}-\d{2}\.md$/;
 const SETTINGS_FILE = "acta-settings.json";
 const DEFAULT_AI_CLI_PATH = "/opt/homebrew/bin/codex";
+const DEFAULT_THEME = "default";
+const ALLOWED_THEMES = new Set([
+  "default",
+  "dracula",
+  "solarized-dark",
+  "solarized-light",
+  "morokai",
+  "morokai-light",
+  "tokyo-night",
+  "nord",
+  "gruvbox-dark"
+]);
 
 function safeJsonParse(text) {
   try {
@@ -119,6 +131,11 @@ function buildDefaultAiInstruction(dataDir) {
   ].join("\n");
 }
 
+function normalizeTheme(raw) {
+  const t = String(raw ?? "").trim().toLowerCase();
+  return ALLOWED_THEMES.has(t) ? t : DEFAULT_THEME;
+}
+
 function getAiSettings() {
   const s = loadSettings();
   const cliPath = typeof s.aiCliPath === "string" ? s.aiCliPath.trim() : "";
@@ -126,22 +143,26 @@ function getAiSettings() {
     typeof s.aiInstructionMarkdown === "string" && s.aiInstructionMarkdown.trim().length > 0
       ? s.aiInstructionMarkdown
       : buildDefaultAiInstruction(getDataDir());
+  const theme = normalizeTheme(s.theme);
 
   return {
     cliPath: cliPath || DEFAULT_AI_CLI_PATH,
-    instructionMarkdown
+    instructionMarkdown,
+    theme
   };
 }
 
 function setAiSettings(payload) {
   const cliPath = String(payload?.cliPath ?? "").trim() || DEFAULT_AI_CLI_PATH;
   const instructionMarkdown = String(payload?.instructionMarkdown ?? "").trim() || buildDefaultAiInstruction(getDataDir());
+  const theme = normalizeTheme(payload?.theme);
 
   const s = loadSettings();
   saveSettings({
     ...s,
     aiCliPath: cliPath,
-    aiInstructionMarkdown: instructionMarkdown
+    aiInstructionMarkdown: instructionMarkdown,
+    theme
   });
 
   return getAiSettings();

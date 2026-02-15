@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { markdownToHtml } from "../lib/markdown";
 import { renderMermaid } from "../lib/mermaid";
-import { setTaskCheckedOnLine } from "../lib/taskList";
+import { hydrateTaskCheckboxStates, nextTaskState, setTaskStateOnLine, taskStateFromInput } from "../lib/taskList";
 import { TagInput } from "./TagInput";
 
 const PREVIEW_DEBOUNCE_MS = 320;
@@ -168,6 +168,7 @@ export function Composer({
   useEffect(() => {
     const el = previewRef.current;
     if (!el) return;
+    hydrateTaskCheckboxStates(el);
     if (!el.querySelector(".mermaid")) {
       cancelScheduledMermaid();
       return;
@@ -277,9 +278,11 @@ export function Composer({
                 const t = e.target;
                 if (!(t instanceof HTMLInputElement)) return;
                 if (t.type !== "checkbox") return;
+                e.preventDefault();
                 const line0 = Number(t.dataset.taskLine);
                 if (!Number.isFinite(line0)) return;
-                const next = setTaskCheckedOnLine(bodyRef.current, line0, t.checked);
+                const nextState = nextTaskState(taskStateFromInput(t));
+                const next = setTaskStateOnLine(bodyRef.current, line0, nextState);
                 if (typeof next === "string") {
                   updateBody(next);
                   if (editorRef.current) editorRef.current.value = next;

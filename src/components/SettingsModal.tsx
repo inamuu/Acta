@@ -1,10 +1,23 @@
 import React, { useEffect, useRef, useState } from "react";
-import type { SaveAiSettingsPayload } from "../../shared/types";
+import type { ActaThemeId, SaveAiSettingsPayload } from "../../shared/types";
+
+const THEME_OPTIONS: Array<{ value: ActaThemeId; label: string }> = [
+  { value: "default", label: "default（現在のテーマ）" },
+  { value: "dracula", label: "dracula" },
+  { value: "solarized-dark", label: "solarized dark" },
+  { value: "solarized-light", label: "solarized light" },
+  { value: "morokai", label: "morokai" },
+  { value: "morokai-light", label: "morokai light" },
+  { value: "tokyo-night", label: "tokyo night" },
+  { value: "nord", label: "nord" },
+  { value: "gruvbox-dark", label: "gruvbox dark" }
+];
 
 type Props = {
   dataDir: string;
   aiCliPath: string;
   aiInstructionMarkdown: string;
+  aiTheme: ActaThemeId;
   onChooseDataDir: () => Promise<void>;
   onSaveAiSettings: (payload: SaveAiSettingsPayload) => Promise<void>;
   onClose: () => void;
@@ -14,6 +27,7 @@ export function SettingsModal({
   dataDir,
   aiCliPath,
   aiInstructionMarkdown,
+  aiTheme,
   onChooseDataDir,
   onSaveAiSettings,
   onClose
@@ -21,6 +35,7 @@ export function SettingsModal({
   const closeRef = useRef<HTMLButtonElement>(null);
   const [cliPath, setCliPath] = useState(aiCliPath);
   const [instructionMarkdown, setInstructionMarkdown] = useState(aiInstructionMarkdown);
+  const [theme, setTheme] = useState<ActaThemeId>(aiTheme);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -35,6 +50,10 @@ export function SettingsModal({
   useEffect(() => {
     setInstructionMarkdown(aiInstructionMarkdown);
   }, [aiInstructionMarkdown]);
+
+  useEffect(() => {
+    setTheme(aiTheme);
+  }, [aiTheme]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -52,7 +71,8 @@ export function SettingsModal({
     try {
       await onSaveAiSettings({
         cliPath,
-        instructionMarkdown
+        instructionMarkdown,
+        theme
       });
       setSaveMessage("保存しました");
     } catch (e) {
@@ -94,6 +114,17 @@ export function SettingsModal({
               placeholder="/opt/homebrew/bin/codex"
               spellCheck={false}
             />
+
+            <div className="settingCol">
+              <div className="settingSubLabel">テーマ</div>
+              <select className="settingTextInput" value={theme} onChange={(e) => setTheme(e.target.value as ActaThemeId)}>
+                {THEME_OPTIONS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <div className="settingCol">
               <div className="settingSubLabel">指示 (Markdown)</div>

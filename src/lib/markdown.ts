@@ -1,6 +1,7 @@
 import DOMPurify from "dompurify";
 import hljs from "highlight.js";
 import MarkdownIt from "markdown-it";
+import { taskStateFromMarker } from "./taskList";
 
 const md = new MarkdownIt({
   linkify: true,
@@ -40,22 +41,31 @@ function taskListPlugin(markdownIt: MarkdownIt) {
       const first = inline.children[0];
       if (!first || first.type !== "text") continue;
 
-      const m = first.content.match(/^\[([ xX])\]\s+/);
+      const m = first.content.match(/^\[([ xX\-\/rR])\]\s+/);
       if (!m) continue;
 
-      const checked = m[1].toLowerCase() === "x";
+      const taskState = taskStateFromMarker(m[1] ?? "");
+      if (!taskState) continue;
+      const checked = taskState === "checked";
       const line0 = inline.map?.[0] ?? listItemOpen.map?.[0] ?? -1;
 
-      first.content = first.content.replace(/^\[[ xX]\]\s+/, "");
-      inline.content = inline.content.replace(/^\[[ xX]\]\s+/, "");
+      first.content = first.content.replace(/^\[[ xX\-\/rR]\]\s+/, "");
+      inline.content = inline.content.replace(/^\[[ xX\-\/rR]\]\s+/, "");
 
       const checkbox = new state.Token("html_inline", "", 0);
-      checkbox.content = `<input class="taskListCheckbox" type="checkbox" data-task-line="${line0}"${
-        checked ? " checked" : ""
-      } aria-label="task" />`;
+      checkbox.content =
+        `<input class="taskListCheckbox" type="checkbox" data-task-line="${line0}" data-task-state="${taskState}"` +
+        `${checked ? " checked" : ""} aria-label="task" />`;
       inline.children.unshift(checkbox);
+      if (taskState === "review") {
+        const badge = new state.Token("html_inline", "", 0);
+        badge.content = `<span class="taskStateBadge taskStateBadgeReview" aria-hidden="true">R</span>`;
+        inline.children.splice(1, 0, badge);
+      }
 
       listItemOpen.attrJoin("class", "taskListItem");
+      if (taskState === "partial") listItemOpen.attrJoin("class", "taskStatePartial");
+      if (taskState === "review") listItemOpen.attrJoin("class", "taskStateReview");
     }
   });
 }
@@ -79,11 +89,19 @@ md.renderer.rules.fence = (tokens, idx, options, env, slf) => {
   return defaultFence(tokens, idx, options, env, slf);
 };
 
+function normalizeLooseTaskListSyntax(markdown: string): string {
+  return markdown.replace(
+    /^(\s*(?:>\s*)*(?:[-+*]|\d+[.)]))\[([ xX\-\/rR])\](\s+)/gm,
+    "$1 [$2]$3"
+  );
+}
+
 export function markdownToHtml(markdown: string): string {
-  const raw = md.render(markdown);
+  const normalized = normalizeLooseTaskListSyntax(markdown);
+  const raw = md.render(normalized);
   return DOMPurify.sanitize(raw, {
     USE_PROFILES: { html: true },
     ADD_TAGS: ["input"],
-    ADD_ATTR: ["type", "checked", "data-task-line", "aria-label"]
+    ADD_ATTR: ["type", "checked", "data-task-line", "data-task-state", "aria-label", "aria-hidden"]
   });
 }

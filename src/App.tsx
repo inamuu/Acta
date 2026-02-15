@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { ActaAiSettings, ActaEntry } from "../shared/types";
+import type { ActaAiSettings, ActaEntry, ActaThemeId } from "../shared/types";
 import { AiConsole } from "./components/AiConsole";
 import { CommentCard } from "./components/CommentCard";
 import { Composer } from "./components/Composer";
 import { SettingsModal } from "./components/SettingsModal";
 import { TagSidebar } from "./components/TagSidebar";
 import { installDragScroll } from "./lib/dragScroll";
-import { setTaskCheckedOnLine } from "./lib/taskList";
+import { setTaskStateOnLine, type TaskState } from "./lib/taskList";
 
 type TagStat = { tag: string; count: number };
 
@@ -37,6 +37,30 @@ function lowerBound(list: string[], value: string): number {
   return lo;
 }
 
+function normalizeTheme(theme: string | undefined): ActaThemeId {
+  switch (String(theme ?? "").toLowerCase()) {
+    case "dracula":
+      return "dracula";
+    case "solarized-dark":
+      return "solarized-dark";
+    case "solarized-light":
+      return "solarized-light";
+    case "morokai":
+      return "morokai";
+    case "morokai-light":
+      return "morokai-light";
+    case "tokyo-night":
+      return "tokyo-night";
+    case "nord":
+      return "nord";
+    case "gruvbox-dark":
+      return "gruvbox-dark";
+    case "default":
+    default:
+      return "default";
+  }
+}
+
 export function App() {
   const api = window.acta;
 
@@ -54,7 +78,8 @@ export function App() {
   const [activeView, setActiveView] = useState<"journal" | "ai">("journal");
   const [aiSettings, setAiSettings] = useState<ActaAiSettings>({
     cliPath: "/opt/homebrew/bin/codex",
-    instructionMarkdown: ""
+    instructionMarkdown: "",
+    theme: "default"
   });
   const [limit, setLimit] = useState<number>(() => {
     try {
@@ -114,7 +139,7 @@ export function App() {
         }
 
         if (aiRes.status === "fulfilled") {
-          setAiSettings(aiRes.value);
+          setAiSettings({ ...aiRes.value, theme: normalizeTheme(aiRes.value.theme) });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -134,6 +159,11 @@ export function App() {
       // ignore
     }
   }, [limit]);
+
+  useEffect(() => {
+    const nextTheme = normalizeTheme(aiSettings.theme);
+    document.documentElement.setAttribute("data-acta-theme", nextTheme);
+  }, [aiSettings.theme]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -456,8 +486,8 @@ export function App() {
                         setDraft({ key: `copy:${entry.id}:${Date.now()}`, body: entry.body, tags: entry.tags });
                         setAppError("");
                       }}
-                      onToggleTask={async (entry, line0, checked) => {
-                        const nextBody = setTaskCheckedOnLine(entry.body, line0, checked);
+                      onToggleTask={async (entry, line0, nextState: TaskState) => {
+                        const nextBody = setTaskStateOnLine(entry.body, line0, nextState);
                         if (!nextBody) return;
                         try {
                           const res = await api.updateEntry({ id: entry.id, body: nextBody, tags: entry.tags });
@@ -518,6 +548,7 @@ export function App() {
           dataDir={dataDir}
           aiCliPath={aiSettings.cliPath}
           aiInstructionMarkdown={aiSettings.instructionMarkdown}
+          aiTheme={normalizeTheme(aiSettings.theme)}
           onClose={() => setSettingsOpen(false)}
           onChooseDataDir={async () => {
             try {
@@ -537,7 +568,7 @@ export function App() {
           }}
           onSaveAiSettings={async (payload) => {
             const saved = await api.saveAiSettings(payload);
-            setAiSettings(saved);
+            setAiSettings({ ...saved, theme: normalizeTheme(saved.theme) });
           }}
         />
       ) : null}

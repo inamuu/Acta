@@ -36,9 +36,24 @@ export type UpdateEntryResult = {
   updated: boolean;
 };
 
+export const ACTA_THEME_IDS = [
+  "default",
+  "dracula",
+  "solarized-dark",
+  "solarized-light",
+  "morokai",
+  "morokai-light",
+  "tokyo-night",
+  "nord",
+  "gruvbox-dark"
+] as const;
+
+export type ActaThemeId = (typeof ACTA_THEME_IDS)[number];
+
 export type ActaAiSettings = {
   cliPath: string;
   instructionMarkdown: string;
+  theme: ActaThemeId;
 };
 
 export type SaveAiSettingsPayload = ActaAiSettings;

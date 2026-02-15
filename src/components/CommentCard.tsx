@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from "react";
 import type { ActaEntry } from "../../shared/types";
 import { markdownToHtml } from "../lib/markdown";
 import { renderMermaid } from "../lib/mermaid";
+import { hydrateTaskCheckboxStates, nextTaskState, taskStateFromInput, type TaskState } from "../lib/taskList";
 
 type Props = {
   entry: ActaEntry;
@@ -9,7 +10,7 @@ type Props = {
   onEdit?: (entry: ActaEntry) => void;
   onCopy?: (entry: ActaEntry) => void;
   onDelete?: (entry: ActaEntry) => void;
-  onToggleTask?: (entry: ActaEntry, line0: number, checked: boolean) => void | Promise<void>;
+  onToggleTask?: (entry: ActaEntry, line0: number, nextState: TaskState) => void | Promise<void>;
 };
 
 function formatWhen(ms: number): string {
@@ -35,6 +36,7 @@ export function CommentCard({ entry, onClickTag, onEdit, onCopy, onDelete, onTog
   useEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
+    hydrateTaskCheckboxStates(el);
     void renderMermaid(el);
   }, [html]);
 
@@ -96,9 +98,13 @@ export function CommentCard({ entry, onClickTag, onEdit, onCopy, onDelete, onTog
             const t = e.target;
             if (!(t instanceof HTMLInputElement)) return;
             if (t.type !== "checkbox") return;
+            e.preventDefault();
             const line0 = Number(t.dataset.taskLine);
             if (!Number.isFinite(line0)) return;
-            void onToggleTask?.(entry, line0, t.checked);
+            const nextState = nextTaskState(taskStateFromInput(t));
+            t.dataset.taskState = nextState;
+            if (bodyRef.current) hydrateTaskCheckboxStates(bodyRef.current);
+            void onToggleTask?.(entry, line0, nextState);
           }}
           dangerouslySetInnerHTML={{ __html: html }}
         />

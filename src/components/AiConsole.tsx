@@ -14,6 +14,21 @@ type ChatMessage = {
   text: string;
 };
 
+function roleLabel(role: ChatRole): string {
+  switch (role) {
+    case "assistant":
+      return "AI";
+    case "user":
+      return "あなた";
+    case "system":
+      return "SYSTEM";
+    case "error":
+      return "ERROR";
+    default:
+      return "";
+  }
+}
+
 function buildBootstrapInstruction(settings: ActaAiSettings, dataDir: string): string {
   const dir = String(dataDir ?? "").trim();
   const instruction = String(settings?.instructionMarkdown ?? "").trim();
@@ -198,23 +213,17 @@ export function AiConsole({ settings, dataDir }: Props) {
       </div>
 
       <div className="aiConsoleMeta">
-        <div>CLI: {settings.cliPath || "未設定"}</div>
-        <div>Data: {dataDir || "未設定"}</div>
+        <div className="aiMetaItem">
+          <div className="aiMetaLabel">CLI</div>
+          <div className="aiMetaValue">{settings.cliPath || "未設定"}</div>
+        </div>
+        <div className="aiMetaItem">
+          <div className="aiMetaLabel">DATA</div>
+          <div className="aiMetaValue">{dataDir || "未設定"}</div>
+        </div>
       </div>
 
       {error ? <div className="composerError">{error}</div> : null}
-
-      <div ref={feedRef} className="aiChatFeed">
-        {messages.length === 0 ? (
-          <div className="aiChatEmpty">ここに対話ログが表示されます</div>
-        ) : (
-          messages.map((m) => (
-            <div key={m.id} className={`aiMsg aiMsg--${m.role}`}>
-              <div className="aiMsgBody">{m.text}</div>
-            </div>
-          ))
-        )}
-      </div>
 
       <div className="aiConsoleInputRow">
         <textarea
@@ -230,13 +239,26 @@ export function AiConsole({ settings, dataDir }: Props) {
           }}
         />
         <button
-          className="primaryBtn"
+          className="primaryBtn aiSendBtn"
           type="button"
           disabled={sending || thinking || !input.trim()}
           onClick={() => void handleSend()}
         >
           {sending ? "送信中..." : "送信"}
         </button>
+      </div>
+
+      <div ref={feedRef} className="aiChatFeed">
+        {messages.length === 0 ? (
+          <div className="aiChatEmpty">ここに対話ログが表示されます</div>
+        ) : (
+          messages.map((m) => (
+            <div key={m.id} className={`aiMsg aiMsg--${m.role}`}>
+              <div className="aiMsgRole">{roleLabel(m.role)}</div>
+              <div className="aiMsgBody">{m.text}</div>
+            </div>
+          ))
+        )}
       </div>
     </section>
   );
