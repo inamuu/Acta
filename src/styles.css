@@ -2531,19 +2531,26 @@ body {
 
 .tagItem,
 .sidebar .tagItem {
-  background: linear-gradient(180deg, var(--theme-surface), var(--theme-surface-alt)) !important;
-  border-color: transparent !important;
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
+  border-color: rgba(var(--theme-shadow-rgb), 0.14) !important;
+  color: var(--theme-text-subtle) !important;
 }
 
 .tagItem:hover,
 .sidebar .tagItem:hover {
-  background: linear-gradient(180deg, var(--theme-surface-alt), var(--theme-surface-soft)) !important;
-  border-color: var(--theme-border-soft) !important;
+  background: rgba(var(--theme-accent-rgb), 0.14) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.3) !important;
+  color: var(--theme-text) !important;
 }
 
 .tagItem.isSelected,
+.sidebar .tagItem.isSelected {
+  background: rgba(var(--theme-accent-rgb), 0.2) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.42) !important;
+  color: var(--theme-text) !important;
+}
+
 .tagGroupHeader.isActive,
-.sidebar .tagItem.isSelected,
 .sidebar .tagGroupHeader.isActive {
   background: linear-gradient(180deg, var(--theme-surface-selected), var(--theme-surface-soft-2)) !important;
   border-color: var(--theme-border-selected) !important;
@@ -2767,7 +2774,7 @@ body {
     [data-acta-theme="nord"],
     [data-acta-theme="gruvbox-dark"]
   )
-  :is(.tagGroupHeader, .tagItem, .tagChip, .tagPickerMore, .tagPill, .tagSuggestionPill) {
+  :is(.tagGroupHeader, .tagChip, .tagPickerMore, .tagPill, .tagSuggestionPill) {
   background: linear-gradient(180deg, rgba(var(--theme-shadow-rgb), 0.42), rgba(var(--theme-shadow-rgb), 0.3)) !important;
   border-color: rgba(var(--theme-accent-rgb), 0.28) !important;
   color: rgba(255, 255, 255, 0.92) !important;
@@ -2781,7 +2788,7 @@ body {
     [data-acta-theme="nord"],
     [data-acta-theme="gruvbox-dark"]
   )
-  :is(.tagItem:hover, .tagGroupHeader:hover, .tagPill:hover, .tagSuggestionPill:hover) {
+  :is(.tagGroupHeader:hover, .tagPill:hover, .tagSuggestionPill:hover) {
   background: linear-gradient(180deg, rgba(var(--theme-accent-rgb), 0.34), rgba(var(--theme-accent2-rgb), 0.24)) !important;
   border-color: rgba(var(--theme-accent2-rgb), 0.5) !important;
   color: #ffffff !important;
@@ -2795,7 +2802,7 @@ body {
     [data-acta-theme="nord"],
     [data-acta-theme="gruvbox-dark"]
   )
-  :is(.tagItem.isSelected, .tagGroupHeader.isActive) {
+  .tagGroupHeader.isActive {
   background: linear-gradient(180deg, rgba(var(--theme-accent-rgb), 0.52), rgba(var(--theme-accent2-rgb), 0.36)) !important;
   border-color: rgba(var(--theme-accent2-rgb), 0.66) !important;
   color: #ffffff !important;
@@ -2931,18 +2938,27 @@ body {
   background: rgba(var(--theme-shadow-rgb), 0.08) !important;
   border-color: rgba(var(--theme-shadow-rgb), 0.14) !important;
   color: var(--theme-text-subtle) !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .sidebar .tagItem:hover {
   background: rgba(var(--theme-accent-rgb), 0.14) !important;
   border-color: rgba(var(--theme-accent-rgb), 0.3) !important;
   color: var(--theme-text) !important;
+  transform: none !important;
 }
 
 .sidebar .tagItem.isSelected {
   background: rgba(var(--theme-accent-rgb), 0.2) !important;
   border-color: rgba(var(--theme-accent-rgb), 0.42) !important;
   color: var(--theme-text) !important;
+  transform: none !important;
+}
+
+.sidebar .tagItem.isSelected::before {
+  background: var(--theme-accent) !important;
+  box-shadow: none !important;
 }
 
 .sidebar .tagGroupHeader.isActive {
@@ -2977,6 +2993,69 @@ body {
   background: var(--theme-sidebar-count-active-bg) !important;
   border-color: var(--theme-sidebar-count-active-border) !important;
   color: var(--theme-sidebar-count-active-fg) !important;
+}
+
+/* Flat tag rows in sidebar (all themes) */
+html .sidebar .tagItem {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html .sidebar .tagItem:hover {
+  background: rgba(var(--theme-accent-rgb), 0.1) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.24) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html .sidebar .tagItem.isSelected {
+  background: rgba(var(--theme-accent-rgb), 0.16) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.38) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html .sidebar .tagItem.isSelected::before {
+  background: var(--theme-accent) !important;
+  box-shadow: none !important;
+}
+
+html .sidebar .tagItem .tagCount {
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
+  border-color: rgba(var(--theme-shadow-rgb), 0.16) !important;
+  color: var(--theme-text-muted) !important;
+  box-shadow: none !important;
+}
+
+html .sidebar .tagItem.isSelected .tagCount {
+  background: rgba(var(--theme-accent-rgb), 0.18) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.32) !important;
+  color: var(--theme-text) !important;
+}
+
+/* Force flatter sidebar tags on light themes */
+:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"]) .sidebar .tagItem {
+  background: rgba(15, 23, 42, 0.04) !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  color: var(--theme-text-subtle) !important;
+}
+
+:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"])
+  .sidebar
+  .tagItem:hover {
+  background: rgba(var(--theme-accent-rgb), 0.1) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.28) !important;
+  color: var(--theme-text) !important;
+}
+
+:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"])
+  .sidebar
+  .tagItem.isSelected {
+  background: rgba(var(--theme-accent-rgb), 0.16) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.38) !important;
+  color: var(--theme-text) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3055,4 +3134,50 @@ body {
     min-height: 240px;
     max-height: 360px;
   }
+}
+
+/* Final override: flat tag rows in left sidebar across all themes */
+.sidebar .tagItem {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  transform: none !important;
+  color: var(--theme-text-subtle) !important;
+}
+
+.sidebar .tagItem:hover {
+  background: rgba(var(--theme-accent-rgb), 0.1) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+  color: var(--theme-text) !important;
+}
+
+.sidebar .tagItem.isSelected {
+  background: rgba(var(--theme-accent-rgb), 0.16) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+  color: var(--theme-text) !important;
+}
+
+.sidebar .tagItem.isSelected::before {
+  background: var(--theme-accent) !important;
+  box-shadow: none !important;
+}
+
+.sidebar .tagItem .tagCount {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--theme-text-muted) !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+.sidebar .tagItem.isSelected .tagCount {
+  background: transparent !important;
+  border: 0 !important;
+  color: var(--theme-text) !important;
 }
