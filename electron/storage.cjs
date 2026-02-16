@@ -5,6 +5,7 @@ const { app } = require("electron");
 
 const DATE_FILE_RE = /^\d{4}-\d{2}-\d{2}\.md$/;
 const SETTINGS_FILE = "acta-settings.json";
+const DATA_DIR_SETTINGS_FILE = "settings.json";
 const DEFAULT_AI_CLI_PATH = "/opt/homebrew/bin/codex";
 const DEFAULT_THEME = "default";
 const ALLOWED_THEMES = new Set([
@@ -114,6 +115,10 @@ function saveSettings(next) {
   cachedSettings = next && typeof next === "object" ? next : {};
   fs.mkdirSync(path.dirname(getSettingsPath()), { recursive: true });
   fs.writeFileSync(getSettingsPath(), JSON.stringify(cachedSettings, null, 2), "utf8");
+
+  const dataDir = getDataDir();
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(path.join(dataDir, DATA_DIR_SETTINGS_FILE), JSON.stringify(cachedSettings, null, 2), "utf8");
 }
 
 function getDataDir() {
