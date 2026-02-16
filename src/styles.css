@@ -2928,18 +2928,24 @@ body {
 }
 
 .sidebar .tagItem {
-  background: linear-gradient(180deg, var(--theme-sidebar-item-bg-top), var(--theme-sidebar-item-bg-bottom)) !important;
-  border-color: rgba(var(--theme-accent-rgb), 0.2) !important;
-  color: var(--theme-sidebar-item-fg) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
+  border-color: rgba(var(--theme-shadow-rgb), 0.14) !important;
+  color: var(--theme-text-subtle) !important;
 }
 
 .sidebar .tagItem:hover {
-  background: linear-gradient(180deg, var(--theme-sidebar-item-hover-top), var(--theme-sidebar-item-hover-bottom)) !important;
-  border-color: var(--theme-sidebar-item-hover-border) !important;
+  background: rgba(var(--theme-accent-rgb), 0.14) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.3) !important;
   color: var(--theme-text) !important;
 }
 
-.sidebar :is(.tagItem.isSelected, .tagGroupHeader.isActive) {
+.sidebar .tagItem.isSelected {
+  background: rgba(var(--theme-accent-rgb), 0.2) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.42) !important;
+  color: var(--theme-text) !important;
+}
+
+.sidebar .tagGroupHeader.isActive {
   background: linear-gradient(180deg, var(--theme-sidebar-item-active-top), var(--theme-sidebar-item-active-bottom)) !important;
   border-color: var(--theme-sidebar-item-active-border) !important;
   color: var(--theme-text) !important;
@@ -2955,7 +2961,19 @@ body {
   color: var(--theme-sidebar-count-fg) !important;
 }
 
-.sidebar :is(.tagItem.isSelected .tagCount, .tagGroupHeader.isActive .tagCount) {
+.sidebar .tagItem .tagCount {
+  background: rgba(var(--theme-shadow-rgb), 0.18) !important;
+  border-color: rgba(var(--theme-shadow-rgb), 0.24) !important;
+  color: var(--theme-text-muted) !important;
+}
+
+.sidebar .tagItem.isSelected .tagCount {
+  background: rgba(var(--theme-accent-rgb), 0.22) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.36) !important;
+  color: var(--theme-text) !important;
+}
+
+.sidebar .tagGroupHeader.isActive .tagCount {
   background: var(--theme-sidebar-count-active-bg) !important;
   border-color: var(--theme-sidebar-count-active-border) !important;
   color: var(--theme-sidebar-count-active-fg) !important;
