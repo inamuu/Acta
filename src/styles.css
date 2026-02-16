@@ -3181,3 +3181,89 @@ html .sidebar .tagItem.isSelected .tagCount {
   border: 0 !important;
   color: var(--theme-text) !important;
 }
+
+/* Final override: flat UI across the app */
+body,
+.topbar,
+.sidebar,
+.composerArea,
+.aiArea,
+.scrollArea,
+.commentHeader,
+.modalHeader,
+.commentBody,
+.commentCard,
+.modalCard,
+.settingBlock,
+.tagInputWrap,
+.tagPickerList,
+.pane,
+.paneWrite,
+.panePreview,
+.paneTitle,
+.aiConsole,
+.aiConsoleHeader,
+.aiMetaItem,
+.aiChatFeed,
+.aiConsoleInputRow,
+.noApiCard {
+  background-image: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.topbar,
+.sidebar,
+.composerArea,
+.commentCard,
+.modalCard,
+.settingBlock,
+.tagInputWrap,
+.tagPickerList,
+.pane,
+.paneWrite,
+.panePreview,
+.paneTitle,
+.aiConsole,
+.aiConsoleHeader,
+.aiMetaItem,
+.aiChatFeed,
+.aiConsoleInputRow,
+.noApiCard {
+  background-color: var(--theme-surface) !important;
+  border-color: var(--theme-border-soft) !important;
+}
+
+.viewTab,
+.viewTab:hover,
+.viewTab.isActive,
+.ghostBtn,
+.ghostBtn:hover,
+.dangerGhostBtn,
+.dangerGhostBtn:hover,
+.primaryBtn,
+.primaryBtn:hover,
+.settingsFab,
+.settingsFab:hover,
+.modalClose,
+.modalClose:hover,
+.limitPicker,
+.datePicker,
+.tagGroupHeader,
+.tagGroupHeader:hover,
+.tagGroupHeader.isActive,
+.tagCount,
+.tagChip,
+.tagPickerMore,
+.searchInput,
+.tagSearchInput,
+.tagPickerInput,
+.editor,
+.settingValue,
+.settingTextInput,
+.settingTextarea {
+  background-image: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
