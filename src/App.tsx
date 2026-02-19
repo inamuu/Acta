@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { ActaAiSettings, ActaEntry, ActaThemeId } from "../shared/types";
+import type { ActaAiSettings, ActaEntry, ActaThemeId, SyncResult } from "../shared/types";
 import { AiConsole } from "./components/AiConsole";
 import { CommentCard } from "./components/CommentCard";
 import { Composer } from "./components/Composer";
@@ -9,6 +9,11 @@ import { installDragScroll } from "./lib/dragScroll";
 import { setTaskStateOnLine, type TaskState } from "./lib/taskList";
 
 type TagStat = { tag: string; count: number };
+type SyncIndicatorState = {
+  kind: "idle" | "running" | "success" | "error";
+  label: "" | "Syncing..." | "Sync Success" | "Sync Error";
+  detail: string;
+};
 
 function normalizeQuery(s: string): string {
   return s.trim().toLowerCase();
@@ -81,6 +86,12 @@ export function App() {
     instructionMarkdown: "",
     theme: "default"
   });
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncIndicator, setSyncIndicator] = useState<SyncIndicatorState>({
+    kind: "idle",
+    label: "",
+    detail: ""
+  });
   const [limit, setLimit] = useState<number>(() => {
     try {
       const raw = localStorage.getItem("acta:limit");
@@ -95,6 +106,55 @@ export function App() {
   const searchRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const syncQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  function applySyncResult(result: SyncResult) {
+    const detail = String(result.detail ?? "").trim();
+    if (result.ok) {
+      setSyncIndicator({
+        kind: "success",
+        label: "Sync Success",
+        detail
+      });
+      return;
+    }
+    setSyncIndicator({
+      kind: "error",
+      label: "Sync Error",
+      detail
+    });
+  }
+
+  function applySyncError(err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    setSyncIndicator({
+      kind: "error",
+      label: "Sync Error",
+      detail: msg || "同期に失敗しました"
+    });
+  }
+
+  function queueBackupSync() {
+    if (!api) return;
+    syncQueueRef.current = syncQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        setSyncBusy(true);
+        setSyncIndicator({
+          kind: "running",
+          label: "Syncing...",
+          detail: ""
+        });
+        try {
+          const res = await api.syncBackup();
+          applySyncResult(res);
+        } catch (err) {
+          applySyncError(err);
+        } finally {
+          setSyncBusy(false);
+        }
+      });
+  }
 
   async function reload(opts?: { keepError?: boolean }) {
     if (!api) return;
@@ -117,11 +177,7 @@ export function App() {
       setLoading(true);
       setAppError("");
       try {
-        const [dirRes, listRes, aiRes] = await Promise.allSettled([
-          api.getDataDir(),
-          api.listEntries(),
-          api.getAiSettings()
-        ]);
+        const [dirRes, aiRes] = await Promise.allSettled([api.getDataDir(), api.getAiSettings()]);
         if (cancelled) return;
 
         if (dirRes.status === "fulfilled") {
@@ -130,16 +186,37 @@ export function App() {
           setDataDir("");
         }
 
-        if (listRes.status === "fulfilled") {
-          setEntries(listRes.value);
-        } else {
-          const msg = listRes.reason instanceof Error ? listRes.reason.message : String(listRes.reason);
-          setEntries([]);
-          setAppError(msg || "起動に失敗しました");
-        }
-
         if (aiRes.status === "fulfilled") {
           setAiSettings({ ...aiRes.value, theme: normalizeTheme(aiRes.value.theme) });
+        }
+
+        setSyncBusy(true);
+        setSyncIndicator({
+          kind: "running",
+          label: "Syncing...",
+          detail: ""
+        });
+        try {
+          const syncRes = await api.syncPull();
+          if (cancelled) return;
+          applySyncResult(syncRes);
+        } catch (err) {
+          if (cancelled) return;
+          applySyncError(err);
+        } finally {
+          if (!cancelled) setSyncBusy(false);
+        }
+
+        try {
+          const list = await api.listEntries();
+          if (cancelled) return;
+          setEntries(list);
+          setAppError("");
+        } catch (err) {
+          if (cancelled) return;
+          const msg = err instanceof Error ? err.message : String(err);
+          setEntries([]);
+          setAppError(msg || "起動に失敗しました");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -460,6 +537,7 @@ export function App() {
                   }
                   setDraft(null);
                   await reload();
+                  queueBackupSync();
                 }}
               />
             </section>
@@ -489,9 +567,11 @@ export function App() {
                       onToggleTask={async (entry, line0, nextState: TaskState) => {
                         const nextBody = setTaskStateOnLine(entry.body, line0, nextState);
                         if (!nextBody) return;
+                        let updated = false;
                         try {
                           const res = await api.updateEntry({ id: entry.id, body: nextBody, tags: entry.tags });
                           if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
+                          updated = true;
                           setAppError("");
                         } catch (err) {
                           const msg = err instanceof Error ? err.message : String(err);
@@ -502,18 +582,21 @@ export function App() {
                           }
                         } finally {
                           await reload({ keepError: true });
+                          if (updated) queueBackupSync();
                         }
                       }}
                       onDelete={async (entry) => {
                         const ok = window.confirm("この投稿を削除しますか？");
                         if (!ok) return;
 
+                        let deleted = false;
                         try {
                           if (editing?.id === entry.id) setEditing(null);
                           const res = await api.deleteEntry({ id: entry.id });
                           if (!res?.deleted) {
                             setAppError("削除対象が見つかりませんでした");
                           } else {
+                            deleted = true;
                             setAppError("");
                           }
                           await reload();
@@ -525,6 +608,7 @@ export function App() {
                             setAppError(msg || "削除に失敗しました");
                           }
                         }
+                        if (deleted) queueBackupSync();
                       }}
                     />
                   ))
@@ -538,6 +622,27 @@ export function App() {
           <AiConsole settings={aiSettings} dataDir={dataDir} />
         </section>
       </main>
+
+      {syncIndicator.label ? (
+        <div
+          className={`syncStatus ${
+            syncIndicator.kind === "error" ? "isError" : syncIndicator.kind === "success" ? "isSuccess" : "isRunning"
+          }`}
+          title={syncIndicator.detail || syncIndicator.label}
+        >
+          {syncIndicator.label}
+        </div>
+      ) : null}
+
+      <button
+        className="settingsFab syncFab"
+        type="button"
+        onClick={() => queueBackupSync()}
+        title="同期"
+        disabled={syncBusy}
+      >
+        {syncBusy ? "同期中..." : "同期"}
+      </button>
 
       <button className="settingsFab" type="button" onClick={() => setSettingsOpen(true)} title="設定">
         設定

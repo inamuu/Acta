@@ -12,6 +12,7 @@ import type {
   DeleteEntryPayload,
   DeleteEntryResult,
   SaveAiSettingsPayload,
+  SyncResult,
   UpdateEntryPayload,
   UpdateEntryResult
 } from "../shared/types";
@@ -27,6 +28,8 @@ declare global {
       chooseDataDir: () => Promise<ChooseDataDirResult>;
       deleteEntry: (payload: DeleteEntryPayload) => Promise<DeleteEntryResult>;
       updateEntry: (payload: UpdateEntryPayload) => Promise<UpdateEntryResult>;
+      syncPull: () => Promise<SyncResult>;
+      syncBackup: () => Promise<SyncResult>;
       aiStartSession: (payload: AiStartSessionPayload) => Promise<AiStartSessionResult>;
       aiSendInput: (payload: AiSendInputPayload) => Promise<{ sent: boolean }>;
       aiReadOutput: (payload: AiReadOutputPayload) => Promise<AiReadOutputResult>;

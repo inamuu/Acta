@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld("acta", {
   chooseDataDir: () => ipcRenderer.invoke("acta:chooseDataDir"),
   deleteEntry: (payload) => ipcRenderer.invoke("acta:deleteEntry", payload),
   updateEntry: (payload) => ipcRenderer.invoke("acta:updateEntry", payload),
+  syncPull: () => ipcRenderer.invoke("acta:syncPull"),
+  syncBackup: () => ipcRenderer.invoke("acta:syncBackup"),
   aiStartSession: (payload) => ipcRenderer.invoke("acta:aiStartSession", payload),
   aiSendInput: (payload) => ipcRenderer.invoke("acta:aiSendInput", payload),
   aiReadOutput: (payload) => ipcRenderer.invoke("acta:aiReadOutput", payload),

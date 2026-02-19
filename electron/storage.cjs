@@ -1,11 +1,14 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { spawn } = require("node:child_process");
 const { app } = require("electron");
 
 const DATE_FILE_RE = /^\d{4}-\d{2}-\d{2}\.md$/;
 const SETTINGS_FILE = "acta-settings.json";
 const DATA_DIR_SETTINGS_FILE = "settings.json";
+const SYNC_SUCCESS = "Sync Success";
+const SYNC_ERROR = "Sync Error";
 const DEFAULT_AI_CLI_PATH = "/opt/homebrew/bin/codex";
 const DEFAULT_THEME = "default";
 const ALLOWED_THEMES = new Set([
@@ -195,6 +198,99 @@ async function fileExists(p) {
   } catch {
     return false;
   }
+}
+
+function buildSyncResult(ok, detail, command) {
+  return {
+    ok: Boolean(ok),
+    label: ok ? SYNC_SUCCESS : SYNC_ERROR,
+    detail: String(detail ?? ""),
+    command: String(command ?? "")
+  };
+}
+
+function runGitCommand(args) {
+  return new Promise((resolve) => {
+    const dataDir = getDataDir();
+    let done = false;
+    let stdout = "";
+    let stderr = "";
+
+    const child = spawn("git", args, {
+      cwd: dataDir,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+
+    function finish(result) {
+      if (done) return;
+      done = true;
+      resolve(result);
+    }
+
+    child.stdout?.on("data", (chunk) => {
+      stdout += String(chunk ?? "");
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += String(chunk ?? "");
+    });
+
+    child.on("error", (err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      finish({ code: 1, stdout: stdout.trim(), stderr: msg || stderr.trim() });
+    });
+    child.on("close", (code) => {
+      finish({
+        code: typeof code === "number" ? code : 1,
+        stdout: stdout.trim(),
+        stderr: stderr.trim()
+      });
+    });
+  });
+}
+
+async function syncPull() {
+  await ensureDataDir();
+  const res = await runGitCommand(["pull"]);
+  if (res.code !== 0) {
+    return buildSyncResult(false, res.stderr || res.stdout || "git pull に失敗しました", "git pull");
+  }
+  return buildSyncResult(true, res.stdout || "git pull 完了", "git pull");
+}
+
+async function syncBackup() {
+  await ensureDataDir();
+
+  const addRes = await runGitCommand(["add", "."]);
+  if (addRes.code !== 0) {
+    return buildSyncResult(false, addRes.stderr || addRes.stdout || "git add に失敗しました", "git add .");
+  }
+
+  const statusRes = await runGitCommand(["status", "--porcelain"]);
+  if (statusRes.code !== 0) {
+    return buildSyncResult(
+      false,
+      statusRes.stderr || statusRes.stdout || "git status に失敗しました",
+      "git status --porcelain"
+    );
+  }
+
+  if (statusRes.stdout.trim()) {
+    const commitRes = await runGitCommand(["commit", "-m", "backup"]);
+    if (commitRes.code !== 0) {
+      return buildSyncResult(
+        false,
+        commitRes.stderr || commitRes.stdout || "git commit に失敗しました",
+        'git commit -m "backup"'
+      );
+    }
+  }
+
+  const pushRes = await runGitCommand(["push", "-u", "origin", "main"]);
+  if (pushRes.code !== 0) {
+    return buildSyncResult(false, pushRes.stderr || pushRes.stdout || "git push に失敗しました", "git push -u origin main");
+  }
+
+  return buildSyncResult(true, pushRes.stdout || "git push 完了", "git push -u origin main");
 }
 
 function parseEntriesFromText(text, date, sourceFile) {
@@ -480,5 +576,7 @@ module.exports = {
   listEntries,
   addEntry,
   deleteEntry,
-  updateEntry
+  updateEntry,
+  syncPull,
+  syncBackup
 };

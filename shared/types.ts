@@ -36,6 +36,13 @@ export type UpdateEntryResult = {
   updated: boolean;
 };
 
+export type SyncResult = {
+  ok: boolean;
+  label: "Sync Success" | "Sync Error";
+  detail: string;
+  command: string;
+};
+
 export const ACTA_THEME_IDS = [
   "default",
   "dracula",
