@@ -223,6 +223,19 @@ export function AiConsole({ settings, dataDir }: Props) {
         </div>
       </div>
 
+      <div ref={feedRef} className="aiChatFeed">
+        {messages.length === 0 ? (
+          <div className="aiChatEmpty">ここに対話ログが表示されます</div>
+        ) : (
+          messages.map((m) => (
+            <div key={m.id} className={`aiMsg aiMsg--${m.role}`}>
+              <div className="aiMsgRole">{roleLabel(m.role)}</div>
+              <div className="aiMsgBody">{m.text}</div>
+            </div>
+          ))
+        )}
+      </div>
+
       {error ? <div className="composerError">{error}</div> : null}
 
       <div className="aiConsoleInputRow">
@@ -246,19 +259,6 @@ export function AiConsole({ settings, dataDir }: Props) {
         >
           {sending ? "送信中..." : "送信"}
         </button>
-      </div>
-
-      <div ref={feedRef} className="aiChatFeed">
-        {messages.length === 0 ? (
-          <div className="aiChatEmpty">ここに対話ログが表示されます</div>
-        ) : (
-          messages.map((m) => (
-            <div key={m.id} className={`aiMsg aiMsg--${m.role}`}>
-              <div className="aiMsgRole">{roleLabel(m.role)}</div>
-              <div className="aiMsgBody">{m.text}</div>
-            </div>
-          ))
-        )}
       </div>
     </section>
   );

@@ -109,6 +109,7 @@ function runAiTurn(session, input) {
   let prompt = buildAiPrompt(session, input);
   const outPath = path.join(app.getPath("temp"), `acta-ai-${session.id}-${Date.now()}.txt`);
   const cliKind = detectAiCliKind(session.cliPath);
+  const codexRunArgs = ["-s", "workspace-write", "-a", "never"];
   let args = [];
   let useOutputFile = false;
   let parseThreadIdFromStdout = false;
@@ -117,11 +118,11 @@ function runAiTurn(session, input) {
     args = ["--print"];
   } else if (session.codexThreadId) {
     // Reuse remote thread state to avoid re-sending long local history each turn.
-    args = ["exec", "resume", "--skip-git-repo-check", session.codexThreadId, "-"];
+    args = [...codexRunArgs, "exec", "resume", "--skip-git-repo-check", session.codexThreadId, "-"];
     prompt = input;
   } else {
     // First turn: create a thread and capture its id from JSON events.
-    args = ["exec", "--skip-git-repo-check", "-C", dataDir, "--color", "never", "--json", "-o", outPath, "-"];
+    args = [...codexRunArgs, "exec", "--skip-git-repo-check", "-C", dataDir, "--color", "never", "--json", "-o", outPath, "-"];
     useOutputFile = true;
     parseThreadIdFromStdout = true;
   }
