@@ -1,6 +1,6 @@
 export type TaskState = "unchecked" | "checked" | "partial" | "review";
 
-const TASK_STATE_ORDER: TaskState[] = ["unchecked", "partial", "review", "checked"];
+const TASK_STATE_ORDER: TaskState[] = ["unchecked", "checked", "partial", "review"];
 
 export function taskStateFromMarker(marker: string): TaskState | null {
   switch (String(marker ?? "").toLowerCase()) {
