@@ -3111,6 +3111,47 @@ html .sidebar .tagItem.isSelected .tagCount {
   color: var(--theme-text) !important;
 }
 
+:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"])
+  :is(
+      .viewTab,
+      .viewTab:hover,
+      .viewTab.isActive,
+      .ghostBtn,
+      .ghostBtn:hover,
+      .dangerGhostBtn,
+      .dangerGhostBtn:hover,
+      .primaryBtn,
+      .primaryBtn:hover,
+      .settingsFab,
+      .settingsFab:hover,
+      .modalClose,
+      .modalClose:hover,
+      .searchClear,
+      .searchClear:hover,
+      .dateNavBtn,
+      .dateNavBtn:hover,
+      .dateQuickBtn,
+      .dateQuickBtn:hover,
+      .dateClearBtn,
+      .dateClearBtn:hover,
+      .tagSearchClear,
+      .tagSearchClear:hover,
+      .tagPickerClear,
+      .tagPickerClear:hover,
+      .tagGroupHeader,
+      .tagGroupHeader:hover,
+      .tagGroupHeader.isActive,
+      .tagPill,
+      .tagPill:hover,
+      .tagSuggestionPill,
+      .tagSuggestionPill:hover,
+      .tagChip,
+      .tagPickerMore,
+      .tagCount
+    ) {
+  color: #0f172a !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .commentCard {
     animation: none;
