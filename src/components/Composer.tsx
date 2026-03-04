@@ -10,6 +10,8 @@ const PREVIEW_LARGE_DOC_THRESHOLD = 6000;
 const PREVIEW_IDLE_TIMEOUT_MS = 320;
 const MERMAID_RENDER_DEBOUNCE_MS = 1200;
 const EMPTY_PREVIEW_SOURCE = " ";
+const ENTRY_LINK_LABEL_PLACEHOLDER = "リンク先";
+const ENTRY_HASH_PREFIX = "#post:";
 
 type IdleDeadline = {
   didTimeout: boolean;
@@ -20,6 +22,37 @@ type IdleWindow = Window & {
   requestIdleCallback?: (callback: (deadline: IdleDeadline) => void, options?: { timeout?: number }) => number;
   cancelIdleCallback?: (handle: number) => void;
 };
+
+function decodeUriSafe(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function extractEntryId(text: string): string {
+  const raw = String(text ?? "").trim();
+  if (!raw) return "";
+
+  const hashMatch = /#post:([^\s)]+)/i.exec(raw);
+  if (hashMatch?.[1]) return decodeUriSafe(hashMatch[1]).trim();
+
+  const uriMatch = /acta:\/\/post\/([^\s)]+)/i.exec(raw);
+  if (uriMatch?.[1]) return decodeUriSafe(uriMatch[1]).trim();
+
+  if (/\s/.test(raw)) return "";
+  return raw;
+}
+
+function escapeLinkLabel(label: string): string {
+  return String(label ?? "")
+    .replace(/\r\n/g, " ")
+    .replace(/\n/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/\[/g, "\\[")
+    .replace(/\]/g, "\\]");
+}
 
 type Props = {
   onSubmit: (body: string, tags: string[]) => Promise<void>;
@@ -201,6 +234,53 @@ export function Composer({
     }
   }
 
+  async function pasteEntryLinkFromClipboard() {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    let clipboardText = "";
+    try {
+      clipboardText = await navigator.clipboard.readText();
+    } catch {
+      setError("クリップボードの読み取りに失敗しました");
+      return;
+    }
+
+    const entryId = extractEntryId(clipboardText);
+    if (!entryId) {
+      setError("クリップボードに投稿IDが見つかりません");
+      return;
+    }
+
+    const current = editor.value;
+    const start = editor.selectionStart ?? current.length;
+    const end = editor.selectionEnd ?? start;
+    const hasSelection = end > start;
+    const selectedLabel = hasSelection ? current.slice(start, end) : ENTRY_LINK_LABEL_PLACEHOLDER;
+    const safeLabel = escapeLinkLabel(selectedLabel);
+    const href = `${ENTRY_HASH_PREFIX}${encodeURIComponent(entryId)}`;
+    const snippet = `[${safeLabel}](${href})`;
+    const next = current.slice(0, start) + snippet + current.slice(end);
+
+    editor.value = next;
+    updateBody(next);
+    schedulePreview(next);
+    setError("");
+
+    const linkEnd = start + snippet.length;
+    const labelStart = start + 1;
+    const labelEnd = labelStart + safeLabel.length;
+
+    requestAnimationFrame(() => {
+      editor.focus();
+      if (hasSelection) {
+        editor.setSelectionRange(linkEnd, linkEnd);
+      } else {
+        editor.setSelectionRange(labelStart, labelEnd);
+      }
+    });
+  }
+
   return (
     <div className="composer">
       {mode === "edit" ? <div className="composerTitle">編集中</div> : null}
@@ -306,6 +386,15 @@ export function Composer({
                   キャンセル
                 </button>
               ) : null}
+
+              <button
+                className="ghostBtn"
+                type="button"
+                title="クリップボードの投稿IDをリンクとして挿入"
+                onClick={() => void pasteEntryLinkFromClipboard()}
+              >
+                IDペースト
+              </button>
 
               <button
                 className="primaryBtn"

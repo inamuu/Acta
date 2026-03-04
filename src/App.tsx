@@ -66,6 +66,35 @@ function normalizeTheme(theme: string | undefined): ActaThemeId {
   }
 }
 
+function buildEntryDomId(entryId: string): string {
+  return `entry-${entryId}`;
+}
+
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  const value = String(text ?? "");
+  if (!value) return false;
+
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    // Fallback for environments where async clipboard API is unavailable.
+  }
+
+  const el = document.createElement("textarea");
+  el.value = value;
+  el.setAttribute("readonly", "");
+  el.style.position = "fixed";
+  el.style.opacity = "0";
+  el.style.pointerEvents = "none";
+  el.style.left = "-10000px";
+  document.body.appendChild(el);
+  el.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(el);
+  return copied;
+}
+
 export function App() {
   const api = window.acta;
 
@@ -92,6 +121,7 @@ export function App() {
     label: "",
     detail: ""
   });
+  const [linkedTargetEntryId, setLinkedTargetEntryId] = useState<string>("");
   const [limit, setLimit] = useState<number>(() => {
     try {
       const raw = localStorage.getItem("acta:limit");
@@ -107,6 +137,7 @@ export function App() {
   const sidebarRef = useRef<HTMLElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const syncQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const linkHighlightTimerRef = useRef<number | null>(null);
 
   function applySyncResult(result: SyncResult) {
     const detail = String(result.detail ?? "").trim();
@@ -265,6 +296,14 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (linkHighlightTimerRef.current !== null) {
+        window.clearTimeout(linkHighlightTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     // 日付フィルタを切り替えたら先頭に戻す（遡り操作の体験を安定させる）。
     scrollAreaRef.current?.scrollTo({ top: 0 });
   }, [dateFilter]);
@@ -364,6 +403,72 @@ export function App() {
   function toggleTagFilter(tag: string) {
     setUntaggedOnly(false);
     setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }
+
+  function highlightLinkedEntry(entryId: string) {
+    setLinkedTargetEntryId(entryId);
+    if (linkHighlightTimerRef.current !== null) {
+      window.clearTimeout(linkHighlightTimerRef.current);
+      linkHighlightTimerRef.current = null;
+    }
+    linkHighlightTimerRef.current = window.setTimeout(() => {
+      linkHighlightTimerRef.current = null;
+      setLinkedTargetEntryId((current) => (current === entryId ? "" : current));
+    }, 2200);
+  }
+
+  function scrollToEntryCard(entryId: string) {
+    const domId = buildEntryDomId(entryId);
+    const maxAttempts = 10;
+
+    const run = (attempt: number) => {
+      const el = document.getElementById(domId);
+      if (!(el instanceof HTMLElement)) {
+        if (attempt >= maxAttempts) {
+          setAppError(`リンク先の投稿を表示できませんでした: ${entryId}`);
+          return;
+        }
+        window.setTimeout(() => run(attempt + 1), 80);
+        return;
+      }
+
+      el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      highlightLinkedEntry(entryId);
+    };
+
+    // Wait until filter/view state updates are reflected in DOM.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => run(0));
+    });
+  }
+
+  function openLinkedEntry(entryId: string) {
+    const normalizedId = String(entryId ?? "").trim();
+    if (!normalizedId) return;
+
+    const target = entries.find((e) => e.id === normalizedId);
+    if (!target) {
+      setAppError(`リンク先の投稿が見つかりません: ${normalizedId}`);
+      return;
+    }
+
+    setActiveView("journal");
+    setEditing(null);
+    setDraft(null);
+    setQuery("");
+    setDateFilter(target.date);
+    clearTagFilter();
+    setAppError("");
+    scrollToEntryCard(target.id);
+  }
+
+  async function copyEntryId(entry: ActaEntry) {
+    const copied = await copyTextToClipboard(entry.id);
+    if (!copied) {
+      setAppError("投稿IDのコピーに失敗しました");
+      return;
+    }
+    setAppError("");
   }
 
   if (!api) {
@@ -553,6 +658,8 @@ export function App() {
                     <CommentCard
                       key={e.id}
                       entry={e}
+                      domId={buildEntryDomId(e.id)}
+                      isLinkedTarget={linkedTargetEntryId === e.id}
                       onClickTag={(t) => toggleTagFilter(t)}
                       onEdit={(entry) => {
                         setEditing(entry);
@@ -563,6 +670,12 @@ export function App() {
                         setEditing(null);
                         setDraft({ key: `copy:${entry.id}:${Date.now()}`, body: entry.body, tags: entry.tags });
                         setAppError("");
+                      }}
+                      onCopyId={(entry) => {
+                        void copyEntryId(entry);
+                      }}
+                      onOpenLinkedEntry={(entryId) => {
+                        openLinkedEntry(entryId);
                       }}
                       onToggleTask={async (entry, line0, nextState: TaskState) => {
                         const nextBody = setTaskStateOnLine(entry.body, line0, nextState);
