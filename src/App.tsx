@@ -562,7 +562,7 @@ export function App() {
             </div>
           ) : (
             <div className="topbarCenter">
-              <div className="aiTopHint">設定で指定した CLI と指示 Markdown を使って対話します。</div>
+              <div className="aiTopHint">CLI の進捗と実行コマンドを表示しながら対話します。</div>
             </div>
           )}
 

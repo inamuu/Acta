@@ -82,11 +82,49 @@ export type AiReadOutputPayload = {
   sessionId: string;
 };
 
+export type AiSessionPhase = "idle" | "thinking" | "tool" | "done" | "error";
+
+export type AiConsoleUpdate =
+  | {
+      id: string;
+      kind: "assistant";
+      text: string;
+      createdAtMs: number;
+    }
+  | {
+      id: string;
+      kind: "status";
+      label: string;
+      detail?: string;
+      tone: "neutral" | "active" | "done" | "error";
+      createdAtMs: number;
+    }
+  | {
+      id: string;
+      kind: "command";
+      status: "started" | "completed";
+      command: string;
+      exitCode?: number | null;
+      output?: string;
+      createdAtMs: number;
+    }
+  | {
+      id: string;
+      kind: "error";
+      text: string;
+      createdAtMs: number;
+    };
+
 export type AiReadOutputResult = {
-  chunk: string;
+  updates: AiConsoleUpdate[];
   alive: boolean;
   busy: boolean;
   exitCode: number | null;
+  phase: AiSessionPhase;
+  phaseLabel: string;
+  activeCommand?: string;
+  turnStartedAtMs: number | null;
+  lastTurnDurationMs: number | null;
   error?: string;
 };
 

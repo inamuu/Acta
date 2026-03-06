@@ -43,14 +43,6 @@ function buildAiPrompt(session, input) {
   return lines.join("\n");
 }
 
-async function readFileIfExists(filePath) {
-  try {
-    return await fs.promises.readFile(filePath, "utf8");
-  } catch {
-    return "";
-  }
-}
-
 function detectAiCliKind(cliPath) {
   const binName = path.basename(String(cliPath ?? "")).toLowerCase();
   if (binName.includes("claude")) return "claude";
@@ -68,13 +60,194 @@ function parseJsonLine(line) {
   }
 }
 
-function captureCodexThreadIdFromLine(session, line) {
-  const event = parseJsonLine(line);
-  if (!event) return;
+async function readFileIfExists(filePath) {
+  try {
+    return await fs.promises.readFile(filePath, "utf8");
+  } catch {
+    return "";
+  }
+}
 
-  if (event.type === "thread.started") {
-    const id = String(event.thread_id ?? "").trim();
-    if (id) session.codexThreadId = id;
+function makeSessionUpdate(kind, fields) {
+  return {
+    id: crypto.randomUUID(),
+    kind,
+    createdAtMs: Date.now(),
+    ...fields
+  };
+}
+
+function pushSessionUpdate(session, update) {
+  session.updates.push(update);
+}
+
+function trimPreview(text, maxLen = 240) {
+  const normalized = String(text ?? "").replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (normalized.length <= maxLen) return normalized;
+  return `${normalized.slice(0, maxLen - 1)}…`;
+}
+
+function formatDurationMs(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const seconds = ms / 1000;
+  if (seconds < 10) return `${seconds.toFixed(1)}s`;
+  return `${Math.round(seconds)}s`;
+}
+
+function buildTurnSummary(ms, usage) {
+  const parts = [];
+  const duration = formatDurationMs(ms);
+  if (duration) parts.push(duration);
+  if (usage && typeof usage.output_tokens === "number") {
+    parts.push(`出力 ${usage.output_tokens} tok`);
+  }
+  return parts.join(" / ");
+}
+
+function setSessionPhase(session, phase, label, detail = "") {
+  const nextLabel = String(label ?? "").trim() || "待機中";
+  const nextDetail = String(detail ?? "").trim();
+  const unchanged =
+    session.phase === phase && session.phaseLabel === nextLabel && session.phaseDetail === nextDetail;
+
+  session.phase = phase;
+  session.phaseLabel = nextLabel;
+  session.phaseDetail = nextDetail;
+  if (unchanged) return;
+
+  const tone =
+    phase === "error" ? "error" : phase === "done" ? "done" : phase === "thinking" || phase === "tool" ? "active" : "neutral";
+  pushSessionUpdate(
+    session,
+    makeSessionUpdate("status", {
+      label: nextLabel,
+      detail: nextDetail || undefined,
+      tone
+    })
+  );
+}
+
+function appendAssistantText(session, text) {
+  const value = String(text ?? "");
+  if (!value) return;
+  session.currentAnswer += value;
+  pushSessionUpdate(
+    session,
+    makeSessionUpdate("assistant", {
+      text: value
+    })
+  );
+}
+
+function handleCodexItemText(session, item) {
+  const nextText = typeof item?.text === "string" ? item.text : "";
+  if (!nextText) return;
+
+  const itemId = String(item?.id ?? "");
+  const prevText = itemId ? session.itemTextState[itemId] || "" : "";
+  const delta = itemId && nextText.startsWith(prevText) ? nextText.slice(prevText.length) : nextText;
+  if (itemId) session.itemTextState[itemId] = nextText;
+  appendAssistantText(session, delta);
+}
+
+function handleCodexEvent(session, event) {
+  if (!event || typeof event !== "object") return;
+
+  switch (event.type) {
+    case "thread.started": {
+      const id = String(event.thread_id ?? "").trim();
+      if (id) session.codexThreadId = id;
+      return;
+    }
+    case "turn.started": {
+      session.turnStartedAtMs = Date.now();
+      session.lastTurnDurationMs = null;
+      session.lastTurnUsage = null;
+      session.activeCommand = "";
+      session.itemTextState = {};
+      setSessionPhase(session, "thinking", "応答を考えています");
+      return;
+    }
+    case "item.started": {
+      const item = event.item ?? {};
+      if (item.type === "command_execution") {
+        const command = String(item.command ?? "").trim();
+        session.activeCommand = command;
+        setSessionPhase(session, "tool", "コマンドを実行しています", trimPreview(command, 120));
+        pushSessionUpdate(
+          session,
+          makeSessionUpdate("command", {
+            status: "started",
+            command
+          })
+        );
+        return;
+      }
+      if (item.type === "agent_message") {
+        handleCodexItemText(session, item);
+      }
+      return;
+    }
+    case "item.completed": {
+      const item = event.item ?? {};
+      if (item.type === "command_execution") {
+        const command = String(item.command ?? "").trim();
+        const exitCode = typeof item.exit_code === "number" ? item.exit_code : null;
+        pushSessionUpdate(
+          session,
+          makeSessionUpdate("command", {
+            status: "completed",
+            command,
+            exitCode,
+            output: trimPreview(item.aggregated_output)
+          })
+        );
+        session.activeCommand = "";
+        setSessionPhase(
+          session,
+          "thinking",
+          "結果を取り込んでいます",
+          trimPreview(command, 120) || undefined
+        );
+        return;
+      }
+      if (item.type === "agent_message") {
+        handleCodexItemText(session, item);
+      }
+      return;
+    }
+    case "turn.completed": {
+      if (session.turnStartedAtMs) {
+        session.lastTurnDurationMs = Math.max(0, Date.now() - session.turnStartedAtMs);
+      }
+      session.lastTurnUsage = event.usage ?? null;
+      session.activeCommand = "";
+      session.itemTextState = {};
+      setSessionPhase(
+        session,
+        "done",
+        "応答が完了しました",
+        buildTurnSummary(session.lastTurnDurationMs, session.lastTurnUsage)
+      );
+      return;
+    }
+    case "error": {
+      const msg = String(event.message ?? event.error ?? "").trim();
+      if (!msg) return;
+      session.error = msg;
+      setSessionPhase(session, "error", "CLI 実行エラー", trimPreview(msg));
+      pushSessionUpdate(
+        session,
+        makeSessionUpdate("error", {
+          text: msg
+        })
+      );
+      return;
+    }
+    default:
+      return;
   }
 }
 
@@ -90,12 +263,21 @@ function startAiSession(cliPath) {
     needsBootstrap: true,
     codexThreadId: "",
     history: [],
-    chunks: [],
+    updates: [],
     alive: true,
     busy: false,
     worker: null,
     exitCode: null,
-    error: ""
+    error: "",
+    phase: "idle",
+    phaseLabel: "待機中",
+    phaseDetail: "",
+    activeCommand: "",
+    turnStartedAtMs: null,
+    lastTurnDurationMs: null,
+    lastTurnUsage: null,
+    currentAnswer: "",
+    itemTextState: {}
   };
   aiSessions.set(sessionId, session);
 
@@ -107,29 +289,31 @@ function runAiTurn(session, input) {
   fs.mkdirSync(dataDir, { recursive: true });
 
   let prompt = buildAiPrompt(session, input);
-  const outPath = path.join(app.getPath("temp"), `acta-ai-${session.id}-${Date.now()}.txt`);
   const cliKind = detectAiCliKind(session.cliPath);
   const codexRunArgs = ["-s", "workspace-write", "-a", "never"];
+  const outPath = cliKind === "codex" ? path.join(app.getPath("temp"), `acta-ai-${session.id}-${Date.now()}.txt`) : "";
   let args = [];
-  let useOutputFile = false;
-  let parseThreadIdFromStdout = false;
 
   if (cliKind === "claude") {
     args = ["--print"];
   } else if (session.codexThreadId) {
     // Reuse remote thread state to avoid re-sending long local history each turn.
-    args = [...codexRunArgs, "exec", "resume", "--skip-git-repo-check", session.codexThreadId, "-"];
+    args = [...codexRunArgs, "exec", "resume", "--skip-git-repo-check", "--json", "-o", outPath, session.codexThreadId, "-"];
     prompt = input;
   } else {
-    // First turn: create a thread and capture its id from JSON events.
     args = [...codexRunArgs, "exec", "--skip-git-repo-check", "-C", dataDir, "--color", "never", "--json", "-o", outPath, "-"];
-    useOutputFile = true;
-    parseThreadIdFromStdout = true;
   }
 
   session.busy = true;
   session.exitCode = null;
   session.error = "";
+  session.activeCommand = "";
+  session.turnStartedAtMs = null;
+  session.lastTurnDurationMs = null;
+  session.lastTurnUsage = null;
+  session.currentAnswer = "";
+  session.itemTextState = {};
+  setSessionPhase(session, "thinking", "CLI に送信しています");
 
   const child = spawn(session.cliPath, args, {
     cwd: dataDir,
@@ -140,13 +324,17 @@ function runAiTurn(session, input) {
   });
   session.worker = child;
 
-  let stdoutText = "";
   let stderrText = "";
   let stdoutPending = "";
+  const stdoutNotes = [];
+
   child.stdout?.on("data", (chunk) => {
     const text = String(chunk ?? "");
-    stdoutText += text;
-    if (!parseThreadIdFromStdout) return;
+    if (cliKind !== "codex") {
+      if (!session.turnStartedAtMs) session.turnStartedAtMs = Date.now();
+      appendAssistantText(session, text);
+      return;
+    }
 
     stdoutPending += text;
     while (true) {
@@ -154,7 +342,13 @@ function runAiTurn(session, input) {
       if (idx < 0) break;
       const line = stdoutPending.slice(0, idx);
       stdoutPending = stdoutPending.slice(idx + 1);
-      captureCodexThreadIdFromLine(session, line);
+      const event = parseJsonLine(line);
+      if (event) {
+        handleCodexEvent(session, event);
+        continue;
+      }
+      const note = trimPreview(line);
+      if (note) stdoutNotes.push(note);
     }
   });
   child.stderr?.on("data", (chunk) => {
@@ -164,7 +358,13 @@ function runAiTurn(session, input) {
   child.on("error", (err) => {
     const msg = err instanceof Error ? err.message : String(err);
     session.error = msg || "実行に失敗しました";
-    session.chunks.push(`\n[エラー] ${session.error}\n`);
+    setSessionPhase(session, "error", "CLI 実行エラー", trimPreview(session.error));
+    pushSessionUpdate(
+      session,
+      makeSessionUpdate("error", {
+        text: session.error
+      })
+    );
     session.busy = false;
     session.exitCode = 1;
     session.worker = null;
@@ -172,20 +372,24 @@ function runAiTurn(session, input) {
 
   child.on("close", (code) => {
     void (async () => {
-      if (parseThreadIdFromStdout && stdoutPending) {
-        captureCodexThreadIdFromLine(session, stdoutPending);
+      if (cliKind === "codex" && stdoutPending) {
+        const event = parseJsonLine(stdoutPending);
+        if (event) {
+          handleCodexEvent(session, event);
+        } else {
+          const note = trimPreview(stdoutPending);
+          if (note) stdoutNotes.push(note);
+        }
       }
 
-      let answer = "";
-      if (useOutputFile) {
-        answer = (await readFileIfExists(outPath)).trim();
+      let fileAnswer = "";
+      if (outPath) {
+        fileAnswer = String(await readFileIfExists(outPath)).trim();
         try {
           await fs.promises.unlink(outPath);
         } catch {
           // ignore
         }
-      } else {
-        answer = stdoutText.trim();
       }
 
       session.exitCode = typeof code === "number" ? code : null;
@@ -194,9 +398,24 @@ function runAiTurn(session, input) {
 
       if (!session.alive) return;
 
+      if (!session.currentAnswer.trim() && fileAnswer) {
+        appendAssistantText(session, fileAnswer);
+      }
+
+      const answer = session.currentAnswer.trim();
       if (session.exitCode === 0 && answer) {
         session.history.push({ user: input, assistant: answer });
-        session.chunks.push(`${answer}\n`);
+        if (session.phase !== "done") {
+          if (session.turnStartedAtMs) {
+            session.lastTurnDurationMs = Math.max(0, Date.now() - session.turnStartedAtMs);
+          }
+          setSessionPhase(
+            session,
+            "done",
+            "応答が完了しました",
+            buildTurnSummary(session.lastTurnDurationMs, session.lastTurnUsage)
+          );
+        }
         return;
       }
 
@@ -205,12 +424,26 @@ function runAiTurn(session, input) {
         session.codexThreadId = "";
       }
 
-      const fallback = answer || stderrText.trim() || stdoutText.trim();
+      const fallback = trimPreview(stderrText) || stdoutNotes.join("\n").trim();
       if (fallback) {
-        session.chunks.push(`\n[実行ログ]\n${fallback}\n`);
+        pushSessionUpdate(
+          session,
+          makeSessionUpdate("error", {
+            text: fallback
+          })
+        );
       }
       if (session.exitCode !== 0) {
-        session.chunks.push(`\n[AI実行失敗: code=${session.exitCode ?? "?"}]\n`);
+        const detail = `code=${session.exitCode ?? "?"}`;
+        setSessionPhase(session, "error", "AI 実行に失敗しました", detail);
+        pushSessionUpdate(
+          session,
+          makeSessionUpdate("error", {
+            text: `[AI実行失敗: ${detail}]`
+          })
+        );
+      } else {
+        setSessionPhase(session, "idle", "待機中");
       }
     })();
   });
@@ -237,14 +470,18 @@ function stopAiSession(sessionId) {
 
 function readAiSession(sessionId) {
   const session = getAiSessionOrThrow(sessionId);
-  const chunk = session.chunks.join("");
-  session.chunks.length = 0;
+  const updates = session.updates.splice(0, session.updates.length);
 
   const res = {
-    chunk,
+    updates,
     alive: session.alive,
     busy: Boolean(session.busy),
     exitCode: session.exitCode,
+    phase: session.phase,
+    phaseLabel: session.phaseLabel,
+    activeCommand: session.activeCommand || undefined,
+    turnStartedAtMs: session.turnStartedAtMs ?? null,
+    lastTurnDurationMs: session.lastTurnDurationMs ?? null,
     error: session.error || undefined
   };
   return res;
