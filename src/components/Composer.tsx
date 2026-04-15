@@ -343,7 +343,7 @@ export function Composer({
                 });
               }
             }}
-            placeholder={"Markdownで書けます。\n例:\n- 今日やったこと\n- 次やること\n\n```ts\nconsole.log('hello')\n```"}
+            placeholder=""
             spellCheck={false}
           />
         </div>

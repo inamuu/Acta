@@ -923,6 +923,33 @@ a:focus-visible {
   margin: 16px 0;
 }
 
+.md table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border: 1px solid var(--theme-border-soft);
+  background: rgba(var(--theme-shadow-rgb), 0.02);
+}
+
+.md th,
+.md td {
+  padding: 9px 12px;
+  border: 1px solid var(--theme-border-soft);
+  text-align: left;
+  vertical-align: top;
+}
+
+.md thead th {
+  background: rgba(var(--theme-shadow-rgb), 0.04);
+  color: var(--theme-text-subtle);
+  font-weight: 700;
+}
+
+.md tbody tr:nth-child(even) {
+  background: rgba(var(--theme-shadow-rgb), 0.02);
+}
+
 /* composer */
 .composerArea {
   border-bottom: 1px solid var(--borderSoft);
@@ -1674,8 +1701,8 @@ a:focus-visible {
 .editor {
   width: 100%;
   flex: 1;
-  min-height: 320px;
-  max-height: 520px;
+  min-height: 380px;
+  max-height: 620px;
   resize: none;
   border: 1px solid rgba(15, 23, 42, 0.08);
   outline: none;
@@ -3387,8 +3414,8 @@ html .sidebar .tagItem.isSelected .tagCount {
     min-height: 40px;
   }
   .editor {
-    min-height: 240px;
-    max-height: 360px;
+    min-height: 300px;
+    max-height: 440px;
   }
   .preview {
     min-height: 240px;
