@@ -24,6 +24,26 @@ const md = new MarkdownIt({
   }
 });
 
+type MarkdownRenderOptions = {
+  assetBaseUrl?: string;
+};
+
+function isRelativeAssetUrl(src: string): boolean {
+  const value = String(src ?? "").trim();
+  if (!value) return false;
+  if (value.startsWith("#") || value.startsWith("/") || value.startsWith("\\")) return false;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
+  return true;
+}
+
+function resolveAssetUrl(src: string, assetBaseUrl?: string): string {
+  const value = String(src ?? "").trim();
+  const base = String(assetBaseUrl ?? "").trim();
+  if (!base || !isRelativeAssetUrl(value)) return value;
+  const separator = base.endsWith("/") ? "" : "/";
+  return `${base}${separator}${value.replace(/^\.?\//, "")}`;
+}
+
 function taskListPlugin(markdownIt: MarkdownIt) {
   markdownIt.core.ruler.after("inline", "acta_task_list", (state) => {
     const tokens = state.tokens;
@@ -72,6 +92,17 @@ function taskListPlugin(markdownIt: MarkdownIt) {
 
 md.use(taskListPlugin);
 
+const defaultImage =
+  md.renderer.rules.image ??
+  ((tokens, idx, options, env, slf) => slf.renderToken(tokens, idx, options));
+
+md.renderer.rules.image = (tokens, idx, options, env, slf) => {
+  const token = tokens[idx];
+  const src = token.attrGet("src");
+  if (src) token.attrSet("src", resolveAssetUrl(src, (env as MarkdownRenderOptions | undefined)?.assetBaseUrl));
+  return defaultImage(tokens, idx, options, env, slf);
+};
+
 const defaultFence =
   md.renderer.rules.fence ??
   ((tokens, idx, options, env, slf) => slf.renderToken(tokens, idx, options));
@@ -96,11 +127,13 @@ function normalizeLooseTaskListSyntax(markdown: string): string {
   );
 }
 
-export function markdownToHtml(markdown: string): string {
+export function markdownToHtml(markdown: string, options?: MarkdownRenderOptions): string {
   const normalized = normalizeLooseTaskListSyntax(markdown);
-  const raw = md.render(normalized);
+  const raw = md.render(normalized, options ?? {});
   return DOMPurify.sanitize(raw, {
     USE_PROFILES: { html: true },
+    ALLOWED_URI_REGEXP:
+      /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|matrix|acta-asset):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
     ADD_TAGS: ["input"],
     ADD_ATTR: ["type", "checked", "data-task-line", "data-task-state", "aria-label", "aria-hidden"]
   });

@@ -6,6 +6,7 @@ import { hydrateTaskCheckboxStates, nextTaskState, taskStateFromInput, type Task
 
 type Props = {
   entry: ActaEntry;
+  assetBaseUrl?: string;
   onClickTag?: (tag: string) => void;
   onEdit?: (entry: ActaEntry) => void;
   onCopy?: (entry: ActaEntry) => void;
@@ -56,6 +57,7 @@ function formatWhen(ms: number): string {
 
 export function CommentCard({
   entry,
+  assetBaseUrl,
   onClickTag,
   onEdit,
   onCopy,
@@ -66,7 +68,7 @@ export function CommentCard({
   domId,
   isLinkedTarget
 }: Props) {
-  const html = useMemo(() => markdownToHtml(entry.body), [entry.body]);
+  const html = useMemo(() => markdownToHtml(entry.body, { assetBaseUrl }), [assetBaseUrl, entry.body]);
   const when = formatWhen(entry.createdAtMs);
   const bodyRef = useRef<HTMLDivElement>(null);
   const cardClassName = isLinkedTarget ? "commentCard isLinkedTarget" : "commentCard";

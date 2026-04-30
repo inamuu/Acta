@@ -104,7 +104,7 @@ export function App() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [untaggedOnly, setUntaggedOnly] = useState(false);
   const [query, setQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState<string>("");
+  const [dateFilter, setDateFilter] = useState<string>(() => formatDateYYYYMMDD(new Date()));
   const [appError, setAppError] = useState<string>("");
   const [editing, setEditing] = useState<ActaEntry | null>(null);
   const [draft, setDraft] = useState<{ key: string; body: string; tags: string[] } | null>(null);
@@ -389,6 +389,7 @@ export function App() {
     });
     return copy.slice(0, 10).map((t) => t.tag);
   }, [tagStats]);
+  const assetBaseUrl = "acta-asset:///";
 
   function clearTagFilter() {
     setSelectedTags([]);
@@ -624,6 +625,7 @@ export function App() {
             <section className="composerArea">
               {appError ? <div className="appError">{appError}</div> : null}
               <Composer
+                assetBaseUrl={assetBaseUrl}
                 tagSuggestions={tagSuggestions}
                 popularTagSuggestions={popularTagSuggestions}
                 mode={editing ? "edit" : "create"}
@@ -658,6 +660,7 @@ export function App() {
                     <CommentCard
                       key={e.id}
                       entry={e}
+                      assetBaseUrl={assetBaseUrl}
                       domId={buildEntryDomId(e.id)}
                       isLinkedTarget={linkedTargetEntryId === e.id}
                       onClickTag={(t) => toggleTagFilter(t)}

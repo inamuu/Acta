@@ -54,8 +54,25 @@ function escapeLinkLabel(label: string): string {
     .replace(/\]/g, "\\]");
 }
 
+function escapeImageAlt(label: string): string {
+  return escapeLinkLabel(label || "image");
+}
+
+function getClipboardImageItem(items: DataTransferItemList): DataTransferItem | null {
+  for (const item of Array.from(items)) {
+    if (item.kind === "file" && item.type.startsWith("image/")) return item;
+  }
+  return null;
+}
+
+function isImeComposingEvent(e: React.KeyboardEvent<HTMLTextAreaElement>): boolean {
+  const nativeEvent = e.nativeEvent as KeyboardEvent & { isComposing?: boolean };
+  return Boolean(e.isComposing || nativeEvent.isComposing || nativeEvent.keyCode === 229);
+}
+
 type Props = {
   onSubmit: (body: string, tags: string[]) => Promise<void>;
+  assetBaseUrl?: string;
   tagSuggestions?: string[];
   popularTagSuggestions?: string[];
   mode?: "create" | "edit";
@@ -68,6 +85,7 @@ type Props = {
 
 export function Composer({
   onSubmit,
+  assetBaseUrl,
   tagSuggestions,
   popularTagSuggestions,
   mode = "create",
@@ -82,7 +100,9 @@ export function Composer({
   const [submitting, setSubmitting] = useState(false);
   const [isBodyEmpty, setIsBodyEmpty] = useState(() => initialBodyValue.trim().length === 0);
   const [error, setError] = useState<string>("");
-  const [previewHtml, setPreviewHtml] = useState<string>(() => markdownToHtml(initialBodyValue || EMPTY_PREVIEW_SOURCE));
+  const [previewHtml, setPreviewHtml] = useState<string>(() =>
+    markdownToHtml(initialBodyValue || EMPTY_PREVIEW_SOURCE, { assetBaseUrl })
+  );
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<string>(initialBodyValue);
@@ -126,7 +146,7 @@ export function Composer({
   function commitPreview(nextBody: string) {
     if (lastPreviewBodyRef.current === nextBody) return;
     lastPreviewBodyRef.current = nextBody;
-    setPreviewHtml(markdownToHtml(nextBody || EMPTY_PREVIEW_SOURCE));
+    setPreviewHtml(markdownToHtml(nextBody || EMPTY_PREVIEW_SOURCE, { assetBaseUrl }));
   }
 
   function renderPreviewNow(nextBody: string) {
@@ -188,6 +208,10 @@ export function Composer({
     if (!autoFocusEditor) return;
     editorRef.current?.focus();
   }, [draftKey, autoFocusEditor]);
+
+  useEffect(() => {
+    setPreviewHtml(markdownToHtml(bodyRef.current || EMPTY_PREVIEW_SOURCE, { assetBaseUrl }));
+  }, [assetBaseUrl]);
 
   useEffect(() => {
     return () => {
@@ -281,6 +305,40 @@ export function Composer({
     });
   }
 
+  async function savePastedImage(file: File) {
+    const api = window.acta;
+    const editor = editorRef.current;
+    if (!api?.saveImage || !editor) return;
+
+    const current = editor.value;
+    const start = editor.selectionStart ?? current.length;
+    const end = editor.selectionEnd ?? start;
+
+    const res = await api.saveImage({
+      bytes: await file.arrayBuffer(),
+      mimeType: file.type || "image/png",
+      name: file.name || undefined
+    });
+
+    const alt = escapeImageAlt(file.name ? file.name.replace(/\.[^.]+$/, "") : "image");
+    const snippet = `![${alt}](${res.markdownPath})`;
+    const prefix = start > 0 && current[start - 1] !== "\n" ? "\n" : "";
+    const suffix = current[end] && current[end] !== "\n" ? "\n" : "";
+    const insert = `${prefix}${snippet}${suffix}`;
+    const next = current.slice(0, start) + insert + current.slice(end);
+
+    editor.value = next;
+    updateBody(next);
+    schedulePreview(next);
+    setError("");
+
+    const nextPos = start + insert.length;
+    requestAnimationFrame(() => {
+      editor.focus();
+      editor.setSelectionRange(nextPos, nextPos);
+    });
+  }
+
   return (
     <div className="composer">
       {mode === "edit" ? <div className="composerTitle">編集中</div> : null}
@@ -318,12 +376,27 @@ export function Composer({
               if (isComposingRef.current) return;
               schedulePreview(nextBody);
             }}
+            onPaste={(e) => {
+              const item = getClipboardImageItem(e.clipboardData.items);
+              if (!item) return;
+
+              const file = item.getAsFile();
+              if (!file) return;
+
+              e.preventDefault();
+              setError("");
+              void savePastedImage(file).catch((err) => {
+                const msg = err instanceof Error ? err.message : String(err);
+                setError(msg || "画像の保存に失敗しました");
+              });
+            }}
             onKeyDown={(e) => {
               const isSubmit = (e.metaKey || e.ctrlKey) && e.key === "Enter";
               if (isSubmit) {
                 e.preventDefault();
                 void submit();
               }
+              if (isImeComposingEvent(e)) return;
               if (e.key === "Tab" && !e.shiftKey) {
                 e.preventDefault();
 

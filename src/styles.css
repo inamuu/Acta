@@ -723,6 +723,13 @@ a:focus-visible {
   -moz-tab-size: 2;
 }
 
+.md img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
 .md ul,
 .md ol {
   /* Browser default indent is wide; keep nested lists compact. */

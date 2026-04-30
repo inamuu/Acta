@@ -1,11 +1,23 @@
-const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 const storage = require("./storage.cjs");
 const iconPath = path.join(__dirname, "assets", "icon.png");
 const aiSessions = new Map();
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "acta-asset",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true
+    }
+  }
+]);
 
 function getAiSessionOrThrow(id) {
   const key = String(id ?? "").trim();
@@ -545,10 +557,28 @@ function createWindow() {
   return win;
 }
 
+function registerAssetProtocol() {
+  protocol.handle("acta-asset", (request) => {
+    const url = new URL(request.url);
+    const rawRelativePath = decodeURIComponent(`${url.hostname}${url.pathname}`);
+    const dataDir = storage.getDataDir();
+    const filePath = path.normalize(path.join(dataDir, rawRelativePath));
+    const relative = path.relative(dataDir, filePath);
+
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      return new Response("Forbidden", { status: 403 });
+    }
+
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
+}
+
 app.whenReady().then(() => {
   if (process.platform === "darwin") {
     app.dock.setIcon(iconPath);
   }
+
+  registerAssetProtocol();
 
   ipcMain.handle("acta:getDataDir", async () => storage.getDataDir());
   ipcMain.handle("acta:getAiSettings", async () => storage.getAiSettings());
@@ -574,6 +604,7 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("acta:listEntries", async () => storage.listEntries());
   ipcMain.handle("acta:addEntry", async (_event, payload) => storage.addEntry(payload));
+  ipcMain.handle("acta:saveImage", async (_event, payload) => storage.saveImage(payload));
   ipcMain.handle("acta:deleteEntry", async (_event, payload) => storage.deleteEntry(payload));
   ipcMain.handle("acta:updateEntry", async (_event, payload) => storage.updateEntry(payload));
   ipcMain.handle("acta:syncPull", async () => storage.syncPull());

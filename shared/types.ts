@@ -13,6 +13,17 @@ export type AddEntryPayload = {
   tags: string[];
 };
 
+export type SaveImagePayload = {
+  bytes: ArrayBuffer;
+  mimeType: string;
+  name?: string;
+};
+
+export type SaveImageResult = {
+  filePath: string;
+  markdownPath: string;
+};
+
 export type ChooseDataDirResult = {
   canceled: boolean;
   dataDir: string;

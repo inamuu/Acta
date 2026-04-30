@@ -12,6 +12,8 @@ import type {
   DeleteEntryPayload,
   DeleteEntryResult,
   SaveAiSettingsPayload,
+  SaveImagePayload,
+  SaveImageResult,
   SyncResult,
   UpdateEntryPayload,
   UpdateEntryResult
@@ -25,6 +27,7 @@ declare global {
       saveAiSettings: (payload: SaveAiSettingsPayload) => Promise<ActaAiSettings>;
       listEntries: () => Promise<ActaEntry[]>;
       addEntry: (payload: AddEntryPayload) => Promise<ActaEntry>;
+      saveImage: (payload: SaveImagePayload) => Promise<SaveImageResult>;
       chooseDataDir: () => Promise<ChooseDataDirResult>;
       deleteEntry: (payload: DeleteEntryPayload) => Promise<DeleteEntryResult>;
       updateEntry: (payload: UpdateEntryPayload) => Promise<UpdateEntryResult>;

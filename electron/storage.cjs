@@ -5,6 +5,8 @@ const { spawn } = require("node:child_process");
 const { app } = require("electron");
 
 const DATE_FILE_RE = /^\d{4}-\d{2}-\d{2}\.md$/;
+const POSTS_DIR = "posts";
+const IMAGES_DIR = "images";
 const SETTINGS_FILE = "acta-settings.json";
 const DATA_DIR_SETTINGS_FILE = "settings.json";
 const SYNC_SUCCESS = "Sync Success";
@@ -45,6 +47,14 @@ function formatTime(d) {
 
 function formatDateTime(d) {
   return `${formatDate(d)} ${formatTime(d)}`;
+}
+
+function getDateParts(d) {
+  return {
+    yyyy: String(d.getFullYear()),
+    mm: pad2(d.getMonth() + 1),
+    dd: pad2(d.getDate())
+  };
 }
 
 function normalizeNewlines(s) {
@@ -189,6 +199,75 @@ async function setDataDir(dir) {
 
 async function ensureDataDir() {
   await fs.promises.mkdir(getDataDir(), { recursive: true });
+}
+
+function getPostFilePath(date) {
+  const [yyyy, mm, dd] = String(date ?? "").split("-");
+  return path.join(getDataDir(), POSTS_DIR, yyyy, mm, dd, `${date}.md`);
+}
+
+function getDateFromFilePath(filePath) {
+  const name = path.basename(String(filePath ?? ""));
+  return DATE_FILE_RE.test(name) ? name.slice(0, 10) : "";
+}
+
+function isCanonicalPostFilePath(filePath) {
+  const date = getDateFromFilePath(filePath);
+  if (!date) return false;
+  return path.resolve(filePath) === path.resolve(getPostFilePath(date));
+}
+
+function getRelativeDataPath(filePath) {
+  return path.relative(getDataDir(), filePath).split(path.sep).join("/");
+}
+
+async function collectDateFiles(dir = getDataDir()) {
+  let names = [];
+  try {
+    names = await fs.promises.readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const out = [];
+  for (const entry of names) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...(await collectDateFiles(p)));
+      continue;
+    }
+    if (entry.isFile() && DATE_FILE_RE.test(entry.name)) {
+      out.push(p);
+    }
+  }
+  out.sort();
+  return out;
+}
+
+async function migrateDateFilesToPostDirs() {
+  const files = await collectDateFiles();
+
+  for (const sourcePath of files) {
+    const date = getDateFromFilePath(sourcePath);
+    if (!date) continue;
+    if (isCanonicalPostFilePath(sourcePath)) continue;
+
+    const targetPath = getPostFilePath(date);
+    await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
+
+    const sourceText = await fs.promises.readFile(sourcePath, "utf8");
+    const targetExists = await fileExists(targetPath);
+
+    if (!targetExists) {
+      await fs.promises.rename(sourcePath, targetPath);
+      continue;
+    }
+
+    const targetText = await fs.promises.readFile(targetPath, "utf8");
+    const separator = targetText.endsWith("\n") ? "" : "\n";
+    await fs.promises.writeFile(targetPath, `${targetText}${separator}${sourceText.trimStart()}`, "utf8");
+    await fs.promises.unlink(sourcePath);
+  }
 }
 
 async function fileExists(p) {
@@ -411,20 +490,13 @@ function updateEntryInText(text, id, nextBody, nextTags) {
 
 async function listEntries() {
   await ensureDataDir();
+  await migrateDateFilesToPostDirs();
 
-  let names = [];
-  try {
-    names = await fs.promises.readdir(getDataDir());
-  } catch {
-    return [];
-  }
-
-  const files = names.filter((n) => DATE_FILE_RE.test(n)).sort();
+  const files = await collectDateFiles();
   const entries = [];
 
-  for (const file of files) {
-    const date = file.slice(0, 10);
-    const p = path.join(getDataDir(), file);
+  for (const p of files) {
+    const date = path.basename(p).slice(0, 10);
     let text = "";
     try {
       text = await fs.promises.readFile(p, "utf8");
@@ -467,8 +539,9 @@ async function addEntry(payload) {
 
   const now = new Date();
   const date = formatDate(now);
-  const filePath = path.join(getDataDir(), `${date}.md`);
+  const filePath = getPostFilePath(date);
   const exists = await fileExists(filePath);
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
 
   if (!exists) {
     await fs.promises.writeFile(filePath, `# ${date}\n\n`, "utf8");
@@ -495,23 +568,59 @@ async function addEntry(payload) {
   return entry;
 }
 
+function imageExtensionFromMime(mimeType, name) {
+  const mime = String(mimeType ?? "").toLowerCase();
+  if (mime === "image/jpeg" || mime === "image/jpg") return ".jpg";
+  if (mime === "image/png") return ".png";
+  if (mime === "image/gif") return ".gif";
+  if (mime === "image/webp") return ".webp";
+  if (mime === "image/svg+xml") return ".svg";
+
+  const ext = path.extname(String(name ?? "")).toLowerCase();
+  if (/^\.(jpe?g|png|gif|webp|svg)$/.test(ext)) return ext === ".jpeg" ? ".jpg" : ext;
+  return ".png";
+}
+
+async function saveImage(payload) {
+  const mimeType = String(payload?.mimeType ?? "").trim().toLowerCase();
+  if (!mimeType.startsWith("image/")) throw new Error("画像データではありません");
+
+  const bytes = payload?.bytes;
+  const buffer = Buffer.isBuffer(bytes)
+    ? bytes
+    : bytes instanceof ArrayBuffer
+      ? Buffer.from(bytes)
+      : ArrayBuffer.isView(bytes)
+        ? Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+        : null;
+  if (!buffer || buffer.length === 0) throw new Error("画像データが空です");
+
+  await ensureDataDir();
+
+  const now = new Date();
+  const { yyyy, mm, dd } = getDateParts(now);
+  const dir = path.join(getDataDir(), IMAGES_DIR, yyyy, mm, dd);
+  await fs.promises.mkdir(dir, { recursive: true });
+
+  const ext = imageExtensionFromMime(mimeType, payload?.name);
+  const filePath = path.join(dir, `${Date.now()}-${crypto.randomUUID()}${ext}`);
+  await fs.promises.writeFile(filePath, buffer);
+
+  return {
+    filePath,
+    markdownPath: getRelativeDataPath(filePath)
+  };
+}
+
 async function deleteEntry(payload) {
   const id = String(payload?.id ?? "").trim();
   if (!id) throw new Error("id が不正です");
 
   await ensureDataDir();
 
-  let names = [];
-  try {
-    names = await fs.promises.readdir(getDataDir());
-  } catch {
-    return { deleted: false };
-  }
+  const files = await collectDateFiles();
 
-  const files = names.filter((n) => DATE_FILE_RE.test(n)).sort();
-
-  for (const file of files) {
-    const p = path.join(getDataDir(), file);
+  for (const p of files) {
     let text = "";
     try {
       text = await fs.promises.readFile(p, "utf8");
@@ -540,17 +649,9 @@ async function updateEntry(payload) {
 
   await ensureDataDir();
 
-  let names = [];
-  try {
-    names = await fs.promises.readdir(getDataDir());
-  } catch {
-    return { updated: false };
-  }
+  const files = await collectDateFiles();
 
-  const files = names.filter((n) => DATE_FILE_RE.test(n)).sort();
-
-  for (const file of files) {
-    const p = path.join(getDataDir(), file);
+  for (const p of files) {
     let text = "";
     try {
       text = await fs.promises.readFile(p, "utf8");
@@ -575,6 +676,7 @@ module.exports = {
   setAiSettings,
   listEntries,
   addEntry,
+  saveImage,
   deleteEntry,
   updateEntry,
   syncPull,

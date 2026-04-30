@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("acta", {
   saveAiSettings: (payload) => ipcRenderer.invoke("acta:saveAiSettings", payload),
   listEntries: () => ipcRenderer.invoke("acta:listEntries"),
   addEntry: (payload) => ipcRenderer.invoke("acta:addEntry", payload),
+  saveImage: (payload) => ipcRenderer.invoke("acta:saveImage", payload),
   chooseDataDir: () => ipcRenderer.invoke("acta:chooseDataDir"),
   deleteEntry: (payload) => ipcRenderer.invoke("acta:deleteEntry", payload),
   updateEntry: (payload) => ipcRenderer.invoke("acta:updateEntry", payload),
