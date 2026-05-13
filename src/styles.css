@@ -332,6 +332,12 @@ a:focus-visible {
   background: rgba(15, 23, 42, 0.1);
 }
 
+.dateQuickBtn.isActive {
+  background: rgba(15, 23, 42, 0.14);
+  color: var(--fg0);
+  font-weight: 760;
+}
+
 .limitSelect {
   border: 0;
   background: transparent;

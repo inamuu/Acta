@@ -9,6 +9,7 @@ import { installDragScroll } from "./lib/dragScroll";
 import { setTaskStateOnLine, type TaskState } from "./lib/taskList";
 
 type TagStat = { tag: string; count: number };
+type DateFilterMode = "week" | "day" | "all";
 type SyncIndicatorState = {
   kind: "idle" | "running" | "success" | "error";
   label: "" | "Syncing..." | "Sync Success" | "Sync Error";
@@ -29,6 +30,12 @@ function pad2(n: number): string {
 
 function formatDateYYYYMMDD(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function addDays(d: Date, days: number): Date {
+  const next = new Date(d);
+  next.setDate(next.getDate() + days);
+  return next;
 }
 
 function lowerBound(list: string[], value: string): number {
@@ -105,6 +112,7 @@ export function App() {
   const [untaggedOnly, setUntaggedOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<string>(() => formatDateYYYYMMDD(new Date()));
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>("week");
   const [appError, setAppError] = useState<string>("");
   const [editing, setEditing] = useState<ActaEntry | null>(null);
   const [draft, setDraft] = useState<{ key: string; body: string; tags: string[] } | null>(null);
@@ -306,7 +314,7 @@ export function App() {
   useEffect(() => {
     // 日付フィルタを切り替えたら先頭に戻す（遡り操作の体験を安定させる）。
     scrollAreaRef.current?.scrollTo({ top: 0 });
-  }, [dateFilter]);
+  }, [dateFilter, dateFilterMode]);
 
   const availableDatesAsc = useMemo(() => {
     const set = new Set<string>();
@@ -352,8 +360,12 @@ export function App() {
 
   const filteredEntries = useMemo(() => {
     const q = normalizeQuery(query);
+    const weekEndDate = dateFilter || formatDateYYYYMMDD(new Date());
+    const weekStartDate = formatDateYYYYMMDD(addDays(new Date(`${weekEndDate}T00:00:00`), -6));
+
     return entries.filter((e) => {
-      if (dateFilter && e.date !== dateFilter) return false;
+      if (dateFilterMode === "day" && dateFilter && e.date !== dateFilter) return false;
+      if (dateFilterMode === "week" && (e.date < weekStartDate || e.date > weekEndDate)) return false;
 
       if (untaggedOnly) {
         if (e.tags.length !== 0) return false;
@@ -372,13 +384,13 @@ export function App() {
         includesLoose(e.created, q)
       );
     });
-  }, [dateFilter, entries, query, selectedTags, untaggedOnly]);
+  }, [dateFilter, dateFilterMode, entries, query, selectedTags, untaggedOnly]);
 
   const visibleEntries = useMemo(() => {
-    if (dateFilter) return filteredEntries;
+    if (dateFilterMode !== "all") return filteredEntries;
     if (!limit || limit <= 0) return filteredEntries;
     return filteredEntries.slice(0, limit);
-  }, [dateFilter, filteredEntries, limit]);
+  }, [dateFilterMode, filteredEntries, limit]);
 
   const tagSuggestions = useMemo(() => tagStats.map((t) => t.tag), [tagStats]);
   const popularTagSuggestions = useMemo(() => {
@@ -577,7 +589,11 @@ export function App() {
                   type="button"
                   disabled={!prevAvailableDate}
                   title={prevAvailableDate ? `${prevAvailableDate} へ` : "前の日付がありません"}
-                  onClick={() => prevAvailableDate && setDateFilter(prevAvailableDate)}
+                  onClick={() => {
+                    if (!prevAvailableDate) return;
+                    setDateFilter(prevAvailableDate);
+                    setDateFilterMode("day");
+                  }}
                 >
                   ←
                 </button>
@@ -586,7 +602,10 @@ export function App() {
                   className="dateInput"
                   type="date"
                   value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
+                  onChange={(e) => {
+                    setDateFilter(e.target.value);
+                    setDateFilterMode(e.target.value ? "day" : "all");
+                  }}
                 />
 
                 <button
@@ -594,22 +613,49 @@ export function App() {
                   type="button"
                   disabled={!nextAvailableDate}
                   title={nextAvailableDate ? `${nextAvailableDate} へ` : "次の日付がありません"}
-                  onClick={() => nextAvailableDate && setDateFilter(nextAvailableDate)}
+                  onClick={() => {
+                    if (!nextAvailableDate) return;
+                    setDateFilter(nextAvailableDate);
+                    setDateFilterMode("day");
+                  }}
                 >
                   →
                 </button>
 
                 <button
-                  className="dateQuickBtn"
+                  className={`dateQuickBtn${dateFilterMode === "day" ? " isActive" : ""}`}
                   type="button"
                   title="今日"
-                  onClick={() => setDateFilter(formatDateYYYYMMDD(new Date()))}
+                  onClick={() => {
+                    setDateFilter(formatDateYYYYMMDD(new Date()));
+                    setDateFilterMode("day");
+                  }}
                 >
                   今日
                 </button>
 
-                {dateFilter ? (
-                  <button className="dateClearBtn" type="button" title="クリア" onClick={() => setDateFilter("")}>
+                <button
+                  className={`dateQuickBtn${dateFilterMode === "week" ? " isActive" : ""}`}
+                  type="button"
+                  title="直近1週間"
+                  onClick={() => {
+                    setDateFilter(formatDateYYYYMMDD(new Date()));
+                    setDateFilterMode("week");
+                  }}
+                >
+                  今週
+                </button>
+
+                {dateFilterMode !== "all" ? (
+                  <button
+                    className="dateClearBtn"
+                    type="button"
+                    title="クリア"
+                    onClick={() => {
+                      setDateFilter("");
+                      setDateFilterMode("all");
+                    }}
+                  >
                     ×
                   </button>
                 ) : null}
