@@ -62,11 +62,13 @@ export type KnowledgeIndexResult = {
 
 export type KnowledgeSearchPayload = {
   query: string;
+  excludeTags?: string[];
   limit?: number;
 };
 
 export type KnowledgeSearchResultItem = {
   id: string;
+  title: string;
   date: string;
   created: string;
   createdAtMs: number;

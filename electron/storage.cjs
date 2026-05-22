@@ -585,6 +585,7 @@ async function searchKnowledgeIndex(payload) {
   const query = String(payload?.query ?? "").trim();
   const limit = Math.max(1, Math.min(100, Number(payload?.limit) || 30));
   const terms = splitSearchTerms(query);
+  const excludeTags = parseTags(Array.isArray(payload?.excludeTags) ? payload.excludeTags.join(",") : payload?.excludeTags || "");
 
   let where = "1 = 1";
   if (terms.length > 0) {
@@ -604,6 +605,16 @@ async function searchKnowledgeIndex(payload) {
         );
       })
       .join(" AND ");
+  }
+
+  if (excludeTags.length > 0) {
+    const tagWhere = excludeTags
+      .map((tag) => {
+        const needle = sqlQuote(`%,${escapeLike(tag).toLowerCase()},%`);
+        return "(',' || replace(lower(tags), ', ', ',') || ',') NOT LIKE " + needle + " ESCAPE '\\'";
+      })
+      .join(" AND ");
+    where = `(${where}) AND ${tagWhere}`;
   }
 
   const scoreExpr =
@@ -632,6 +643,7 @@ async function searchKnowledgeIndex(payload) {
     query,
     items: rows.map((row) => ({
       id: String(row.id ?? ""),
+      title: makeArticleTitle({ body: row.body, date: row.date }),
       date: String(row.date ?? ""),
       created: String(row.created ?? ""),
       createdAtMs: Number(row.createdAtMs ?? 0),
@@ -726,6 +738,53 @@ function buildKnowledgeSiteHtml(entries, generatedAtMs) {
     tags: parseTags(entry.tags || ""),
     title: makeArticleTitle(entry)
   }));
+  const tagCounts = new Map();
+  const dateCounts = new Map();
+  for (const entry of articles) {
+    dateCounts.set(entry.date, (dateCounts.get(entry.date) || 0) + 1);
+    for (const tag of entry.tags) {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    }
+  }
+  const datesAsc = Array.from(dateCounts.keys()).sort();
+  const topTags = Array.from(tagCounts.entries())
+    .sort((a, b) => {
+      if (a[1] !== b[1]) return b[1] - a[1];
+      return String(a[0]).localeCompare(String(b[0]), "ja");
+    })
+    .slice(0, 30);
+  const recentArticles = articles.slice(0, 12);
+  const activeDates = Array.from(dateCounts.entries())
+    .sort((a, b) => String(b[0]).localeCompare(String(a[0])))
+    .slice(0, 14);
+  const summaryHtml = `<section class="summaryGrid">
+        <div class="summaryBox">
+          <h2>Overview</h2>
+          <dl>
+            <div><dt>Entries</dt><dd>${articles.length}</dd></div>
+            <div><dt>Tags</dt><dd>${tagCounts.size}</dd></div>
+            <div><dt>Period</dt><dd>${escapeHtml(datesAsc[0] || "-")} - ${escapeHtml(datesAsc[datesAsc.length - 1] || "-")}</dd></div>
+          </dl>
+        </div>
+        <div class="summaryBox">
+          <h2>Recent Entries</h2>
+          <ul>${recentArticles
+            .map((entry) => `<li><a href="#${escapeHtml(entry.id)}">${escapeHtml(entry.title)}</a><small>${escapeHtml(entry.date)}</small></li>`)
+            .join("")}</ul>
+        </div>
+        <div class="summaryBox">
+          <h2>Top Tags</h2>
+          <div class="summaryTags">${topTags
+            .map(([tag, count]) => `<span>${escapeHtml(tag)} <small>${count}</small></span>`)
+            .join("")}</div>
+        </div>
+        <div class="summaryBox">
+          <h2>Recent Dates</h2>
+          <ul>${activeDates
+            .map(([date, count]) => `<li><span>${escapeHtml(date)}</span><small>${count} entries</small></li>`)
+            .join("")}</ul>
+        </div>
+      </section>`;
   const navItems = articles
     .slice(0, 300)
     .map(
@@ -735,6 +794,13 @@ function buildKnowledgeSiteHtml(entries, generatedAtMs) {
         )}</small></a>`
     )
     .join("\n");
+  const summaryArticle = `<article class="article summaryArticle" id="top" data-search="acta wiki summary top overview recent tags">
+        <header class="articleHead">
+          <h1>Summary</h1>
+          <div class="meta">Generated ${escapeHtml(new Date(generatedAtMs).toLocaleString("ja-JP"))}</div>
+        </header>
+        ${summaryHtml}
+      </article>`;
   const articleItems = articles
     .map(
       (entry) => `<article class="article" id="${escapeHtml(entry.id)}" data-search="${escapeHtml(
@@ -781,9 +847,22 @@ function buildKnowledgeSiteHtml(entries, generatedAtMs) {
     .meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
     .tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 12px; }
     .tags span { background: #eaecf0; border: 1px solid #c8ccd1; padding: 1px 7px; border-radius: 2px; color: #202122; }
+    .summaryGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 16px; }
+    .summaryBox { border: 1px solid #a2a9b1; background: #f8f9fa; padding: 14px 16px; }
+    .summaryBox h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; margin: 0 0 10px; border-bottom: 1px solid #c8ccd1; }
+    .summaryBox dl { margin: 0; }
+    .summaryBox dl div { display: grid; grid-template-columns: 90px 1fr; gap: 10px; padding: 4px 0; }
+    .summaryBox dt { color: var(--muted); }
+    .summaryBox dd { margin: 0; font-weight: 600; }
+    .summaryBox ul { margin: 0; padding-left: 18px; }
+    .summaryBox li { margin: 4px 0; }
+    .summaryBox li small { display: block; color: var(--muted); }
+    .summaryTags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .summaryTags span { border: 1px solid #c8ccd1; background: #fff; padding: 2px 7px; }
+    .summaryTags small { color: var(--muted); }
     .body h2, .body h3, .body h4 { border-bottom: 1px solid #eaecf0; font-weight: 400; margin-top: 20px; }
     .body pre { background: var(--soft); border: 1px solid #eaecf0; padding: 10px; overflow: auto; }
-    @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } .side { position: static; height: auto; } .content { padding: 22px 18px 60px; } }
+    @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } .side { position: static; height: auto; } .content { padding: 22px 18px 60px; } .summaryGrid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -792,13 +871,14 @@ function buildKnowledgeSiteHtml(entries, generatedAtMs) {
       <div class="brand">Acta Wiki</div>
       <input id="q" class="search" placeholder="記事を検索" />
       <div id="count" class="count">${articles.length} entries</div>
-      <nav>${navItems}</nav>
+      <nav><a class="navItem" href="#top"><span>Summary</span><small>Top page</small></a>${navItems}</nav>
     </aside>
     <main class="content">
       <header class="siteHead">
         <h1>Acta Wiki</h1>
         <p>Generated ${escapeHtml(new Date(generatedAtMs).toLocaleString("ja-JP"))} from ${articles.length} indexed posts.</p>
       </header>
+      ${summaryArticle}
       ${articleItems}
     </main>
   </div>

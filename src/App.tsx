@@ -147,6 +147,7 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeView, setActiveView] = useState<ActiveView>("journal");
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
+  const [knowledgeExcludeTags, setKnowledgeExcludeTags] = useState("");
   const [knowledgeResults, setKnowledgeResults] = useState<KnowledgeSearchResultItem[]>([]);
   const [knowledgeBusy, setKnowledgeBusy] = useState(false);
   const [knowledgeStatus, setKnowledgeStatus] = useState("");
@@ -525,7 +526,11 @@ export function App() {
         `更新完了: ${res.changedFiles}ファイル更新 / ${res.deletedFiles}ファイル削除 / ${res.totalEntries}件`
       );
       if (knowledgeQuery.trim()) {
-        const searchRes = await api.searchKnowledgeIndex({ query: knowledgeQuery, limit: 50 });
+        const searchRes = await api.searchKnowledgeIndex({
+          query: knowledgeQuery,
+          excludeTags: knowledgeExcludeTags.split(/[,、]/g),
+          limit: 50
+        });
         setKnowledgeResults(searchRes.items);
       }
     } catch (err) {
@@ -540,7 +545,11 @@ export function App() {
     setKnowledgeBusy(true);
     setKnowledgeStatus("検索しています...");
     try {
-      const res = await api.searchKnowledgeIndex({ query: nextQuery, limit: 50 });
+      const res = await api.searchKnowledgeIndex({
+        query: nextQuery,
+        excludeTags: knowledgeExcludeTags.split(/[,、]/g),
+        limit: 50
+      });
       setKnowledgeResults(res.items);
       setKnowledgeStatus(`${res.items.length}件見つかりました`);
     } catch (err) {
@@ -924,6 +933,17 @@ export function App() {
                 </button>
               </div>
 
+              <input
+                className="knowledgeExcludeInput"
+                value={knowledgeExcludeTags}
+                onChange={(e) => setKnowledgeExcludeTags(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void searchKnowledgeIndex();
+                }}
+                placeholder="除外タグ (, 区切り)"
+                title="指定したタグを含む投稿を検索結果から除外"
+              />
+
               <div className="knowledgeActions">
                 <button
                   className="ghostBtn"
@@ -973,9 +993,12 @@ export function App() {
                         onClick={() => openLinkedEntry(item.id)}
                         title="記録で開く"
                       >
-                        {item.date} / {item.created || item.id}
+                        {item.title || `${item.date} の記録`}
                       </button>
                       <span className="knowledgeScore">score {item.score}</span>
+                    </div>
+                    <div className="knowledgeResultMeta">
+                      {item.created || item.date} / {item.id}
                     </div>
                     {item.tags.length > 0 ? (
                       <div className="commentTags">
