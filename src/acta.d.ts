@@ -11,6 +11,10 @@ import type {
   ChooseDataDirResult,
   DeleteEntryPayload,
   DeleteEntryResult,
+  KnowledgeIndexResult,
+  KnowledgeSearchPayload,
+  KnowledgeSearchResult,
+  KnowledgeSiteResult,
   SaveAiSettingsPayload,
   SaveImagePayload,
   SaveImageResult,
@@ -31,6 +35,10 @@ declare global {
       chooseDataDir: () => Promise<ChooseDataDirResult>;
       deleteEntry: (payload: DeleteEntryPayload) => Promise<DeleteEntryResult>;
       updateEntry: (payload: UpdateEntryPayload) => Promise<UpdateEntryResult>;
+      rebuildKnowledgeIndex: () => Promise<KnowledgeIndexResult>;
+      searchKnowledgeIndex: (payload: KnowledgeSearchPayload) => Promise<KnowledgeSearchResult>;
+      generateKnowledgeSite: () => Promise<KnowledgeSiteResult>;
+      openKnowledgeSite: () => Promise<{ opened: boolean; path: string; error?: string }>;
       syncPull: () => Promise<SyncResult>;
       syncBackup: () => Promise<SyncResult>;
       aiStartSession: (payload: AiStartSessionPayload) => Promise<AiStartSessionResult>;

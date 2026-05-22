@@ -364,6 +364,28 @@ a:focus-visible {
   transform: translateY(-1px);
 }
 
+.ghostBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+
+.primaryActionBtn {
+  border: 1px solid rgba(37, 99, 235, 0.24);
+  background: #2563eb;
+  color: #fff;
+  padding: 7px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.primaryActionBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .scrollArea {
   flex: 1;
   overflow: auto;
@@ -980,6 +1002,112 @@ a:focus-visible {
 
 .aiArea.isHidden {
   display: none;
+}
+
+.knowledgeArea {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.knowledgeToolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.knowledgeSearch {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: min(560px, 100%);
+  flex: 1;
+}
+
+.knowledgeSearchInput {
+  width: 100%;
+  height: 38px;
+  border: 1px solid var(--borderSoft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.66);
+  color: var(--fg0);
+  outline: none;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.knowledgeSearchInput:focus {
+  border-color: rgba(37, 99, 235, 0.36);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.knowledgeActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.knowledgeStatus {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.knowledgeResults {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.knowledgeResult {
+  border: 1px solid var(--borderSoft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  padding: 14px;
+}
+
+.knowledgeResultHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.knowledgeResultTitle {
+  border: 0;
+  background: transparent;
+  color: var(--fg0);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 0;
+  text-align: left;
+}
+
+.knowledgeResultTitle:hover {
+  text-decoration: underline;
+}
+
+.knowledgeScore,
+.knowledgeSource {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.knowledgeExcerpt {
+  color: var(--fg1);
+  margin: 10px 0 8px;
+  line-height: 1.65;
 }
 
 .aiConsole {

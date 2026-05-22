@@ -607,6 +607,14 @@ app.whenReady().then(() => {
   ipcMain.handle("acta:saveImage", async (_event, payload) => storage.saveImage(payload));
   ipcMain.handle("acta:deleteEntry", async (_event, payload) => storage.deleteEntry(payload));
   ipcMain.handle("acta:updateEntry", async (_event, payload) => storage.updateEntry(payload));
+  ipcMain.handle("acta:rebuildKnowledgeIndex", async () => storage.rebuildKnowledgeIndex());
+  ipcMain.handle("acta:searchKnowledgeIndex", async (_event, payload) => storage.searchKnowledgeIndex(payload));
+  ipcMain.handle("acta:generateKnowledgeSite", async () => storage.generateKnowledgeSite());
+  ipcMain.handle("acta:openKnowledgeSite", async () => {
+    const sitePath = storage.getKnowledgeSitePath();
+    const error = await shell.openPath(sitePath);
+    return { opened: !error, path: sitePath, error: error || undefined };
+  });
   ipcMain.handle("acta:syncPull", async () => storage.syncPull());
   ipcMain.handle("acta:syncBackup", async () => storage.syncBackup());
   ipcMain.handle("acta:aiStartSession", async (_event, payload) => startAiSession(payload?.cliPath));

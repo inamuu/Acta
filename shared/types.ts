@@ -47,6 +47,47 @@ export type UpdateEntryResult = {
   updated: boolean;
 };
 
+export type KnowledgeIndexResult = {
+  ok: boolean;
+  dbPath: string;
+  statePath: string;
+  indexedAtMs: number;
+  scannedFiles: number;
+  changedFiles: number;
+  deletedFiles: number;
+  indexedEntries: number;
+  totalEntries: number;
+  detail: string;
+};
+
+export type KnowledgeSearchPayload = {
+  query: string;
+  limit?: number;
+};
+
+export type KnowledgeSearchResultItem = {
+  id: string;
+  date: string;
+  created: string;
+  createdAtMs: number;
+  tags: string[];
+  body: string;
+  sourceFile: string;
+  score: number;
+};
+
+export type KnowledgeSearchResult = {
+  query: string;
+  items: KnowledgeSearchResultItem[];
+};
+
+export type KnowledgeSiteResult = {
+  ok: boolean;
+  sitePath: string;
+  entryCount: number;
+  generatedAtMs: number;
+};
+
 export type SyncResult = {
   ok: boolean;
   label: "Sync Success" | "Sync Error";

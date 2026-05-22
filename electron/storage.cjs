@@ -9,6 +9,9 @@ const POSTS_DIR = "posts";
 const IMAGES_DIR = "images";
 const SETTINGS_FILE = "acta-settings.json";
 const DATA_DIR_SETTINGS_FILE = "settings.json";
+const KNOWLEDGE_DB_FILE = "knowledge-index.sqlite";
+const KNOWLEDGE_STATE_FILE = "knowledge-index-state.json";
+const KNOWLEDGE_SITE_DIR = "wiki";
 const SYNC_SUCCESS = "Sync Success";
 const SYNC_ERROR = "Sync Error";
 const DEFAULT_AI_CLI_PATH = "/opt/homebrew/bin/codex";
@@ -59,6 +62,36 @@ function getDateParts(d) {
 
 function normalizeNewlines(s) {
   return s.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function sqlQuote(value) {
+  return `'${String(value ?? "").replace(/'/g, "''")}'`;
+}
+
+function escapeLike(value) {
+  return String(value ?? "").replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+function splitSearchTerms(query) {
+  return String(query ?? "")
+    .trim()
+    .split(/\s+/g)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escapeScriptJson(value) {
+  return JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
 }
 
 function parseCreatedToMs(created) {
@@ -140,10 +173,27 @@ function getDataDir() {
   return dir ? dir : getDefaultDataDir();
 }
 
+function getKnowledgeDbPath() {
+  return path.join(getDataDir(), KNOWLEDGE_DB_FILE);
+}
+
+function getKnowledgeStatePath() {
+  return path.join(getDataDir(), KNOWLEDGE_STATE_FILE);
+}
+
+function getKnowledgeSiteDir() {
+  return path.join(getDataDir(), KNOWLEDGE_SITE_DIR);
+}
+
+function getKnowledgeSitePath() {
+  return path.join(getKnowledgeSiteDir(), "index.html");
+}
+
 function buildDefaultAiInstruction(dataDir) {
   const dir = String(dataDir ?? "").trim() || getDefaultDataDir();
   return [
     `<data>${dir}</data> の中身を読み込んでください。`,
+    "検索や調査を求められた場合は、必要に応じて data 直下の knowledge-index.sqlite を SQLite で検索してください。Wiki 形式で俯瞰したい場合は wiki/index.html も参照できます。",
     "例えば、今日から一週間分のサマリーを作成してと言われたら、今日の日付から一週間分の内容を読み込んでサマリーを作成して、他のファイルと同じように今の日時でファイルを作成、またはすでにファイルがあれば追記するようにしてください。",
     "作成してと言われたファイルはすべて、上記 data に保存するようにしてください。"
   ].join("\n");
@@ -325,6 +375,476 @@ function runGitCommand(args) {
       });
     });
   });
+}
+
+function runSqlite(dbPath, sql) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("sqlite3", [dbPath], {
+      cwd: getDataDir(),
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout?.on("data", (chunk) => {
+      stdout += String(chunk ?? "");
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += String(chunk ?? "");
+    });
+    child.on("error", (err) => {
+      reject(err);
+    });
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(stderr.trim() || stdout.trim() || `sqlite3 exited with code ${code}`));
+        return;
+      }
+      resolve(stdout);
+    });
+
+    child.stdin.write(sql);
+    child.stdin.end();
+  });
+}
+
+async function runSqliteJson(dbPath, sql) {
+  const out = await runSqlite(dbPath, `.mode json\n${sql}\n`);
+  const text = String(out ?? "").trim();
+  if (!text) return [];
+  const parsed = safeJsonParse(text);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+async function initKnowledgeDb(dbPath) {
+  await fs.promises.mkdir(path.dirname(dbPath), { recursive: true });
+  await runSqlite(
+    dbPath,
+    [
+      "PRAGMA journal_mode=WAL;",
+      "PRAGMA synchronous=NORMAL;",
+      "CREATE TABLE IF NOT EXISTS entries (",
+      "  id TEXT PRIMARY KEY,",
+      "  date TEXT NOT NULL,",
+      "  created TEXT NOT NULL,",
+      "  created_at_ms INTEGER NOT NULL,",
+      "  tags TEXT NOT NULL,",
+      "  body TEXT NOT NULL,",
+      "  source_file TEXT NOT NULL,",
+      "  source_rel TEXT NOT NULL",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_entries_date ON entries(date);",
+      "CREATE INDEX IF NOT EXISTS idx_entries_created_at_ms ON entries(created_at_ms);",
+      "CREATE INDEX IF NOT EXISTS idx_entries_source_rel ON entries(source_rel);",
+      "CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(id UNINDEXED, body, tags, tokenize='trigram');"
+    ].join("\n")
+  );
+}
+
+async function loadKnowledgeState() {
+  const statePath = getKnowledgeStatePath();
+  const raw = await readTextFileIfExists(statePath);
+  const parsed = safeJsonParse(raw);
+  if (!parsed || typeof parsed !== "object") return { version: 1, files: {} };
+  const files = parsed.files && typeof parsed.files === "object" ? parsed.files : {};
+  return { version: 1, files };
+}
+
+async function readTextFileIfExists(filePath) {
+  try {
+    return await fs.promises.readFile(filePath, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function getFileStateForStat(stat) {
+  return {
+    size: stat.size,
+    mtimeMs: Math.round(stat.mtimeMs)
+  };
+}
+
+function fileStateEquals(a, b) {
+  return Boolean(a && b && Number(a.size) === Number(b.size) && Number(a.mtimeMs) === Number(b.mtimeMs));
+}
+
+function buildEntryInsertSql(entry) {
+  const tagsText = (entry.tags || []).join(", ");
+  return [
+    "INSERT OR REPLACE INTO entries (id, date, created, created_at_ms, tags, body, source_file, source_rel) VALUES (",
+    [
+      sqlQuote(entry.id),
+      sqlQuote(entry.date),
+      sqlQuote(entry.created),
+      Number(entry.createdAtMs || 0),
+      sqlQuote(tagsText),
+      sqlQuote(entry.body),
+      sqlQuote(entry.sourceFile),
+      sqlQuote(getRelativeDataPath(entry.sourceFile))
+    ].join(", "),
+    ");",
+    `INSERT INTO entries_fts (id, body, tags) VALUES (${sqlQuote(entry.id)}, ${sqlQuote(entry.body)}, ${sqlQuote(tagsText)});`
+  ].join("");
+}
+
+async function rebuildKnowledgeIndex() {
+  await ensureDataDir();
+  await migrateDateFilesToPostDirs();
+
+  const dbPath = getKnowledgeDbPath();
+  const statePath = getKnowledgeStatePath();
+  await initKnowledgeDb(dbPath);
+
+  const state = await loadKnowledgeState();
+  const files = await collectDateFiles();
+  const nextFiles = {};
+  const fileSet = new Set();
+  const changed = [];
+
+  for (const p of files) {
+    const rel = getRelativeDataPath(p);
+    fileSet.add(rel);
+    const stat = await fs.promises.stat(p);
+    const nextState = getFileStateForStat(stat);
+    nextFiles[rel] = nextState;
+    if (!fileStateEquals(state.files[rel], nextState)) {
+      changed.push(p);
+    }
+  }
+
+  const deletedRels = Object.keys(state.files || {}).filter((rel) => !fileSet.has(rel));
+  let indexedEntries = 0;
+  const sqlParts = ["BEGIN;"];
+
+  for (const rel of deletedRels) {
+    sqlParts.push(`DELETE FROM entries_fts WHERE id IN (SELECT id FROM entries WHERE source_rel = ${sqlQuote(rel)});`);
+    sqlParts.push(`DELETE FROM entries WHERE source_rel = ${sqlQuote(rel)};`);
+  }
+
+  for (const p of changed) {
+    const rel = getRelativeDataPath(p);
+    sqlParts.push(`DELETE FROM entries_fts WHERE id IN (SELECT id FROM entries WHERE source_rel = ${sqlQuote(rel)});`);
+    sqlParts.push(`DELETE FROM entries WHERE source_rel = ${sqlQuote(rel)};`);
+
+    const date = path.basename(p).slice(0, 10);
+    const text = await fs.promises.readFile(p, "utf8");
+    const entries = parseEntriesFromText(text, date, p);
+    indexedEntries += entries.length;
+    for (const entry of entries) {
+      sqlParts.push(buildEntryInsertSql(entry));
+    }
+  }
+
+  sqlParts.push("COMMIT;");
+  if (changed.length > 0 || deletedRels.length > 0) {
+    await runSqlite(dbPath, sqlParts.join("\n"));
+  }
+
+  const totalRows = await runSqliteJson(dbPath, "SELECT COUNT(*) AS count FROM entries;");
+  const totalEntries = Number(totalRows[0]?.count ?? 0);
+  const indexedAtMs = Date.now();
+  await fs.promises.writeFile(
+    statePath,
+    JSON.stringify(
+      {
+        version: 1,
+        indexedAtMs,
+        dbPath,
+        files: nextFiles
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  return {
+    ok: true,
+    dbPath,
+    statePath,
+    indexedAtMs,
+    scannedFiles: files.length,
+    changedFiles: changed.length,
+    deletedFiles: deletedRels.length,
+    indexedEntries,
+    totalEntries,
+    detail: `${changed.length} files updated, ${deletedRels.length} files removed, ${totalEntries} entries indexed`
+  };
+}
+
+async function searchKnowledgeIndex(payload) {
+  await ensureDataDir();
+  const dbPath = getKnowledgeDbPath();
+  if (!(await fileExists(dbPath))) {
+    return { query: String(payload?.query ?? ""), items: [] };
+  }
+
+  await initKnowledgeDb(dbPath);
+  const query = String(payload?.query ?? "").trim();
+  const limit = Math.max(1, Math.min(100, Number(payload?.limit) || 30));
+  const terms = splitSearchTerms(query);
+
+  let where = "1 = 1";
+  if (terms.length > 0) {
+    where = terms
+      .map((term) => {
+        const needle = sqlQuote(`%${escapeLike(term).toLowerCase()}%`);
+        return (
+          "(lower(body) LIKE " +
+          needle +
+          " ESCAPE '\\' OR lower(tags) LIKE " +
+          needle +
+          " ESCAPE '\\' OR lower(date) LIKE " +
+          needle +
+          " ESCAPE '\\' OR lower(created) LIKE " +
+          needle +
+          " ESCAPE '\\')"
+        );
+      })
+      .join(" AND ");
+  }
+
+  const scoreExpr =
+    terms.length === 0
+      ? "0"
+      : terms
+          .map((term) => {
+            const lit = sqlQuote(term.toLowerCase());
+            return `(CASE WHEN instr(lower(tags), ${lit}) > 0 THEN 8 ELSE 0 END + CASE WHEN instr(lower(body), ${lit}) > 0 THEN 3 ELSE 0 END + CASE WHEN instr(lower(date || ' ' || created), ${lit}) > 0 THEN 1 ELSE 0 END)`;
+          })
+          .join(" + ");
+
+  const rows = await runSqliteJson(
+    dbPath,
+    [
+      "SELECT id, date, created, created_at_ms AS createdAtMs, tags, body, source_file AS sourceFile,",
+      `${scoreExpr} AS score`,
+      "FROM entries",
+      `WHERE ${where}`,
+      "ORDER BY score DESC, created_at_ms DESC",
+      `LIMIT ${limit};`
+    ].join("\n")
+  );
+
+  return {
+    query,
+    items: rows.map((row) => ({
+      id: String(row.id ?? ""),
+      date: String(row.date ?? ""),
+      created: String(row.created ?? ""),
+      createdAtMs: Number(row.createdAtMs ?? 0),
+      tags: parseTags(row.tags || ""),
+      body: String(row.body ?? ""),
+      sourceFile: String(row.sourceFile ?? ""),
+      score: Number(row.score ?? 0)
+    }))
+  };
+}
+
+function makeArticleTitle(entry) {
+  const body = String(entry.body ?? "").trim();
+  const heading = body.split("\n").find((line) => /^#{1,3}\s+\S/.test(line.trim()));
+  if (heading) return heading.replace(/^#{1,3}\s+/, "").trim().slice(0, 80);
+
+  const firstLine = body
+    .split("\n")
+    .map((line) => line.trim())
+    .find(Boolean);
+  if (firstLine) return firstLine.replace(/^[-*]\s+/, "").slice(0, 80);
+  return `${entry.date} の記録`;
+}
+
+function renderWikiBody(markdown) {
+  const lines = normalizeNewlines(String(markdown ?? "")).split("\n");
+  const out = [];
+  let inList = false;
+  let inPre = false;
+
+  function closeList() {
+    if (inList) {
+      out.push("</ul>");
+      inList = false;
+    }
+  }
+
+  for (const line of lines) {
+    const raw = line;
+    const trimmed = raw.trim();
+
+    if (/^```/.test(trimmed)) {
+      closeList();
+      if (inPre) {
+        out.push("</code></pre>");
+      } else {
+        out.push("<pre><code>");
+      }
+      inPre = !inPre;
+      continue;
+    }
+
+    if (inPre) {
+      out.push(escapeHtml(raw));
+      continue;
+    }
+
+    const heading = /^(#{1,4})\s+(.+)$/.exec(trimmed);
+    if (heading) {
+      closeList();
+      const level = Math.min(4, heading[1].length + 1);
+      out.push(`<h${level}>${escapeHtml(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    const bullet = /^[-*]\s+(.+)$/.exec(trimmed);
+    if (bullet) {
+      if (!inList) {
+        out.push("<ul>");
+        inList = true;
+      }
+      out.push(`<li>${escapeHtml(bullet[1])}</li>`);
+      continue;
+    }
+
+    closeList();
+    if (!trimmed) {
+      out.push("");
+      continue;
+    }
+    out.push(`<p>${escapeHtml(trimmed)}</p>`);
+  }
+
+  closeList();
+  if (inPre) out.push("</code></pre>");
+  return out.join("\n");
+}
+
+function buildKnowledgeSiteHtml(entries, generatedAtMs) {
+  const articles = entries.map((entry) => ({
+    ...entry,
+    tags: parseTags(entry.tags || ""),
+    title: makeArticleTitle(entry)
+  }));
+  const navItems = articles
+    .slice(0, 300)
+    .map(
+      (entry) =>
+        `<a class="navItem" href="#${escapeHtml(entry.id)}"><span>${escapeHtml(entry.title)}</span><small>${escapeHtml(
+          entry.date
+        )}</small></a>`
+    )
+    .join("\n");
+  const articleItems = articles
+    .map(
+      (entry) => `<article class="article" id="${escapeHtml(entry.id)}" data-search="${escapeHtml(
+        `${entry.title} ${entry.body} ${entry.tags.join(" ")} ${entry.date}`.toLowerCase()
+      )}">
+        <header class="articleHead">
+          <h1>${escapeHtml(entry.title)}</h1>
+          <div class="meta">${escapeHtml(entry.created || entry.date)} / ${escapeHtml(entry.id)}</div>
+          ${
+            entry.tags.length > 0
+              ? `<div class="tags">${entry.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>`
+              : ""
+          }
+        </header>
+        <section class="body">${renderWikiBody(entry.body)}</section>
+      </article>`
+    )
+    .join("\n");
+
+  return `<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Acta Wiki</title>
+  <style>
+    :root { color-scheme: light; --line: #a2a9b1; --link: #36c; --muted: #54595d; --bg: #fff; --soft: #f8f9fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; color: #202122; background: var(--bg); }
+    .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: 100vh; }
+    .side { border-right: 1px solid var(--line); background: var(--soft); padding: 18px 14px; position: sticky; top: 0; height: 100vh; overflow: auto; }
+    .brand { font-family: Georgia, serif; font-size: 28px; margin: 0 0 12px; }
+    .search { width: 100%; border: 1px solid var(--line); border-radius: 2px; padding: 8px 10px; background: #fff; }
+    .count { color: var(--muted); margin: 10px 0 16px; }
+    .navItem { display: block; color: var(--link); text-decoration: none; padding: 7px 2px; border-bottom: 1px solid #eaecf0; }
+    .navItem small { display: block; color: var(--muted); }
+    .content { max-width: 1040px; padding: 28px 38px 80px; }
+    .siteHead { border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+    .siteHead h1 { font-family: Georgia, serif; font-size: 38px; font-weight: 400; margin: 0 0 4px; }
+    .siteHead p { color: var(--muted); margin: 0 0 14px; }
+    .article { border-bottom: 1px solid var(--line); padding: 18px 0 30px; }
+    .article.isHidden { display: none; }
+    .articleHead h1 { font-family: Georgia, serif; font-size: 30px; font-weight: 400; border-bottom: 1px solid var(--line); margin: 0 0 4px; }
+    .meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 12px; }
+    .tags span { background: #eaecf0; border: 1px solid #c8ccd1; padding: 1px 7px; border-radius: 2px; color: #202122; }
+    .body h2, .body h3, .body h4 { border-bottom: 1px solid #eaecf0; font-weight: 400; margin-top: 20px; }
+    .body pre { background: var(--soft); border: 1px solid #eaecf0; padding: 10px; overflow: auto; }
+    @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } .side { position: static; height: auto; } .content { padding: 22px 18px 60px; } }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="side">
+      <div class="brand">Acta Wiki</div>
+      <input id="q" class="search" placeholder="記事を検索" />
+      <div id="count" class="count">${articles.length} entries</div>
+      <nav>${navItems}</nav>
+    </aside>
+    <main class="content">
+      <header class="siteHead">
+        <h1>Acta Wiki</h1>
+        <p>Generated ${escapeHtml(new Date(generatedAtMs).toLocaleString("ja-JP"))} from ${articles.length} indexed posts.</p>
+      </header>
+      ${articleItems}
+    </main>
+  </div>
+  <script>
+    const articles = Array.from(document.querySelectorAll(".article"));
+    const count = document.getElementById("count");
+    document.getElementById("q").addEventListener("input", (event) => {
+      const terms = String(event.target.value || "").trim().toLowerCase().split(/\\s+/).filter(Boolean);
+      let visible = 0;
+      for (const article of articles) {
+        const haystack = article.dataset.search || "";
+        const ok = terms.every((term) => haystack.includes(term));
+        article.classList.toggle("isHidden", !ok);
+        if (ok) visible++;
+      }
+      count.textContent = visible + " / " + articles.length + " entries";
+    });
+    window.__ACTA_WIKI_ENTRIES__ = ${escapeScriptJson(articles.map(({ id, date, created, title, tags }) => ({ id, date, created, title, tags })))};
+  </script>
+</body>
+</html>`;
+}
+
+async function generateKnowledgeSite() {
+  await ensureDataDir();
+  const dbPath = getKnowledgeDbPath();
+  if (!(await fileExists(dbPath))) {
+    await rebuildKnowledgeIndex();
+  }
+
+  const rows = await runSqliteJson(
+    dbPath,
+    "SELECT id, date, created, created_at_ms AS createdAtMs, tags, body, source_file AS sourceFile FROM entries ORDER BY date DESC, created_at_ms DESC;"
+  );
+  const generatedAtMs = Date.now();
+  const siteDir = getKnowledgeSiteDir();
+  const sitePath = getKnowledgeSitePath();
+  await fs.promises.mkdir(siteDir, { recursive: true });
+  await fs.promises.writeFile(sitePath, buildKnowledgeSiteHtml(rows, generatedAtMs), "utf8");
+
+  return {
+    ok: true,
+    sitePath,
+    entryCount: rows.length,
+    generatedAtMs
+  };
 }
 
 async function syncPull() {
@@ -679,6 +1199,10 @@ module.exports = {
   saveImage,
   deleteEntry,
   updateEntry,
+  rebuildKnowledgeIndex,
+  searchKnowledgeIndex,
+  generateKnowledgeSite,
+  getKnowledgeSitePath,
   syncPull,
   syncBackup
 };

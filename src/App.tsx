@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { ActaAiSettings, ActaEntry, ActaThemeId, SyncResult } from "../shared/types";
+import type {
+  ActaAiSettings,
+  ActaEntry,
+  ActaThemeId,
+  KnowledgeIndexResult,
+  KnowledgeSearchResultItem,
+  KnowledgeSiteResult,
+  SyncResult
+} from "../shared/types";
 import { AiConsole } from "./components/AiConsole";
 import { CommentCard } from "./components/CommentCard";
 import { Composer } from "./components/Composer";
@@ -10,6 +18,7 @@ import { setTaskStateOnLine, type TaskState } from "./lib/taskList";
 
 type TagStat = { tag: string; count: number };
 type DateFilterMode = "week" | "day" | "all";
+type ActiveView = "journal" | "knowledge" | "ai";
 type SyncIndicatorState = {
   kind: "idle" | "running" | "success" | "error";
   label: "" | "Syncing..." | "Sync Success" | "Sync Error";
@@ -22,6 +31,21 @@ function normalizeQuery(s: string): string {
 
 function includesLoose(haystack: string, needle: string): boolean {
   return haystack.toLowerCase().includes(needle);
+}
+
+function makeExcerpt(text: string, query: string, maxLen = 220): string {
+  const normalized = String(text ?? "").replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLen) return normalized;
+
+  const firstTerm = String(query ?? "")
+    .trim()
+    .split(/\s+/g)
+    .find(Boolean)
+    ?.toLowerCase();
+  const idx = firstTerm ? normalized.toLowerCase().indexOf(firstTerm) : -1;
+  const start = idx > 40 ? idx - 40 : 0;
+  const excerpt = normalized.slice(start, start + maxLen);
+  return `${start > 0 ? "..." : ""}${excerpt}${start + maxLen < normalized.length ? "..." : ""}`;
 }
 
 function pad2(n: number): string {
@@ -77,6 +101,10 @@ function buildEntryDomId(entryId: string): string {
   return `entry-${entryId}`;
 }
 
+function sortEntriesNewestFirst(list: ActaEntry[]): ActaEntry[] {
+  return [...list].sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+}
+
 async function copyTextToClipboard(text: string): Promise<boolean> {
   const value = String(text ?? "");
   if (!value) return false;
@@ -117,7 +145,13 @@ export function App() {
   const [editing, setEditing] = useState<ActaEntry | null>(null);
   const [draft, setDraft] = useState<{ key: string; body: string; tags: string[] } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [activeView, setActiveView] = useState<"journal" | "ai">("journal");
+  const [activeView, setActiveView] = useState<ActiveView>("journal");
+  const [knowledgeQuery, setKnowledgeQuery] = useState("");
+  const [knowledgeResults, setKnowledgeResults] = useState<KnowledgeSearchResultItem[]>([]);
+  const [knowledgeBusy, setKnowledgeBusy] = useState(false);
+  const [knowledgeStatus, setKnowledgeStatus] = useState("");
+  const [knowledgeIndex, setKnowledgeIndex] = useState<KnowledgeIndexResult | null>(null);
+  const [knowledgeSite, setKnowledgeSite] = useState<KnowledgeSiteResult | null>(null);
   const [aiSettings, setAiSettings] = useState<ActaAiSettings>({
     cliPath: "/opt/homebrew/bin/codex",
     instructionMarkdown: "",
@@ -142,6 +176,7 @@ export function App() {
   });
 
   const searchRef = useRef<HTMLInputElement>(null);
+  const knowledgeSearchRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const syncQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -288,6 +323,11 @@ export function App() {
         e.preventDefault();
         searchRef.current?.focus();
         searchRef.current?.select();
+      }
+      if ((e.ctrlKey || e.metaKey) && key === "f" && activeView === "knowledge") {
+        e.preventDefault();
+        knowledgeSearchRef.current?.focus();
+        knowledgeSearchRef.current?.select();
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -475,6 +515,67 @@ export function App() {
     scrollToEntryCard(target.id);
   }
 
+  async function rebuildKnowledgeIndex() {
+    setKnowledgeBusy(true);
+    setKnowledgeStatus("インデックスを更新しています...");
+    try {
+      const res = await api.rebuildKnowledgeIndex();
+      setKnowledgeIndex(res);
+      setKnowledgeStatus(
+        `更新完了: ${res.changedFiles}ファイル更新 / ${res.deletedFiles}ファイル削除 / ${res.totalEntries}件`
+      );
+      if (knowledgeQuery.trim()) {
+        const searchRes = await api.searchKnowledgeIndex({ query: knowledgeQuery, limit: 50 });
+        setKnowledgeResults(searchRes.items);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setKnowledgeStatus(msg || "インデックス更新に失敗しました");
+    } finally {
+      setKnowledgeBusy(false);
+    }
+  }
+
+  async function searchKnowledgeIndex(nextQuery = knowledgeQuery) {
+    setKnowledgeBusy(true);
+    setKnowledgeStatus("検索しています...");
+    try {
+      const res = await api.searchKnowledgeIndex({ query: nextQuery, limit: 50 });
+      setKnowledgeResults(res.items);
+      setKnowledgeStatus(`${res.items.length}件見つかりました`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setKnowledgeStatus(msg || "検索に失敗しました。先にインデックスを更新してください");
+    } finally {
+      setKnowledgeBusy(false);
+    }
+  }
+
+  async function generateKnowledgeSite() {
+    setKnowledgeBusy(true);
+    setKnowledgeStatus("Wikiサイトを作成しています...");
+    try {
+      const res = await api.generateKnowledgeSite();
+      setKnowledgeSite(res);
+      setKnowledgeStatus(`Wiki作成完了: ${res.entryCount}件 / ${res.sitePath}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setKnowledgeStatus(msg || "Wiki作成に失敗しました");
+    } finally {
+      setKnowledgeBusy(false);
+    }
+  }
+
+  async function openKnowledgeSite() {
+    try {
+      const res = await api.openKnowledgeSite();
+      if (!res.opened) setKnowledgeStatus(res.error || `${res.path} を開けませんでした`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setKnowledgeStatus(msg || "Wikiを開けませんでした");
+    }
+  }
+
   async function copyEntryId(entry: ActaEntry) {
     const copied = await copyTextToClipboard(entry.id);
     if (!copied) {
@@ -525,6 +626,13 @@ export function App() {
                 記録
               </button>
               <button
+                className={`viewTab ${activeView === "knowledge" ? "isActive" : ""}`}
+                type="button"
+                onClick={() => setActiveView("knowledge")}
+              >
+                検索
+              </button>
+              <button
                 className={`viewTab ${activeView === "ai" ? "isActive" : ""}`}
                 type="button"
                 onClick={() => setActiveView("ai")}
@@ -572,6 +680,10 @@ export function App() {
                   </select>
                 </div>
               </div>
+            </div>
+          ) : activeView === "knowledge" ? (
+            <div className="topbarCenter">
+              <div className="aiTopHint">全投稿をSQLiteに索引化して、GUIとAIの両方で参照しやすくします。</div>
             </div>
           ) : (
             <div className="topbarCenter">
@@ -661,6 +773,8 @@ export function App() {
                 ) : null}
               </div>
             </div>
+          ) : activeView === "knowledge" ? (
+            <div className="topbarRight" />
           ) : (
             <div className="topbarRight" />
           )}
@@ -685,11 +799,17 @@ export function App() {
                     const res = await api.updateEntry({ id: editing.id, body, tags });
                     if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
                     setEditing(null);
+                    await reload();
                   } else {
-                    await api.addEntry({ body, tags });
+                    const entry = await api.addEntry({ body, tags });
+                    setEntries((prev) => sortEntriesNewestFirst([entry, ...prev.filter((e) => e.id !== entry.id)]));
+                    setDateFilter(entry.date);
+                    setDateFilterMode("week");
+                    setQuery("");
+                    clearTagFilter();
+                    setAppError("");
                   }
                   setDraft(null);
-                  await reload();
                   queueBackupSync();
                 }}
               />
@@ -778,6 +898,110 @@ export function App() {
               </div>
             </div>
           </>
+        ) : null}
+
+        {activeView === "knowledge" ? (
+          <section className="knowledgeArea">
+            <div className="knowledgeToolbar">
+              <div className="knowledgeSearch">
+                <input
+                  ref={knowledgeSearchRef}
+                  className="knowledgeSearchInput"
+                  value={knowledgeQuery}
+                  onChange={(e) => setKnowledgeQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void searchKnowledgeIndex();
+                  }}
+                  placeholder="SQLiteインデックスを検索 (Ctrl+F)"
+                />
+                <button
+                  className="primaryActionBtn"
+                  type="button"
+                  disabled={knowledgeBusy}
+                  onClick={() => void searchKnowledgeIndex()}
+                >
+                  検索
+                </button>
+              </div>
+
+              <div className="knowledgeActions">
+                <button
+                  className="ghostBtn"
+                  type="button"
+                  disabled={knowledgeBusy}
+                  onClick={() => void rebuildKnowledgeIndex()}
+                  title="変更された日次ファイルだけをSQLiteへ反映"
+                >
+                  インデックス更新
+                </button>
+                <button
+                  className="ghostBtn"
+                  type="button"
+                  disabled={knowledgeBusy}
+                  onClick={() => void generateKnowledgeSite()}
+                  title="SQLiteインデックスから静的Wikiを作成"
+                >
+                  Wiki作成
+                </button>
+                <button className="ghostBtn" type="button" onClick={() => void openKnowledgeSite()}>
+                  Wikiを開く
+                </button>
+              </div>
+            </div>
+
+            <div className="knowledgeStatus">
+              {knowledgeStatus || "インデックス更新後、全投稿を対象に検索できます。"}
+              {knowledgeIndex ? (
+                <span>
+                  {" "}
+                  DB: {knowledgeIndex.dbPath} / State: {knowledgeIndex.statePath}
+                </span>
+              ) : null}
+              {knowledgeSite ? <span> / Wiki: {knowledgeSite.sitePath}</span> : null}
+            </div>
+
+            <div className="knowledgeResults">
+              {knowledgeResults.length === 0 ? (
+                <div className="empty">検索結果はまだありません</div>
+              ) : (
+                knowledgeResults.map((item) => (
+                  <article className="knowledgeResult" key={item.id}>
+                    <div className="knowledgeResultHead">
+                      <button
+                        className="knowledgeResultTitle"
+                        type="button"
+                        onClick={() => openLinkedEntry(item.id)}
+                        title="記録で開く"
+                      >
+                        {item.date} / {item.created || item.id}
+                      </button>
+                      <span className="knowledgeScore">score {item.score}</span>
+                    </div>
+                    {item.tags.length > 0 ? (
+                      <div className="commentTags">
+                        {item.tags.map((tag) => (
+                          <button
+                            className="tagPill"
+                            key={tag}
+                            type="button"
+                            onClick={() => {
+                              setActiveView("journal");
+                              clearTagFilter();
+                              toggleTagFilter(tag);
+                            }}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    <p className="knowledgeExcerpt">{makeExcerpt(item.body, knowledgeQuery)}</p>
+                    <div className="knowledgeSource">{item.sourceFile}</div>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
         ) : null}
 
         <section className={`aiArea ${activeView === "ai" ? "" : "isHidden"}`}>
