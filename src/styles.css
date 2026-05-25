@@ -1595,6 +1595,51 @@ a:focus-visible {
   margin: 2px 0 2px;
 }
 
+.composerMode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-left-width: 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.74);
+  padding: 9px 12px;
+  box-shadow: var(--shadowSm), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.composerMode-create {
+  border-left-color: rgba(22, 163, 74, 0.72);
+}
+
+.composerMode-copy {
+  border-left-color: rgba(217, 119, 6, 0.76);
+  background: rgba(255, 251, 235, 0.76);
+}
+
+.composerMode-edit {
+  border-left-color: rgba(37, 99, 235, 0.74);
+  background: rgba(239, 246, 255, 0.76);
+}
+
+.composerModeTitle {
+  color: var(--fg0);
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.composerModeMeta {
+  min-width: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .composerError {
   border: 1px solid rgba(209, 36, 47, 0.22);
   background: rgba(209, 36, 47, 0.06);

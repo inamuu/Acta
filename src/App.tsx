@@ -19,6 +19,15 @@ import { setTaskStateOnLine, type TaskState } from "./lib/taskList";
 type TagStat = { tag: string; count: number };
 type DateFilterMode = "week" | "day" | "all";
 type ActiveView = "journal" | "knowledge" | "ai";
+type DraftPost = {
+  key: string;
+  body: string;
+  tags: string[];
+  source?: {
+    id: string;
+    date: string;
+  };
+};
 type SyncIndicatorState = {
   kind: "idle" | "running" | "success" | "error";
   label: "" | "Syncing..." | "Sync Success" | "Sync Error";
@@ -143,7 +152,7 @@ export function App() {
   const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>("week");
   const [appError, setAppError] = useState<string>("");
   const [editing, setEditing] = useState<ActaEntry | null>(null);
-  const [draft, setDraft] = useState<{ key: string; body: string; tags: string[] } | null>(null);
+  const [draft, setDraft] = useState<DraftPost | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeView, setActiveView] = useState<ActiveView>("journal");
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
@@ -797,12 +806,16 @@ export function App() {
                 assetBaseUrl={assetBaseUrl}
                 tagSuggestions={tagSuggestions}
                 popularTagSuggestions={popularTagSuggestions}
-                mode={editing ? "edit" : "create"}
+                mode={editing ? "edit" : draft?.source ? "copy" : "create"}
                 draftKey={editing?.id ?? draft?.key ?? "create"}
                 initialBody={editing?.body ?? draft?.body ?? ""}
                 initialTags={editing?.tags ?? draft?.tags ?? []}
+                source={editing ? { id: editing.id, date: editing.date } : draft?.source}
                 autoFocusEditor={Boolean(editing || draft)}
-                onCancel={() => setEditing(null)}
+                onCancel={() => {
+                  setEditing(null);
+                  setDraft(null);
+                }}
                 onSubmit={async (body, tags) => {
                   if (editing) {
                     const res = await api.updateEntry({ id: editing.id, body, tags });
@@ -846,7 +859,12 @@ export function App() {
                       }}
                       onCopy={(entry) => {
                         setEditing(null);
-                        setDraft({ key: `copy:${entry.id}:${Date.now()}`, body: entry.body, tags: entry.tags });
+                        setDraft({
+                          key: `copy:${entry.id}:${Date.now()}`,
+                          body: entry.body,
+                          tags: entry.tags,
+                          source: { id: entry.id, date: entry.date }
+                        });
                         setAppError("");
                       }}
                       onCopyId={(entry) => {

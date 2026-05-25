@@ -75,10 +75,14 @@ type Props = {
   assetBaseUrl?: string;
   tagSuggestions?: string[];
   popularTagSuggestions?: string[];
-  mode?: "create" | "edit";
+  mode?: "create" | "copy" | "edit";
   draftKey?: string;
   initialBody?: string;
   initialTags?: string[];
+  source?: {
+    id: string;
+    date: string;
+  };
   onCancel?: () => void;
   autoFocusEditor?: boolean;
 };
@@ -92,6 +96,7 @@ export function Composer({
   draftKey,
   initialBody,
   initialTags,
+  source,
   onCancel,
   autoFocusEditor
 }: Props) {
@@ -221,6 +226,11 @@ export function Composer({
   }, []);
 
   const canSubmit = !isBodyEmpty && !submitting;
+  const modeLabel =
+    mode === "edit" ? "既存投稿を編集中" : mode === "copy" ? "コピーから新規投稿" : "新規投稿";
+  const submitLabel = mode === "edit" ? "更新" : mode === "copy" ? "コピーを追加" : "追加";
+  const sourceLabel = source ? `${source.date} / ${source.id}` : "";
+  const sourcePrefix = mode === "edit" ? "対象投稿" : "コピー元";
 
   useEffect(() => {
     const el = previewRef.current;
@@ -240,7 +250,7 @@ export function Composer({
     setError("");
     try {
       await onSubmit(currentBody, tags);
-      if (mode === "create") {
+      if (mode === "create" || mode === "copy") {
         setTags([]);
         updateBody("");
         if (editorRef.current) editorRef.current.value = "";
@@ -341,7 +351,14 @@ export function Composer({
 
   return (
     <div className="composer">
-      {mode === "edit" ? <div className="composerTitle">編集中</div> : null}
+      <div className={`composerMode composerMode-${mode}`}>
+        <div className="composerModeTitle">{modeLabel}</div>
+        {sourceLabel ? (
+          <div className="composerModeMeta">
+            {sourcePrefix}: {sourceLabel}
+          </div>
+        ) : null}
+      </div>
 
       {error ? <div className="composerError">{error}</div> : null}
 
@@ -447,7 +464,7 @@ export function Composer({
             />
 
             <div className="previewActions">
-              {mode === "edit" ? (
+              {mode === "edit" || mode === "copy" ? (
                 <button
                   className="ghostBtn"
                   type="button"
@@ -476,7 +493,7 @@ export function Composer({
                 disabled={!canSubmit}
                 onClick={() => void submit()}
               >
-                {submitting ? "保存中..." : mode === "edit" ? "更新" : "追加"}
+                {submitting ? "保存中..." : submitLabel}
               </button>
             </div>
           </div>
