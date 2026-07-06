@@ -607,6 +607,29 @@ app.whenReady().then(() => {
   ipcMain.handle("acta:saveImage", async (_event, payload) => storage.saveImage(payload));
   ipcMain.handle("acta:deleteEntry", async (_event, payload) => storage.deleteEntry(payload));
   ipcMain.handle("acta:updateEntry", async (_event, payload) => storage.updateEntry(payload));
+  ipcMain.handle("acta:listProjects", async () => storage.listProjects());
+  ipcMain.handle("acta:createProject", async (_event, payload) => storage.createProject(payload));
+  ipcMain.handle("acta:saveProject", async (_event, payload) => storage.saveProject(payload));
+  ipcMain.handle("acta:addProjectTask", async (_event, payload) => storage.addProjectTask(payload));
+  ipcMain.handle("acta:moveProjectTask", async (_event, payload) => storage.moveProjectTask(payload));
+  ipcMain.handle("acta:renameProjectTask", async (_event, payload) => storage.renameProjectTask(payload));
+  ipcMain.handle("acta:deleteProjectTask", async (_event, payload) => storage.deleteProjectTask(payload));
+  ipcMain.handle("acta:setProjectArchived", async (_event, payload) => storage.setProjectArchived(payload));
+  ipcMain.handle("acta:renameProject", async (_event, payload) => storage.renameProject(payload));
+  ipcMain.handle("acta:deleteProject", async (_event, payload) => storage.deleteProject(payload));
+  ipcMain.handle("acta:setProjectIssueUrl", async (_event, payload) => storage.setProjectIssueUrl(payload));
+  ipcMain.handle("acta:addProjectKnowledgeEntry", async (_event, payload) => storage.addProjectKnowledgeEntry(payload));
+  ipcMain.handle("acta:updateProjectKnowledgeEntry", async (_event, payload) =>
+    storage.updateProjectKnowledgeEntry(payload)
+  );
+  ipcMain.handle("acta:deleteProjectKnowledgeEntry", async (_event, payload) =>
+    storage.deleteProjectKnowledgeEntry(payload)
+  );
+  ipcMain.handle("acta:appendProjectInProgressToTodayTodo", async (_event, payload) =>
+    storage.appendProjectInProgressToTodayTodo(payload)
+  );
+  ipcMain.handle("acta:createTodoFromProjects", async () => storage.createTodoFromProjects());
+  ipcMain.handle("acta:copyPreviousTodo", async () => storage.copyPreviousTodo());
   ipcMain.handle("acta:rebuildKnowledgeIndex", async () => storage.rebuildKnowledgeIndex());
   ipcMain.handle("acta:searchKnowledgeIndex", async (_event, payload) => storage.searchKnowledgeIndex(payload));
   ipcMain.handle("acta:generateKnowledgeSite", async () => storage.generateKnowledgeSite());

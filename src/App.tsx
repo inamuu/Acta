@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type {
   ActaAiSettings,
   ActaEntry,
+  ActaProject,
   ActaThemeId,
   KnowledgeIndexResult,
   KnowledgeSearchResultItem,
@@ -18,7 +19,7 @@ import { setTaskStateOnLine, type TaskState } from "./lib/taskList";
 
 type TagStat = { tag: string; count: number };
 type DateFilterMode = "week" | "day" | "all";
-type ActiveView = "journal" | "knowledge" | "ai";
+type ActiveView = "todo" | "projects" | "journal" | "knowledge" | "ai";
 type DraftPost = {
   key: string;
   body: string;
@@ -69,6 +70,11 @@ function addDays(d: Date, days: number): Date {
   const next = new Date(d);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+function isImeComposingEvent(e: React.KeyboardEvent<HTMLInputElement>): boolean {
+  const nativeEvent = e.nativeEvent as KeyboardEvent & { isComposing?: boolean };
+  return Boolean(e.isComposing || nativeEvent.isComposing || nativeEvent.keyCode === 229);
 }
 
 function lowerBound(list: string[], value: string): number {
@@ -154,7 +160,20 @@ export function App() {
   const [editing, setEditing] = useState<ActaEntry | null>(null);
   const [draft, setDraft] = useState<DraftPost | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [activeView, setActiveView] = useState<ActiveView>("journal");
+  const [activeView, setActiveView] = useState<ActiveView>("todo");
+  const [projects, setProjects] = useState<ActaProject[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectTaskTitle, setNewProjectTaskTitle] = useState("");
+  const [editingProjectKnowledge, setEditingProjectKnowledge] = useState<ActaEntry | null>(null);
+  const [showArchivedProjects, setShowArchivedProjects] = useState(false);
+  const [draggingTaskId, setDraggingTaskId] = useState("");
+  const [editingProjectTaskId, setEditingProjectTaskId] = useState("");
+  const [projectTaskTitleDraft, setProjectTaskTitleDraft] = useState("");
+  const [projectNameDraft, setProjectNameDraft] = useState("");
+  const [projectIssueUrlDraft, setProjectIssueUrlDraft] = useState("");
+  const [projectStatus, setProjectStatus] = useState("");
+  const [todoStatus, setTodoStatus] = useState("");
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
   const [knowledgeExcludeTags, setKnowledgeExcludeTags] = useState("");
   const [knowledgeResults, setKnowledgeResults] = useState<KnowledgeSearchResultItem[]>([]);
@@ -253,6 +272,16 @@ export function App() {
     }
   }
 
+  async function reloadProjects(nextSelectedId?: string) {
+    if (!api) return;
+    const list = await api.listProjects();
+    setProjects(list);
+    const preferredId = nextSelectedId || selectedProjectId;
+    const filtered = list.filter((project) => Boolean(project.archivedAtMs) === showArchivedProjects);
+    const selected = filtered.find((project) => project.id === preferredId) || filtered[0] || null;
+    setSelectedProjectId(selected?.id ?? "");
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -292,9 +321,12 @@ export function App() {
         }
 
         try {
-          const list = await api.listEntries();
+          const [list, projectList] = await Promise.all([api.listEntries(), api.listProjects()]);
           if (cancelled) return;
           setEntries(list);
+          setProjects(projectList);
+          const firstProject = projectList[0] || null;
+          setSelectedProjectId(firstProject?.id ?? "");
           setAppError("");
         } catch (err) {
           if (cancelled) return;
@@ -325,6 +357,21 @@ export function App() {
     const nextTheme = normalizeTheme(aiSettings.theme);
     document.documentElement.setAttribute("data-acta-theme", nextTheme);
   }, [aiSettings.theme]);
+
+  useEffect(() => {
+    setEditingProjectKnowledge(null);
+    setEditingProjectTaskId("");
+    setProjectTaskTitleDraft("");
+    const selected = projects.find((project) => project.id === selectedProjectId);
+    setProjectNameDraft(selected?.name ?? "");
+    setProjectIssueUrlDraft(selected?.issueUrl ?? "");
+  }, [projects, selectedProjectId]);
+
+  useEffect(() => {
+    const filtered = projects.filter((project) => Boolean(project.archivedAtMs) === showArchivedProjects);
+    if (filtered.some((project) => project.id === selectedProjectId)) return;
+    setSelectedProjectId(filtered[0]?.id ?? "");
+  }, [projects, selectedProjectId, showArchivedProjects]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -441,6 +488,29 @@ export function App() {
     if (!limit || limit <= 0) return filteredEntries;
     return filteredEntries.slice(0, limit);
   }, [dateFilterMode, filteredEntries, limit]);
+
+  const todoEntries = useMemo(() => {
+    const today = formatDateYYYYMMDD(new Date());
+    const weekStart = formatDateYYYYMMDD(addDays(new Date(`${today}T00:00:00`), -6));
+    return entries.filter(
+      (entry) =>
+        entry.date >= weekStart &&
+        entry.date <= today &&
+        (entry.tags.includes("ToDo") || /^#\s*todo\b/im.test(entry.body))
+    );
+  }, [entries]);
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === selectedProjectId) || null,
+    [projects, selectedProjectId]
+  );
+  const visibleProjects = useMemo(
+    () => projects.filter((project) => Boolean(project.archivedAtMs) === showArchivedProjects),
+    [projects, showArchivedProjects]
+  );
+  const selectedProjectKnowledgeEntries = useMemo(
+    () => (selectedProject ? sortEntriesNewestFirst(selectedProject.knowledgeEntries) : []),
+    [selectedProject]
+  );
 
   const tagSuggestions = useMemo(() => tagStats.map((t) => t.tag), [tagStats]);
   const popularTagSuggestions = useMemo(() => {
@@ -603,6 +673,258 @@ export function App() {
     setAppError("");
   }
 
+  async function createTodoFromProjects() {
+    setTodoStatus("");
+    try {
+      const entry = await api.createTodoFromProjects();
+      await reload();
+      queueBackupSync();
+      setTodoStatus(`${entry.date} のToDoを作成しました`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setTodoStatus(msg || "ToDo作成に失敗しました");
+    }
+  }
+
+  async function copyPreviousTodo() {
+    setTodoStatus("");
+    try {
+      const entry = await api.copyPreviousTodo();
+      await reload();
+      queueBackupSync();
+      setTodoStatus(`${entry.date} に前回のToDoをコピーしました`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setTodoStatus(msg || "前回ToDoのコピーに失敗しました");
+    }
+  }
+
+  async function createProject() {
+    const name = newProjectName.trim();
+    if (!name) return;
+    setProjectStatus("");
+    try {
+      const project = await api.createProject({ name });
+      setNewProjectName("");
+      await reloadProjects(project.id);
+      queueBackupSync();
+      setProjectStatus(`${project.name} を作成しました`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "プロジェクト作成に失敗しました");
+    }
+  }
+
+  async function addProjectTask() {
+    if (!selectedProject) return;
+    const title = newProjectTaskTitle.trim();
+    if (!title) return;
+    setProjectStatus("");
+    try {
+      await api.addProjectTask({ projectId: selectedProject.id, title, status: "Inbox" });
+      setNewProjectTaskTitle("");
+      await reloadProjects(selectedProject.id);
+      queueBackupSync();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "タスク追加に失敗しました");
+    }
+  }
+
+  async function moveProjectTask(taskId: string, status: "Inbox" | "InProgress" | "Waiting" | "Done") {
+    if (!selectedProject) return;
+    const task = selectedProject.tasks.find((item) => item.id === taskId);
+    if (task?.status === status) return;
+    setProjectStatus("");
+    try {
+      await api.moveProjectTask({ projectId: selectedProject.id, taskId, status });
+      await reloadProjects(selectedProject.id);
+      queueBackupSync();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "タスク移動に失敗しました");
+    }
+  }
+
+  function dropProjectTask(status: "Inbox" | "InProgress" | "Waiting" | "Done") {
+    const taskId = draggingTaskId.trim();
+    setDraggingTaskId("");
+    if (!taskId) return;
+    void moveProjectTask(taskId, status);
+  }
+
+  function startProjectTaskEdit(taskId: string, title: string) {
+    setEditingProjectTaskId(taskId);
+    setProjectTaskTitleDraft(title);
+  }
+
+  async function renameProjectTask(taskId: string) {
+    if (!selectedProject) return;
+    const title = projectTaskTitleDraft.trim();
+    const current = selectedProject.tasks.find((task) => task.id === taskId);
+    if (!title || title === current?.title) {
+      setEditingProjectTaskId("");
+      setProjectTaskTitleDraft("");
+      return;
+    }
+    setProjectStatus("");
+    try {
+      await api.renameProjectTask({ projectId: selectedProject.id, taskId, title });
+      setEditingProjectTaskId("");
+      setProjectTaskTitleDraft("");
+      await reloadProjects(selectedProject.id);
+      queueBackupSync();
+      setProjectStatus("タスク名を変更しました");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "タスク名の変更に失敗しました");
+    }
+  }
+
+  async function deleteProjectTask(taskId: string, title: string) {
+    if (!selectedProject) return;
+    const ok = window.confirm(`タスク「${title}」を削除しますか？`);
+    if (!ok) return;
+    setProjectStatus("");
+    try {
+      await api.deleteProjectTask({ projectId: selectedProject.id, taskId });
+      if (editingProjectTaskId === taskId) {
+        setEditingProjectTaskId("");
+        setProjectTaskTitleDraft("");
+      }
+      await reloadProjects(selectedProject.id);
+      queueBackupSync();
+      setProjectStatus("タスクを削除しました");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "タスク削除に失敗しました");
+    }
+  }
+
+  async function saveProjectKnowledge(body: string) {
+    if (!selectedProject) return;
+    setProjectStatus("");
+    try {
+      if (editingProjectKnowledge) {
+        await api.updateProjectKnowledgeEntry({
+          projectId: selectedProject.id,
+          entryId: editingProjectKnowledge.id,
+          body
+        });
+        setEditingProjectKnowledge(null);
+      } else {
+        await api.addProjectKnowledgeEntry({ projectId: selectedProject.id, body });
+      }
+      await reloadProjects(selectedProject.id);
+      queueBackupSync();
+      setProjectStatus("ナレッジを保存しました");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "ナレッジ保存に失敗しました");
+    }
+  }
+
+  async function deleteProjectKnowledge(entry: ActaEntry) {
+    if (!selectedProject) return;
+    const ok = window.confirm("このナレッジ投稿を削除しますか？");
+    if (!ok) return;
+    setProjectStatus("");
+    try {
+      await api.deleteProjectKnowledgeEntry({ projectId: selectedProject.id, entryId: entry.id });
+      if (editingProjectKnowledge?.id === entry.id) setEditingProjectKnowledge(null);
+      await reloadProjects(selectedProject.id);
+      queueBackupSync();
+      setProjectStatus("ナレッジを削除しました");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "ナレッジ削除に失敗しました");
+    }
+  }
+
+  async function setProjectArchived(archived: boolean) {
+    if (!selectedProject) return;
+    setProjectStatus("");
+    try {
+      await api.setProjectArchived({ projectId: selectedProject.id, archived });
+      await reloadProjects(selectedProject.id);
+      queueBackupSync();
+      setProjectStatus(archived ? "プロジェクトをアーカイブしました" : "アーカイブを解除しました");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "アーカイブ状態の更新に失敗しました");
+    }
+  }
+
+  async function renameSelectedProject() {
+    if (!selectedProject) return;
+    const trimmed = projectNameDraft.trim();
+    if (!trimmed || trimmed === selectedProject.name) return;
+    setProjectStatus("");
+    try {
+      const project = await api.renameProject({ projectId: selectedProject.id, name: trimmed });
+      setActiveView("projects");
+      setEditing(null);
+      setDraft(null);
+      setProjectNameDraft(project.name);
+      setProjectIssueUrlDraft(project.issueUrl || "");
+      await reload();
+      await reloadProjects(project.id);
+      queueBackupSync();
+      setProjectStatus("プロジェクト名を変更しました");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "プロジェクト名の変更に失敗しました");
+    }
+  }
+
+  async function deleteSelectedProject() {
+    if (!selectedProject) return;
+    const ok = window.confirm(`プロジェクト「${selectedProject.name}」を削除しますか？\nタスクとナレッジも削除されます。`);
+    if (!ok) return;
+    setProjectStatus("");
+    try {
+      const res = await api.deleteProject({ projectId: selectedProject.id });
+      if (!res?.deleted) throw new Error("削除対象が見つかりませんでした");
+      setEditingProjectKnowledge(null);
+      await reloadProjects();
+      queueBackupSync();
+      setProjectStatus("プロジェクトを削除しました");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "プロジェクト削除に失敗しました");
+    }
+  }
+
+  async function editProjectIssueUrl() {
+    if (!selectedProject) return;
+    const issueUrl = projectIssueUrlDraft.trim();
+    if (issueUrl === (selectedProject.issueUrl || "")) return;
+    setProjectStatus("");
+    try {
+      const project = await api.setProjectIssueUrl({ projectId: selectedProject.id, issueUrl });
+      await reloadProjects(project.id);
+      queueBackupSync();
+      setProjectStatus(project.issueUrl ? "issueリンクを保存しました" : "issueリンクを解除しました");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "issueリンクの保存に失敗しました");
+    }
+  }
+
+  async function appendProjectTasksToTodo() {
+    if (!selectedProject) return;
+    setProjectStatus("");
+    try {
+      const entry = await api.appendProjectInProgressToTodayTodo({ projectId: selectedProject.id });
+      await reload();
+      queueBackupSync();
+      setProjectStatus(`${entry.date} のToDoにInProgressを追記しました`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "ToDoへの追記に失敗しました");
+    }
+  }
+
   if (!api) {
     return (
       <div className="noApi">
@@ -637,6 +959,20 @@ export function App() {
             <div className="appTitle">Acta</div>
             <div className="viewTabs">
               <button
+                className={`viewTab ${activeView === "todo" ? "isActive" : ""}`}
+                type="button"
+                onClick={() => setActiveView("todo")}
+              >
+                ToDo
+              </button>
+              <button
+                className={`viewTab ${activeView === "projects" ? "isActive" : ""}`}
+                type="button"
+                onClick={() => setActiveView("projects")}
+              >
+                プロジェクト
+              </button>
+              <button
                 className={`viewTab ${activeView === "journal" ? "isActive" : ""}`}
                 type="button"
                 onClick={() => setActiveView("journal")}
@@ -660,7 +996,15 @@ export function App() {
             </div>
           </div>
 
-          {activeView === "journal" ? (
+          {activeView === "todo" ? (
+            <div className="topbarCenter">
+              <div className="aiTopHint">日々のToDoだけを表示します。</div>
+            </div>
+          ) : activeView === "projects" ? (
+            <div className="topbarCenter">
+              <div className="aiTopHint">プロジェクトごとにタスクとナレッジを管理します。</div>
+            </div>
+          ) : activeView === "journal" ? (
             <div className="topbarCenter">
               <div className="topbarControls">
                 <div className="search">
@@ -709,7 +1053,9 @@ export function App() {
             </div>
           )}
 
-          {activeView === "journal" ? (
+          {activeView === "todo" || activeView === "projects" ? (
+            <div className="topbarRight" />
+          ) : activeView === "journal" ? (
             <div className="topbarRight">
               <div className="datePicker" title="日付で絞り込み">
                 <div className="dateLabel">日付</div>
@@ -797,6 +1143,385 @@ export function App() {
             <div className="topbarRight" />
           )}
         </header>
+
+        {activeView === "todo" ? (
+          <section className="todoArea">
+            <div className="todoToolbar">
+              <button className="primaryActionBtn" type="button" onClick={() => void createTodoFromProjects()}>
+                新規ToDo
+              </button>
+              <button className="ghostBtn" type="button" onClick={() => void copyPreviousTodo()}>
+                昨日のToDoコピー
+              </button>
+              <div className="knowledgeStatus">{todoStatus || "新規ToDoは全プロジェクトのInProgressから作成します。"}</div>
+            </div>
+            <div className="commentList">
+              {loading ? (
+                <div className="empty">読み込み中...</div>
+              ) : todoEntries.length === 0 ? (
+                <div className="empty">ToDoはまだありません</div>
+              ) : (
+                todoEntries.map((e) => (
+                  <CommentCard
+                    key={e.id}
+                    entry={e}
+                    assetBaseUrl={assetBaseUrl}
+                    domId={buildEntryDomId(e.id)}
+                    isLinkedTarget={linkedTargetEntryId === e.id}
+                    onEdit={(entry) => {
+                      setActiveView("journal");
+                      setEditing(entry);
+                      setDraft(null);
+                    }}
+                    onCopyId={(entry) => {
+                      void copyEntryId(entry);
+                    }}
+                    onOpenLinkedEntry={(entryId) => {
+                      openLinkedEntry(entryId);
+                    }}
+                    onToggleTask={async (entry, line0, nextState: TaskState) => {
+                      const nextBody = setTaskStateOnLine(entry.body, line0, nextState);
+                      if (!nextBody) return;
+                      const res = await api.updateEntry({ id: entry.id, body: nextBody, tags: entry.tags });
+                      if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
+                      await reload();
+                      queueBackupSync();
+                    }}
+                    onDelete={async (entry) => {
+                      const ok = window.confirm("このToDoを削除しますか？");
+                      if (!ok) return;
+
+                      let deleted = false;
+                      try {
+                        const res = await api.deleteEntry({ id: entry.id });
+                        if (!res?.deleted) {
+                          setTodoStatus("削除対象が見つかりませんでした");
+                        } else {
+                          deleted = true;
+                          setTodoStatus("ToDoを削除しました");
+                        }
+                        await reload();
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : String(err);
+                        setTodoStatus(msg || "削除に失敗しました");
+                      }
+                      if (deleted) queueBackupSync();
+                    }}
+                  />
+                ))
+              )}
+            </div>
+          </section>
+        ) : null}
+
+        {activeView === "projects" ? (
+          <section className="projectsArea">
+            <aside className="projectList">
+              <div className="projectCreate">
+                <input
+                  className="projectInput"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (isImeComposingEvent(e)) return;
+                    if (e.key === "Enter") void createProject();
+                  }}
+                  placeholder="新規プロジェクト名"
+                />
+                <button className="primaryActionBtn" type="button" onClick={() => void createProject()}>
+                  作成
+                </button>
+              </div>
+              <div className="projectArchiveToggle">
+                <button
+                  className={`viewTab ${!showArchivedProjects ? "isActive" : ""}`}
+                  type="button"
+                  onClick={() => setShowArchivedProjects(false)}
+                >
+                  Active
+                </button>
+                <button
+                  className={`viewTab ${showArchivedProjects ? "isActive" : ""}`}
+                  type="button"
+                  onClick={() => setShowArchivedProjects(true)}
+                >
+                  Archive
+                </button>
+              </div>
+              <div className="projectNav">
+                {visibleProjects.length === 0 ? (
+                  <div className="empty">
+                    {showArchivedProjects ? "アーカイブ済みプロジェクトはありません" : "プロジェクトはまだありません"}
+                  </div>
+                ) : (
+                  visibleProjects.map((project) => (
+                    <button
+                      className={`projectNavItem ${selectedProjectId === project.id ? "isActive" : ""}`}
+                      key={project.id}
+                      type="button"
+                      onClick={() => setSelectedProjectId(project.id)}
+                    >
+                      <span>{project.name}</span>
+                      <small>
+                        {project.archivedAtMs
+                          ? "archived"
+                          : `${project.tasks.filter((task) => task.status === "InProgress").length} active`}
+                      </small>
+                    </button>
+                  ))
+                )}
+              </div>
+            </aside>
+            <div className="projectDetail">
+              {selectedProject ? (
+                <>
+                  <div className="projectHeader">
+                    <div>
+                      <h2>
+                        {selectedProject.name}
+                        {selectedProject.archivedAtMs ? <span className="projectArchivedBadge">Archived</span> : null}
+                      </h2>
+                      <div className="knowledgeStatus">{projectStatus || selectedProject.sourceDir}</div>
+                      <div className="projectInlineEditors">
+                        <label className="projectInlineField">
+                          <span>プロジェクト名</span>
+                          <input
+                            className="projectInlineInput"
+                            value={projectNameDraft}
+                            onChange={(e) => setProjectNameDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (isImeComposingEvent(e)) return;
+                              if (e.key === "Enter") void renameSelectedProject();
+                            }}
+                          />
+                        </label>
+                        <button
+                          className="ghostBtn"
+                          type="button"
+                          disabled={!projectNameDraft.trim() || projectNameDraft.trim() === selectedProject.name}
+                          onClick={() => void renameSelectedProject()}
+                        >
+                          名前を保存
+                        </button>
+                        <label className="projectInlineField isWide">
+                          <span>issueリンク</span>
+                          <input
+                            className="projectInlineInput"
+                            value={projectIssueUrlDraft}
+                            onChange={(e) => setProjectIssueUrlDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (isImeComposingEvent(e)) return;
+                              if (e.key === "Enter") void editProjectIssueUrl();
+                            }}
+                            placeholder="https://..."
+                          />
+                        </label>
+                        <button
+                          className="ghostBtn"
+                          type="button"
+                          disabled={projectIssueUrlDraft.trim() === (selectedProject.issueUrl || "")}
+                          onClick={() => void editProjectIssueUrl()}
+                        >
+                          リンクを保存
+                        </button>
+                      </div>
+                    </div>
+                    <div className="projectHeaderActions">
+                      {selectedProject.issueUrl ? (
+                        <a
+                          className="ghostLinkBtn"
+                          href={selectedProject.issueUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={selectedProject.issueUrl}
+                        >
+                          Issueを開く
+                        </a>
+                      ) : null}
+                      <button
+                        className="ghostBtn"
+                        type="button"
+                        disabled={Boolean(selectedProject.archivedAtMs)}
+                        onClick={() => void appendProjectTasksToTodo()}
+                      >
+                        InProgressをToDoへ追記
+                      </button>
+                      <button
+                        className={selectedProject.archivedAtMs ? "ghostBtn" : "dangerGhostBtn"}
+                        type="button"
+                        onClick={() => void setProjectArchived(!selectedProject.archivedAtMs)}
+                      >
+                        {selectedProject.archivedAtMs ? "アーカイブ解除" : "アーカイブ"}
+                      </button>
+                      <button className="dangerGhostBtn" type="button" onClick={() => void deleteSelectedProject()}>
+                        削除
+                      </button>
+                    </div>
+                  </div>
+                  <div className="projectTaskCreate">
+                    <input
+                      className="projectInput"
+                      value={newProjectTaskTitle}
+                      onChange={(e) => setNewProjectTaskTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (isImeComposingEvent(e)) return;
+                        if (e.key === "Enter") void addProjectTask();
+                      }}
+                      placeholder="Inboxへタスク追加"
+                    />
+                    <button className="primaryActionBtn" type="button" onClick={() => void addProjectTask()}>
+                      追加
+                    </button>
+                  </div>
+                  <div className="kanbanBoard">
+                    {(["Inbox", "InProgress", "Waiting", "Done"] as const).map((status) => (
+                      <section
+                        className={`kanbanColumn ${draggingTaskId ? "isDropReady" : ""}`}
+                        key={status}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          dropProjectTask(status);
+                        }}
+                      >
+                        <h3>{status}</h3>
+                        {selectedProject.tasks.filter((task) => task.status === status).length === 0 ? (
+                          <div className="kanbanEmpty">空</div>
+                        ) : (
+                          selectedProject.tasks
+                            .filter((task) => task.status === status)
+                            .map((task) => (
+                              <div
+                                className={`kanbanCard ${draggingTaskId === task.id ? "isDragging" : ""}`}
+                                key={task.id}
+                                draggable={editingProjectTaskId !== task.id}
+                                onDragStart={(e) => {
+                                  setDraggingTaskId(task.id);
+                                  e.dataTransfer.effectAllowed = "move";
+                                  e.dataTransfer.setData("text/plain", task.id);
+                                }}
+                                onDragEnd={() => setDraggingTaskId("")}
+                              >
+                                {editingProjectTaskId === task.id ? (
+                                  <div className="kanbanEdit">
+                                    <input
+                                      className="kanbanEditInput"
+                                      value={projectTaskTitleDraft}
+                                      autoFocus
+                                      onChange={(e) => setProjectTaskTitleDraft(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (isImeComposingEvent(e)) return;
+                                        if (e.key === "Enter") void renameProjectTask(task.id);
+                                        if (e.key === "Escape") {
+                                          setEditingProjectTaskId("");
+                                          setProjectTaskTitleDraft("");
+                                        }
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onDragStart={(e) => e.preventDefault()}
+                                    />
+                                    <div className="kanbanEditActions">
+                                      <button
+                                        className="ghostBtn"
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void renameProjectTask(task.id);
+                                        }}
+                                      >
+                                        保存
+                                      </button>
+                                      <button
+                                        className="ghostBtn"
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingProjectTaskId("");
+                                          setProjectTaskTitleDraft("");
+                                        }}
+                                      >
+                                        キャンセル
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div>{task.title}</div>
+                                    <div className="kanbanCardActions">
+                                      <button
+                                        className="ghostBtn"
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          startProjectTaskEdit(task.id, task.title);
+                                        }}
+                                      >
+                                        編集
+                                      </button>
+                                      <button
+                                        className="dangerGhostBtn"
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void deleteProjectTask(task.id, task.title);
+                                        }}
+                                      >
+                                        削除
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ))
+                        )}
+                      </section>
+                    ))}
+                  </div>
+                  <div className="projectKnowledge">
+                    <h3>ナレッジ</h3>
+                    <Composer
+                      assetBaseUrl={assetBaseUrl}
+                      tagSuggestions={[]}
+                      popularTagSuggestions={[]}
+                      mode={editingProjectKnowledge ? "edit" : "create"}
+                      draftKey={editingProjectKnowledge?.id ?? `project:${selectedProject.id}`}
+                      initialBody={editingProjectKnowledge?.body ?? ""}
+                      initialTags={[]}
+                      autoFocusEditor={Boolean(editingProjectKnowledge)}
+                      onCancel={() => setEditingProjectKnowledge(null)}
+                      onSubmit={async (body) => {
+                        await saveProjectKnowledge(body);
+                      }}
+                    />
+                    <div className="projectKnowledgeList">
+                      {selectedProjectKnowledgeEntries.length === 0 ? (
+                        <div className="empty">ナレッジ投稿はまだありません</div>
+                      ) : (
+                        selectedProjectKnowledgeEntries.map((entry) => (
+                          <CommentCard
+                            key={entry.id}
+                            entry={entry}
+                            assetBaseUrl={assetBaseUrl}
+                            onEdit={(item) => setEditingProjectKnowledge(item)}
+                            onCopyId={(item) => {
+                              void copyEntryId(item);
+                            }}
+                            onDelete={(item) => void deleteProjectKnowledge(item)}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="empty">左側でプロジェクトを作成してください</div>
+              )}
+            </div>
+          </section>
+        ) : null}
 
         {activeView === "journal" ? (
           <>

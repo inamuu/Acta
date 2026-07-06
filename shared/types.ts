@@ -47,6 +47,100 @@ export type UpdateEntryResult = {
   updated: boolean;
 };
 
+export type ProjectTaskStatus = "Inbox" | "InProgress" | "Waiting" | "Done";
+
+export type ProjectTask = {
+  id: string;
+  title: string;
+  status: ProjectTaskStatus;
+  createdAtMs: number;
+  updatedAtMs: number;
+};
+
+export type ActaProject = {
+  id: string;
+  name: string;
+  dirName: string;
+  createdAtMs: number;
+  updatedAtMs: number;
+  archivedAtMs: number;
+  issueUrl: string;
+  tasks: ProjectTask[];
+  knowledgeEntries: ActaEntry[];
+  sourceDir: string;
+};
+
+export type CreateProjectPayload = {
+  name: string;
+};
+
+export type SaveProjectPayload = {
+  id: string;
+  tasks: ProjectTask[];
+};
+
+export type AddProjectTaskPayload = {
+  projectId: string;
+  title: string;
+  status?: ProjectTaskStatus;
+};
+
+export type MoveProjectTaskPayload = {
+  projectId: string;
+  taskId: string;
+  status: ProjectTaskStatus;
+};
+
+export type RenameProjectTaskPayload = {
+  projectId: string;
+  taskId: string;
+  title: string;
+};
+
+export type DeleteProjectTaskPayload = {
+  projectId: string;
+  taskId: string;
+};
+
+export type AddProjectKnowledgePayload = {
+  projectId: string;
+  body: string;
+};
+
+export type UpdateProjectKnowledgePayload = {
+  projectId: string;
+  entryId: string;
+  body: string;
+};
+
+export type DeleteProjectKnowledgePayload = {
+  projectId: string;
+  entryId: string;
+};
+
+export type SetProjectArchivedPayload = {
+  projectId: string;
+  archived: boolean;
+};
+
+export type RenameProjectPayload = {
+  projectId: string;
+  name: string;
+};
+
+export type DeleteProjectPayload = {
+  projectId: string;
+};
+
+export type DeleteProjectResult = {
+  deleted: boolean;
+};
+
+export type SetProjectIssueUrlPayload = {
+  projectId: string;
+  issueUrl: string;
+};
+
 export type KnowledgeIndexResult = {
   ok: boolean;
   dbPath: string;

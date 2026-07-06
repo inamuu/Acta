@@ -7,6 +7,11 @@ const { app } = require("electron");
 const DATE_FILE_RE = /^\d{4}-\d{2}-\d{2}\.md$/;
 const POSTS_DIR = "posts";
 const IMAGES_DIR = "images";
+const PROJECTS_DIR = "projects";
+const PROJECT_FILE = "project.json";
+const PROJECT_KNOWLEDGE_FILE = "knowledge.md";
+const PROJECT_TASK_STATUSES = new Set(["Inbox", "InProgress", "Waiting", "Done"]);
+const TODO_TAG = "ToDo";
 const SETTINGS_FILE = "acta-settings.json";
 const DATA_DIR_SETTINGS_FILE = "settings.json";
 const KNOWLEDGE_DB_FILE = "knowledge-index.sqlite";
@@ -187,6 +192,77 @@ function getKnowledgeSiteDir() {
 
 function getKnowledgeSitePath() {
   return path.join(getKnowledgeSiteDir(), "index.html");
+}
+
+function getProjectsDir() {
+  return path.join(getDataDir(), PROJECTS_DIR);
+}
+
+function slugifyProjectName(name) {
+  const base = String(name ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^0-9a-z_-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return base || `project-${Date.now()}`;
+}
+
+function normalizeProjectTaskStatus(raw) {
+  const value = String(raw ?? "").trim();
+  return PROJECT_TASK_STATUSES.has(value) ? value : "Inbox";
+}
+
+function normalizeProjectTask(task) {
+  const now = Date.now();
+  const id = String(task?.id ?? "").trim() || crypto.randomUUID();
+  const title = String(task?.title ?? "").trim();
+  return {
+    id,
+    title,
+    status: normalizeProjectTaskStatus(task?.status),
+    createdAtMs: Number(task?.createdAtMs) || now,
+    updatedAtMs: Number(task?.updatedAtMs) || now
+  };
+}
+
+function parseProjectKnowledgeEntries(text, sourceFile) {
+  return parseEntriesFromText(String(text ?? ""), "project", sourceFile).map((entry) => {
+    const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(entry.created ?? ""));
+    return m ? { ...entry, date: m[1] } : entry;
+  });
+}
+
+function normalizeProject(parsed, dirName, sourceDir, knowledgeText) {
+  const now = Date.now();
+  const name = String(parsed?.name ?? "").trim() || dirName;
+  const tasks = Array.isArray(parsed?.tasks) ? parsed.tasks.map(normalizeProjectTask).filter((task) => task.title) : [];
+  const knowledgePath = path.join(sourceDir, PROJECT_KNOWLEDGE_FILE);
+  return {
+    id: String(parsed?.id ?? "").trim() || dirName,
+    name,
+    dirName,
+    createdAtMs: Number(parsed?.createdAtMs) || now,
+    updatedAtMs: Number(parsed?.updatedAtMs) || now,
+    archivedAtMs: Number(parsed?.archivedAtMs) || 0,
+    issueUrl: String(parsed?.issueUrl ?? "").trim(),
+    tasks,
+    knowledgeEntries: parseProjectKnowledgeEntries(knowledgeText, knowledgePath),
+    sourceDir
+  };
+}
+
+async function ensureUniqueProjectDirName(name) {
+  const projectsDir = getProjectsDir();
+  const slug = slugifyProjectName(name);
+  let candidate = slug;
+  let i = 2;
+  while (await fileExists(path.join(projectsDir, candidate))) {
+    candidate = `${slug}-${i}`;
+    i += 1;
+  }
+  return candidate;
 }
 
 function buildDefaultAiInstruction(dataDir) {
@@ -954,12 +1030,12 @@ async function syncBackup() {
   }
 
   if (statusRes.stdout.trim()) {
-    const commitRes = await runGitCommand(["commit", "-m", "backup"]);
+    const commitRes = await runGitCommand(["commit", "--no-gpg-sign", "-m", "backup"]);
     if (commitRes.code !== 0) {
       return buildSyncResult(
         false,
         commitRes.stderr || commitRes.stdout || "git commit に失敗しました",
-        'git commit -m "backup"'
+        'git commit --no-gpg-sign -m "backup"'
       );
     }
   }
@@ -1269,6 +1345,340 @@ async function updateEntry(payload) {
   return { updated: false };
 }
 
+async function readProjectByDirName(dirName) {
+  const cleanDirName = String(dirName ?? "").trim();
+  if (!cleanDirName) return null;
+  const sourceDir = path.join(getProjectsDir(), cleanDirName);
+  const projectPath = path.join(sourceDir, PROJECT_FILE);
+  const knowledgePath = path.join(sourceDir, PROJECT_KNOWLEDGE_FILE);
+  const raw = await readTextFileIfExists(projectPath);
+  const parsed = safeJsonParse(raw);
+  if (!parsed || typeof parsed !== "object") return null;
+  let knowledge = await readTextFileIfExists(knowledgePath);
+  if (knowledge.trim() && parseEntriesFromText(knowledge, "project", knowledgePath).length === 0) {
+    const createdAtMs = Number(parsed.updatedAtMs) || Date.now();
+    knowledge = formatEntryBlock({
+      id: crypto.randomUUID(),
+      created: formatDateTime(new Date(createdAtMs)),
+      createdAtMs,
+      tags: [],
+      body: knowledge
+    });
+    await fs.promises.writeFile(knowledgePath, knowledge, "utf8");
+  }
+  return normalizeProject(parsed, cleanDirName, sourceDir, knowledge);
+}
+
+async function writeProject(project) {
+  const sourceDir = path.join(getProjectsDir(), project.dirName);
+  await fs.promises.mkdir(sourceDir, { recursive: true });
+  const now = Date.now();
+  const next = {
+    id: project.id,
+    name: project.name,
+    dirName: project.dirName,
+    createdAtMs: Number(project.createdAtMs) || now,
+    updatedAtMs: now,
+    archivedAtMs: Number(project.archivedAtMs) || 0,
+    issueUrl: String(project.issueUrl ?? "").trim(),
+    tasks: (project.tasks || []).map(normalizeProjectTask).filter((task) => task.title)
+  };
+  await fs.promises.writeFile(path.join(sourceDir, PROJECT_FILE), JSON.stringify(next, null, 2), "utf8");
+  const knowledgePath = path.join(sourceDir, PROJECT_KNOWLEDGE_FILE);
+  if (!(await fileExists(knowledgePath))) {
+    const legacyKnowledge = typeof project.knowledge === "string" ? String(project.knowledge ?? "").trim() : "";
+    if (legacyKnowledge) {
+      const createdAtMs = Date.now();
+      await fs.promises.writeFile(
+        knowledgePath,
+        formatEntryBlock({
+          id: crypto.randomUUID(),
+          created: formatDateTime(new Date(createdAtMs)),
+          createdAtMs,
+          tags: [],
+          body: legacyKnowledge
+        }),
+        "utf8"
+      );
+    } else {
+      await fs.promises.writeFile(knowledgePath, "", "utf8");
+    }
+  }
+  const knowledgeText = await readTextFileIfExists(knowledgePath);
+  return normalizeProject(next, project.dirName, sourceDir, knowledgeText);
+}
+
+async function listProjects() {
+  await ensureDataDir();
+  await fs.promises.mkdir(getProjectsDir(), { recursive: true });
+  const entries = await fs.promises.readdir(getProjectsDir(), { withFileTypes: true });
+  const projects = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const project = await readProjectByDirName(entry.name);
+    if (project) projects.push(project);
+  }
+  projects.sort((a, b) => a.name.localeCompare(b.name, "ja"));
+  return projects;
+}
+
+async function getProjectById(id) {
+  const projectId = String(id ?? "").trim();
+  if (!projectId) throw new Error("projectId が不正です");
+  const projects = await listProjects();
+  const project = projects.find((item) => item.id === projectId || item.dirName === projectId);
+  if (!project) throw new Error("プロジェクトが見つかりません");
+  return project;
+}
+
+async function createProject(payload) {
+  const name = String(payload?.name ?? "").trim();
+  if (!name) throw new Error("プロジェクト名が空です");
+  await ensureDataDir();
+  const dirName = await ensureUniqueProjectDirName(name);
+  const now = Date.now();
+  return writeProject({
+    id: crypto.randomUUID(),
+    name,
+    dirName,
+    createdAtMs: now,
+    updatedAtMs: now,
+    archivedAtMs: 0,
+    issueUrl: "",
+    tasks: [],
+    knowledge: "",
+    sourceDir: path.join(getProjectsDir(), dirName)
+  });
+}
+
+async function saveProject(payload) {
+  const project = await getProjectById(payload?.id);
+  return writeProject({
+    ...project,
+    tasks: Array.isArray(payload?.tasks) ? payload.tasks : project.tasks
+  });
+}
+
+async function setProjectArchived(payload) {
+  const project = await getProjectById(payload?.projectId);
+  return writeProject({
+    ...project,
+    archivedAtMs: payload?.archived ? Date.now() : 0
+  });
+}
+
+async function renameProject(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const name = String(payload?.name ?? "").trim();
+  if (!name) throw new Error("プロジェクト名が空です");
+  return writeProject({
+    ...project,
+    name
+  });
+}
+
+async function deleteProject(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const projectsDir = path.resolve(getProjectsDir());
+  const targetDir = path.resolve(project.sourceDir);
+  const rel = path.relative(projectsDir, targetDir);
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+    throw new Error("削除対象が不正です");
+  }
+  await fs.promises.rm(targetDir, { recursive: true, force: true });
+  return { deleted: true };
+}
+
+async function setProjectIssueUrl(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const issueUrl = String(payload?.issueUrl ?? "").trim();
+  if (issueUrl) {
+    let parsed;
+    try {
+      parsed = new URL(issueUrl);
+    } catch {
+      throw new Error("issueリンクのURLが不正です");
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("issueリンクは http または https のURLを指定してください");
+    }
+  }
+  return writeProject({
+    ...project,
+    issueUrl
+  });
+}
+
+async function addProjectTask(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const title = String(payload?.title ?? "").trim();
+  if (!title) throw new Error("タスク名が空です");
+  const now = Date.now();
+  project.tasks.unshift({
+    id: crypto.randomUUID(),
+    title,
+    status: normalizeProjectTaskStatus(payload?.status),
+    createdAtMs: now,
+    updatedAtMs: now
+  });
+  return writeProject(project);
+}
+
+async function moveProjectTask(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const taskId = String(payload?.taskId ?? "").trim();
+  const status = normalizeProjectTaskStatus(payload?.status);
+  let changed = false;
+  project.tasks = project.tasks.map((task) => {
+    if (task.id !== taskId) return task;
+    changed = true;
+    return { ...task, status, updatedAtMs: Date.now() };
+  });
+  if (!changed) throw new Error("タスクが見つかりません");
+  return writeProject(project);
+}
+
+async function renameProjectTask(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const taskId = String(payload?.taskId ?? "").trim();
+  const title = String(payload?.title ?? "").trim();
+  if (!taskId) throw new Error("taskId が不正です");
+  if (!title) throw new Error("タスク名が空です");
+
+  let changed = false;
+  project.tasks = project.tasks.map((task) => {
+    if (task.id !== taskId) return task;
+    changed = true;
+    return { ...task, title, updatedAtMs: Date.now() };
+  });
+  if (!changed) throw new Error("タスクが見つかりません");
+  return writeProject(project);
+}
+
+async function deleteProjectTask(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const taskId = String(payload?.taskId ?? "").trim();
+  if (!taskId) throw new Error("taskId が不正です");
+  const before = project.tasks.length;
+  project.tasks = project.tasks.filter((task) => task.id !== taskId);
+  if (project.tasks.length === before) throw new Error("タスクが見つかりません");
+  return writeProject(project);
+}
+
+async function addProjectKnowledgeEntry(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const body = String(payload?.body ?? "").trim();
+  if (!body) throw new Error("本文が空です");
+
+  const knowledgePath = path.join(project.sourceDir, PROJECT_KNOWLEDGE_FILE);
+  await fs.promises.mkdir(project.sourceDir, { recursive: true });
+  const now = new Date();
+  const createdAtMs = Date.now();
+  await fs.promises.appendFile(
+    knowledgePath,
+    formatEntryBlock({
+      id: crypto.randomUUID(),
+      created: formatDateTime(now),
+      createdAtMs,
+      tags: [],
+      body
+    }),
+    "utf8"
+  );
+  return getProjectById(project.id);
+}
+
+async function updateProjectKnowledgeEntry(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const entryId = String(payload?.entryId ?? "").trim();
+  const body = String(payload?.body ?? "").trim();
+  if (!entryId) throw new Error("entryId が不正です");
+  if (!body) throw new Error("本文が空です");
+
+  const knowledgePath = path.join(project.sourceDir, PROJECT_KNOWLEDGE_FILE);
+  const text = await readTextFileIfExists(knowledgePath);
+  const { changed, nextText } = updateEntryInText(text, entryId, body, []);
+  if (!changed) throw new Error("ナレッジ投稿が見つかりません");
+  await fs.promises.writeFile(knowledgePath, nextText, "utf8");
+  return getProjectById(project.id);
+}
+
+async function deleteProjectKnowledgeEntry(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const entryId = String(payload?.entryId ?? "").trim();
+  if (!entryId) throw new Error("entryId が不正です");
+
+  const knowledgePath = path.join(project.sourceDir, PROJECT_KNOWLEDGE_FILE);
+  const text = await readTextFileIfExists(knowledgePath);
+  const { changed, nextText } = removeEntryFromText(text, entryId);
+  if (!changed) throw new Error("ナレッジ投稿が見つかりません");
+  await fs.promises.writeFile(knowledgePath, nextText, "utf8");
+  return getProjectById(project.id);
+}
+
+function buildTodoBodyFromProjectGroups(groups, heading) {
+  const lines = [`# ${heading}`];
+  for (const group of groups) {
+    if (!group.tasks.length) continue;
+    lines.push(`- ${group.name}`);
+    for (const task of group.tasks) {
+      lines.push(`  - [ ] ${task.title}`);
+    }
+  }
+  return lines.join("\n").trimEnd();
+}
+
+async function addTodoEntry(body) {
+  return addEntry({ body, tags: [TODO_TAG] });
+}
+
+async function appendToTodayTodo(body) {
+  const today = formatDate(new Date());
+  const entries = await listEntries();
+  const current = entries.find((entry) => entry.date === today && entry.tags.includes(TODO_TAG));
+  if (!current) return addTodoEntry(body);
+
+  const separator = current.body.trimEnd() ? "\n" : "";
+  const nextBody = `${current.body.trimEnd()}${separator}${String(body ?? "").replace(/^#\s+ToDo\s*\n*/i, "").trim()}`;
+  const res = await updateEntry({ id: current.id, body: nextBody, tags: current.tags });
+  if (!res.updated) throw new Error("今日のToDo更新に失敗しました");
+  return { ...current, body: nextBody };
+}
+
+function isTodoEntry(entry) {
+  if ((entry.tags || []).includes(TODO_TAG)) return true;
+  return /^#\s*todo\b/im.test(String(entry.body ?? ""));
+}
+
+async function appendProjectInProgressToTodayTodo(payload) {
+  const project = await getProjectById(payload?.projectId);
+  if (project.archivedAtMs) throw new Error("アーカイブ済みプロジェクトはToDoに追記できません");
+  const tasks = project.tasks.filter((task) => task.status === "InProgress");
+  if (tasks.length === 0) throw new Error("InProgress のタスクがありません");
+  return appendToTodayTodo(buildTodoBodyFromProjectGroups([{ name: project.name, tasks }], "ToDo"));
+}
+
+async function createTodoFromProjects() {
+  const projects = await listProjects();
+  const groups = projects
+    .filter((project) => !project.archivedAtMs)
+    .map((project) => ({
+      name: project.name,
+      tasks: project.tasks.filter((task) => task.status === "InProgress")
+    }))
+    .filter((group) => group.tasks.length > 0);
+  if (groups.length === 0) throw new Error("InProgress のプロジェクトタスクがありません");
+  return addTodoEntry(buildTodoBodyFromProjectGroups(groups, "ToDo"));
+}
+
+async function copyPreviousTodo() {
+  const entries = await listEntries();
+  const today = formatDate(new Date());
+  const previous = entries.find((entry) => entry.date < today && isTodoEntry(entry));
+  if (!previous) throw new Error("コピーできる前回のToDoがありません");
+  return addTodoEntry(previous.body);
+}
+
 module.exports = {
   getDataDir,
   setDataDir,
@@ -1279,6 +1689,23 @@ module.exports = {
   saveImage,
   deleteEntry,
   updateEntry,
+  listProjects,
+  createProject,
+  saveProject,
+  setProjectArchived,
+  renameProject,
+  deleteProject,
+  setProjectIssueUrl,
+  addProjectTask,
+  moveProjectTask,
+  renameProjectTask,
+  deleteProjectTask,
+  addProjectKnowledgeEntry,
+  updateProjectKnowledgeEntry,
+  deleteProjectKnowledgeEntry,
+  appendProjectInProgressToTodayTodo,
+  createTodoFromProjects,
+  copyPreviousTodo,
   rebuildKnowledgeIndex,
   searchKnowledgeIndex,
   generateKnowledgeSite,

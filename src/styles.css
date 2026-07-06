@@ -359,7 +359,27 @@ a:focus-visible {
   transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
 }
 
+.ghostLinkBtn {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(18px) saturate(1.15);
+  color: var(--fg1);
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  text-decoration: none;
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
 .ghostBtn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.ghostLinkBtn:hover {
   background: rgba(255, 255, 255, 0.22);
   transform: translateY(-1px);
 }
@@ -1012,6 +1032,329 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.todoArea {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 20px 24px;
+}
+
+.todoToolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.projectsArea {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+
+.projectList {
+  border-right: 1px solid var(--borderSoft);
+  padding: 16px 14px;
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.projectCreate,
+.projectTaskCreate,
+.projectKnowledgeHeader,
+.projectHeader,
+.projectHeaderActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.projectCreate,
+.projectTaskCreate {
+  margin-bottom: 14px;
+}
+
+.projectArchiveToggle {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.projectInput {
+  width: 100%;
+  height: 38px;
+  border: 1px solid var(--borderSoft);
+  border-radius: 10px;
+  background: var(--bg1);
+  color: var(--fg0);
+  outline: none;
+  padding: 0 11px;
+  font-size: 14px;
+}
+
+.projectInput:focus,
+.projectKnowledgeTextarea:focus {
+  border-color: rgba(37, 99, 235, 0.36);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.projectNav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.projectNavItem {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  padding: 10px 11px;
+  color: var(--fg1);
+  cursor: pointer;
+  text-align: left;
+}
+
+.projectNavItem span,
+.projectNavItem small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectNavItem small {
+  color: var(--muted);
+  margin-top: 3px;
+  font-size: 11px;
+}
+
+.projectNavItem:hover,
+.projectNavItem.isActive {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.16);
+  color: var(--accent);
+}
+
+.projectDetail {
+  min-width: 0;
+  overflow: auto;
+  padding: 18px 20px 24px;
+}
+
+.projectHeader {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.projectHeader h2,
+.projectKnowledgeHeader h3,
+.kanbanColumn h3 {
+  margin: 0;
+}
+
+.projectHeader h2 {
+  font-size: 20px;
+}
+
+.projectInlineEditors {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.projectInlineField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.projectInlineField.isWide {
+  min-width: min(360px, 100%);
+  flex: 1;
+}
+
+.projectInlineField span {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 720;
+}
+
+.projectInlineInput {
+  height: 32px;
+  border: 1px solid var(--borderSoft);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--fg0);
+  outline: none;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.projectInlineInput:focus {
+  border-color: rgba(37, 99, 235, 0.36);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.projectHeaderActions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.projectArchivedBadge {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 10px;
+  border: 1px solid rgba(100, 116, 139, 0.28);
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: var(--muted);
+  background: rgba(100, 116, 139, 0.1);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.kanbanBoard {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.kanbanColumn {
+  min-width: 180px;
+  border: 1px solid var(--borderSoft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 12px;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.kanbanColumn.isDropReady {
+  border-color: rgba(37, 99, 235, 0.24);
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.kanbanColumn h3 {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.kanbanCard {
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 10px;
+  background: var(--bg1);
+  box-shadow: var(--shadowSm);
+  padding: 10px;
+  color: var(--fg0);
+  line-height: 1.45;
+  margin-bottom: 8px;
+  word-break: break-word;
+  cursor: grab;
+  user-select: none;
+}
+
+.kanbanCard:active {
+  cursor: grabbing;
+}
+
+.kanbanCard.isDragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+}
+
+.kanbanCardActions,
+.kanbanEditActions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.kanbanCardActions .ghostBtn,
+.kanbanCardActions .dangerGhostBtn,
+.kanbanEditActions .ghostBtn {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.kanbanEdit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kanbanEditInput {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid var(--borderSoft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--fg0);
+  outline: none;
+  padding: 0 9px;
+  font-size: 13px;
+}
+
+.kanbanEditInput:focus {
+  border-color: rgba(37, 99, 235, 0.36);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.kanbanEmpty {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 8px 0;
+}
+
+.projectKnowledge {
+  margin-top: 18px;
+}
+
+.projectKnowledge h3 {
+  margin: 0 0 10px;
+}
+
+.projectKnowledgeHeader {
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.projectKnowledge .composerArea {
+  border: 1px solid var(--borderSoft);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.projectKnowledgeList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.projectKnowledgeTextarea {
+  width: 100%;
+  min-height: 280px;
+  resize: vertical;
+  border: 1px solid var(--borderSoft);
+  border-radius: 12px;
+  background: var(--bg1);
+  color: var(--fg0);
+  outline: none;
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .knowledgeToolbar {
