@@ -7,6 +7,7 @@ const { pathToFileURL } = require("node:url");
 const storage = require("./storage.cjs");
 const iconPath = path.join(__dirname, "assets", "icon.png");
 const aiSessions = new Map();
+const AI_ARTICLE_MAX_BYTES = 1024 * 1024;
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -53,6 +54,69 @@ function buildAiPrompt(session, input) {
   lines.push("日本語で回答してください。");
 
   return lines.join("\n");
+}
+
+function normalizeArticlePaths(articlePaths) {
+  if (!Array.isArray(articlePaths)) return [];
+
+  const seen = new Set();
+  const paths = [];
+  for (const rawPath of articlePaths) {
+    const trimmedPath = String(rawPath ?? "").trim();
+    if (!trimmedPath) continue;
+    const filePath = path.resolve(trimmedPath);
+    if (!filePath || seen.has(filePath)) continue;
+    seen.add(filePath);
+    paths.push(filePath);
+  }
+  return paths.slice(0, 10);
+}
+
+function escapePromptAttribute(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+async function readArticleForPrompt(filePath) {
+  const promptPath = escapePromptAttribute(filePath);
+  try {
+    const stat = await fs.promises.stat(filePath);
+    if (!stat.isFile()) {
+      return `<article path="${promptPath}" error="not_file"></article>`;
+    }
+    if (stat.size > AI_ARTICLE_MAX_BYTES) {
+      return `<article path="${promptPath}" error="too_large" bytes="${stat.size}" maxBytes="${AI_ARTICLE_MAX_BYTES}"></article>`;
+    }
+
+    const content = await fs.promises.readFile(filePath, "utf8");
+    return `<article path="${promptPath}">\n${content.trimEnd()}\n</article>`;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return `<article path="${promptPath}" error="${escapePromptAttribute(msg || "read_failed")}"></article>`;
+  }
+}
+
+async function buildInputWithArticles(input, articlePaths) {
+  const paths = normalizeArticlePaths(articlePaths);
+  const text = String(input ?? "").trim();
+  if (paths.length === 0) return text;
+
+  const articles = [];
+  for (const filePath of paths) {
+    articles.push(await readArticleForPrompt(filePath));
+  }
+
+  return [
+    "# 今回の指示",
+    text,
+    "",
+    "# 添付記事",
+    "以下の記事ファイルを読んだ上で、今回の指示に従ってください。",
+    ...articles
+  ].join("\n");
 }
 
 function detectAiCliKind(cliPath) {
@@ -499,13 +563,14 @@ function readAiSession(sessionId) {
   return res;
 }
 
-function writeAiSessionInput(sessionId, input) {
+async function writeAiSessionInput(sessionId, input, articlePaths) {
   const session = getAiSessionOrThrow(sessionId);
   if (!session.alive) throw new Error("AIセッションは終了しています");
   if (session.busy) throw new Error("前回の応答を待ってから送信してください");
 
   const text = String(input ?? "");
-  if (!text.trim()) return { sent: false };
+  const paths = normalizeArticlePaths(articlePaths);
+  if (!text.trim() && paths.length === 0) return { sent: false };
 
   if (session.needsBootstrap) {
     session.systemInstruction = text;
@@ -513,7 +578,8 @@ function writeAiSessionInput(sessionId, input) {
     return { sent: true };
   }
 
-  runAiTurn(session, text);
+  const inputWithArticles = await buildInputWithArticles(text, paths);
+  runAiTurn(session, inputWithArticles);
   return { sent: true };
 }
 
@@ -640,8 +706,26 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("acta:syncPull", async () => storage.syncPull());
   ipcMain.handle("acta:syncBackup", async () => storage.syncBackup());
+  ipcMain.handle("acta:chooseAiArticleFiles", async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const res = await dialog.showOpenDialog(win, {
+      title: "AIに読ませる記事を選択",
+      properties: ["openFile", "multiSelections"],
+      filters: [
+        { name: "Text Articles", extensions: ["md", "markdown", "txt", "log", "json", "yaml", "yml"] },
+        { name: "All Files", extensions: ["*"] }
+      ]
+    });
+
+    return {
+      canceled: Boolean(res.canceled),
+      filePaths: res.canceled ? [] : res.filePaths ?? []
+    };
+  });
   ipcMain.handle("acta:aiStartSession", async (_event, payload) => startAiSession(payload?.cliPath));
-  ipcMain.handle("acta:aiSendInput", async (_event, payload) => writeAiSessionInput(payload?.sessionId, payload?.input));
+  ipcMain.handle("acta:aiSendInput", async (_event, payload) =>
+    writeAiSessionInput(payload?.sessionId, payload?.input, payload?.articlePaths)
+  );
   ipcMain.handle("acta:aiReadOutput", async (_event, payload) => readAiSession(payload?.sessionId));
   ipcMain.handle("acta:aiStopSession", async (_event, payload) => stopAiSession(payload?.sessionId));
 

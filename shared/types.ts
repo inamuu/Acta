@@ -224,6 +224,12 @@ export type AiStartSessionResult = {
 export type AiSendInputPayload = {
   sessionId: string;
   input: string;
+  articlePaths?: string[];
+};
+
+export type AiChooseArticleFilesResult = {
+  canceled: boolean;
+  filePaths: string[];
 };
 
 export type AiReadOutputPayload = {

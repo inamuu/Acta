@@ -69,6 +69,8 @@ export function AiConsole({ settings, dataDir }: Props) {
   const [sending, setSending] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [input, setInput] = useState("");
+  const [articlePathInput, setArticlePathInput] = useState("");
+  const [articlePaths, setArticlePaths] = useState<string[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activities, setActivities] = useState<ProgressItem[]>([]);
   const [phaseLabel, setPhaseLabel] = useState("待機中");
@@ -106,6 +108,21 @@ export function AiConsole({ settings, dataDir }: Props) {
     if (!clean) return;
     const nextMessageId = nextId();
     setMessages((prev) => [...prev, { id: nextMessageId, role, text: clean }]);
+  }
+
+  function appendArticlePaths(paths: string[]) {
+    const cleanPaths = paths.map((filePath) => String(filePath ?? "").trim()).filter(Boolean);
+    if (cleanPaths.length === 0) return;
+    setArticlePaths((prev) => {
+      const seen = new Set(prev);
+      const next = [...prev];
+      for (const filePath of cleanPaths) {
+        if (seen.has(filePath)) continue;
+        seen.add(filePath);
+        next.push(filePath);
+      }
+      return next.slice(0, 10);
+    });
   }
 
   function startAssistantDraft() {
@@ -312,21 +329,27 @@ export function AiConsole({ settings, dataDir }: Props) {
   async function handleSend() {
     if (!api) return;
     const text = input.trim();
-    if (!text || sending || thinking) return;
+    const attachedArticlePaths = articlePaths;
+    if ((!text && attachedArticlePaths.length === 0) || sending || thinking) return;
 
     setSending(true);
     setError("");
     try {
       const sid = await ensureSession();
-      pushMessage("user", text);
+      const articleSummary = attachedArticlePaths.length
+        ? `\n\n[添付記事]\n${attachedArticlePaths.map((filePath) => `- ${filePath}`).join("\n")}`
+        : "";
+      pushMessage("user", `${text || "添付記事を読んでください。"}${articleSummary}`);
       startAssistantDraft();
       pushActivity("入力を送信", "active", shorten(text));
       setThinking(true);
       setPhaseLabel("CLI に送信しています");
       setTurnStartedAtMs(Date.now());
       setLastTurnDurationMs(null);
-      await api.aiSendInput({ sessionId: sid, input: text });
+      await api.aiSendInput({ sessionId: sid, input: text, articlePaths: attachedArticlePaths });
       setInput("");
+      setArticlePaths([]);
+      setArticlePathInput("");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg || "送信に失敗しました");
@@ -335,6 +358,23 @@ export function AiConsole({ settings, dataDir }: Props) {
     } finally {
       setSending(false);
     }
+  }
+
+  async function handleChooseArticleFiles() {
+    if (!api || sending || thinking) return;
+    setError("");
+    try {
+      const res = await api.chooseAiArticleFiles();
+      if (!res.canceled) appendArticlePaths(res.filePaths);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg || "記事ファイルの選択に失敗しました");
+    }
+  }
+
+  function handleAddArticlePath() {
+    appendArticlePaths([articlePathInput]);
+    setArticlePathInput("");
   }
 
   async function handleStop() {
@@ -452,6 +492,53 @@ export function AiConsole({ settings, dataDir }: Props) {
 
       {error ? <div className="composerError">{error}</div> : null}
 
+      <div className="aiArticlePanel">
+        <div className="aiArticleHeader">
+          <div>
+            <div className="aiArticleTitle">読ませる記事</div>
+            <div className="aiArticleHint">今回の送信にだけ添付します。Markdown/Text など UTF-8 の記事向けです。</div>
+          </div>
+          <button className="ghostBtn" type="button" disabled={sending || thinking} onClick={() => void handleChooseArticleFiles()}>
+            ファイル選択
+          </button>
+        </div>
+        <div className="aiArticlePathRow">
+          <input
+            className="aiArticlePathInput"
+            value={articlePathInput}
+            onChange={(e) => setArticlePathInput(e.target.value)}
+            placeholder="/path/to/article.md"
+            disabled={sending || thinking}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              handleAddArticlePath();
+            }}
+          />
+          <button className="ghostBtn" type="button" disabled={sending || thinking || !articlePathInput.trim()} onClick={handleAddArticlePath}>
+            追加
+          </button>
+        </div>
+        {articlePaths.length > 0 ? (
+          <div className="aiArticleList">
+            {articlePaths.map((filePath) => (
+              <div key={filePath} className="aiArticleItem">
+                <div className="aiArticlePath">{filePath}</div>
+                <button
+                  className="aiArticleRemove"
+                  type="button"
+                  disabled={sending || thinking}
+                  onClick={() => setArticlePaths((prev) => prev.filter((item) => item !== filePath))}
+                  aria-label={`${filePath} を削除`}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
       <div className="aiConsoleInputRow">
         <textarea
           className="aiConsoleInput"
@@ -468,7 +555,7 @@ export function AiConsole({ settings, dataDir }: Props) {
         <button
           className="primaryBtn aiSendBtn"
           type="button"
-          disabled={sending || thinking || !input.trim()}
+          disabled={sending || thinking || (!input.trim() && articlePaths.length === 0)}
           onClick={() => void handleSend()}
         >
           {sending ? "送信中..." : "送信"}

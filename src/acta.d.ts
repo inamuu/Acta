@@ -7,6 +7,7 @@ import type {
   AddProjectTaskPayload,
   AiReadOutputPayload,
   AiReadOutputResult,
+  AiChooseArticleFilesResult,
   AiSendInputPayload,
   AiStartSessionPayload,
   AiStartSessionResult,
@@ -73,6 +74,7 @@ declare global {
       openKnowledgeSite: () => Promise<{ opened: boolean; path: string; error?: string }>;
       syncPull: () => Promise<SyncResult>;
       syncBackup: () => Promise<SyncResult>;
+      chooseAiArticleFiles: () => Promise<AiChooseArticleFilesResult>;
       aiStartSession: (payload: AiStartSessionPayload) => Promise<AiStartSessionResult>;
       aiSendInput: (payload: AiSendInputPayload) => Promise<{ sent: boolean }>;
       aiReadOutput: (payload: AiReadOutputPayload) => Promise<AiReadOutputResult>;

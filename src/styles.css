@@ -1853,6 +1853,101 @@ a:focus-visible {
   margin: 0;
 }
 
+.aiArticlePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 10px;
+}
+
+.aiArticleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.aiArticleTitle {
+  font-size: 12px;
+  font-weight: 760;
+  color: var(--fg0);
+}
+
+.aiArticleHint {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.aiArticlePathRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.aiArticlePathInput {
+  min-width: 0;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--fg0);
+  padding: 0 10px;
+  outline: none;
+  font-size: 12px;
+}
+
+.aiArticlePathInput:focus {
+  border-color: rgba(37, 99, 235, 0.5);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.aiArticleList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.aiArticleItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  border-radius: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  background: rgba(37, 99, 235, 0.06);
+  padding: 5px 6px 5px 10px;
+}
+
+.aiArticlePath {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--fg0);
+}
+
+.aiArticleRemove {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.aiArticleRemove:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--fg0);
+}
+
 @keyframes aiMsgEnter {
   0% {
     opacity: 0;
@@ -4021,6 +4116,13 @@ html .sidebar .tagItem.isSelected .tagCount {
   }
   .aiProgressStep {
     flex-basis: 180px;
+  }
+  .aiArticleHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .aiArticlePathRow {
+    grid-template-columns: 1fr;
   }
   .aiConsoleInputRow {
     grid-template-columns: 1fr;

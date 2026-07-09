@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld("acta", {
   openKnowledgeSite: () => ipcRenderer.invoke("acta:openKnowledgeSite"),
   syncPull: () => ipcRenderer.invoke("acta:syncPull"),
   syncBackup: () => ipcRenderer.invoke("acta:syncBackup"),
+  chooseAiArticleFiles: () => ipcRenderer.invoke("acta:chooseAiArticleFiles"),
   aiStartSession: (payload) => ipcRenderer.invoke("acta:aiStartSession", payload),
   aiSendInput: (payload) => ipcRenderer.invoke("acta:aiSendInput", payload),
   aiReadOutput: (payload) => ipcRenderer.invoke("acta:aiReadOutput", payload),
