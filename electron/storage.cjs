@@ -1529,13 +1529,19 @@ async function moveProjectTask(payload) {
   const taskId = String(payload?.taskId ?? "").trim();
   const status = normalizeProjectTaskStatus(payload?.status);
   let changed = false;
+  let movedTask = null;
   project.tasks = project.tasks.map((task) => {
     if (task.id !== taskId) return task;
     changed = true;
-    return { ...task, status, updatedAtMs: Date.now() };
+    movedTask = { ...task, status, updatedAtMs: Date.now() };
+    return movedTask;
   });
   if (!changed) throw new Error("タスクが見つかりません");
-  return writeProject(project);
+  const written = await writeProject(project);
+  if (!written.archivedAtMs && movedTask && status !== "Inbox") {
+    await upsertProjectTasksToLatestTodo(written, [movedTask]);
+  }
+  return written;
 }
 
 async function renameProjectTask(payload) {
@@ -1622,9 +1628,100 @@ function buildTodoBodyFromProjectGroups(groups, heading) {
     if (!group.tasks.length) continue;
     lines.push(`- ${group.name}`);
     for (const task of group.tasks) {
-      lines.push(`  - [ ] ${task.title}`);
+      lines.push(`  - [${markerFromProjectTaskStatus(task.status)}] ${task.title}`);
     }
   }
+  return lines.join("\n").trimEnd();
+}
+
+function markerFromProjectTaskStatus(status) {
+  switch (normalizeProjectTaskStatus(status)) {
+    case "InProgress":
+      return "-";
+    case "Waiting":
+      return "R";
+    case "Done":
+      return "x";
+    case "Inbox":
+    default:
+      return " ";
+  }
+}
+
+function escapeRegExp(value) {
+  return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeTodoTaskTitle(value) {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findProjectTodoGroup(lines, projectName) {
+  const name = String(projectName ?? "").trim();
+  if (!name) return null;
+
+  const headingRe = new RegExp(`^(-\\s+)${escapeRegExp(name)}\\s*$`);
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] ?? "";
+    if (!headingRe.test(line)) continue;
+
+    let end = i + 1;
+    while (end < lines.length && !/^\S/.test(lines[end] ?? "")) end += 1;
+    return { start: i, end };
+  }
+
+  return null;
+}
+
+function upsertProjectTasksInTodoBody(body, projectName, tasks) {
+  const normalizedTasks = (tasks || [])
+    .map((task) => ({
+      title: normalizeTodoTaskTitle(task?.title),
+      marker: markerFromProjectTaskStatus(task?.status)
+    }))
+    .filter((task) => task.title);
+  if (normalizedTasks.length === 0) return String(body ?? "").trimEnd();
+
+  const lines = normalizeNewlines(String(body ?? "")).trimEnd().split("\n");
+  const group = findProjectTodoGroup(lines, projectName);
+  if (!group) {
+    const separator = lines.length === 1 && lines[0] === "" ? [] : [""];
+    return [
+      ...lines.filter((line, index) => !(lines.length === 1 && index === 0 && line === "")),
+      ...separator,
+      `- ${projectName}`,
+      ...normalizedTasks.map((task) => `  - [${task.marker}] ${task.title}`)
+    ].join("\n");
+  }
+
+  const titleToLine = new Map();
+  for (let i = group.start + 1; i < group.end; i += 1) {
+    const line = lines[i] ?? "";
+    const match = /^(\s*[-+*]\s*)\[([ xX\-\/rR])\](\s+)(.*?)\s*$/.exec(line);
+    if (!match) continue;
+    const title = normalizeTodoTaskTitle(match[4]);
+    if (title && !titleToLine.has(title)) titleToLine.set(title, i);
+  }
+
+  const appendLines = [];
+  for (const task of normalizedTasks) {
+    const existingLine = titleToLine.get(task.title);
+    if (typeof existingLine === "number") {
+      lines[existingLine] = lines[existingLine].replace(
+        /^(\s*[-+*]\s*)\[([ xX\-\/rR])\](\s+)/,
+        `$1[${task.marker}]$3`
+      );
+      continue;
+    }
+    appendLines.push(`  - [${task.marker}] ${task.title}`);
+  }
+
+  if (appendLines.length > 0) {
+    lines.splice(group.end, 0, ...appendLines);
+  }
+
   return lines.join("\n").trimEnd();
 }
 
@@ -1645,6 +1742,25 @@ async function appendToTodayTodo(body) {
   return { ...current, body: nextBody };
 }
 
+async function upsertProjectTasksToLatestTodo(project, tasks) {
+  const targetTasks = (tasks || []).filter((task) => task?.title);
+  if (!targetTasks.length) return null;
+
+  const entries = await listEntries();
+  const current = entries.find((entry) => isTodoEntry(entry));
+  if (!current) {
+    return addTodoEntry(buildTodoBodyFromProjectGroups([{ name: project.name, tasks: targetTasks }], "ToDo"));
+  }
+
+  const nextBody = upsertProjectTasksInTodoBody(current.body, project.name, targetTasks);
+  if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
+
+  const tags = Array.from(new Set([...(current.tags || []), TODO_TAG]));
+  const res = await updateEntry({ id: current.id, body: nextBody, tags });
+  if (!res.updated) throw new Error("最新のToDo更新に失敗しました");
+  return { ...current, body: nextBody, tags };
+}
+
 function isTodoEntry(entry) {
   if ((entry.tags || []).includes(TODO_TAG)) return true;
   return /^#\s*todo\b/im.test(String(entry.body ?? ""));
@@ -1653,9 +1769,9 @@ function isTodoEntry(entry) {
 async function appendProjectInProgressToTodayTodo(payload) {
   const project = await getProjectById(payload?.projectId);
   if (project.archivedAtMs) throw new Error("アーカイブ済みプロジェクトはToDoに追記できません");
-  const tasks = project.tasks.filter((task) => task.status === "InProgress");
-  if (tasks.length === 0) throw new Error("InProgress のタスクがありません");
-  return appendToTodayTodo(buildTodoBodyFromProjectGroups([{ name: project.name, tasks }], "ToDo"));
+  const tasks = project.tasks.filter((task) => task.status === "InProgress" || task.status === "Waiting");
+  if (tasks.length === 0) throw new Error("InProgress / Waiting のタスクがありません");
+  return upsertProjectTasksToLatestTodo(project, tasks);
 }
 
 async function createTodoFromProjects() {
@@ -1664,10 +1780,10 @@ async function createTodoFromProjects() {
     .filter((project) => !project.archivedAtMs)
     .map((project) => ({
       name: project.name,
-      tasks: project.tasks.filter((task) => task.status === "InProgress")
+      tasks: project.tasks.filter((task) => task.status === "InProgress" || task.status === "Waiting")
     }))
     .filter((group) => group.tasks.length > 0);
-  if (groups.length === 0) throw new Error("InProgress のプロジェクトタスクがありません");
+  if (groups.length === 0) throw new Error("InProgress / Waiting のプロジェクトタスクがありません");
   return addTodoEntry(buildTodoBodyFromProjectGroups(groups, "ToDo"));
 }
 

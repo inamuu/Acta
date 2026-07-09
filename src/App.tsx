@@ -4,6 +4,8 @@ import type {
   ActaEntry,
   ActaProject,
   ActaThemeId,
+  ProjectTask,
+  ProjectTaskStatus,
   KnowledgeIndexResult,
   KnowledgeSearchResultItem,
   KnowledgeSiteResult,
@@ -118,6 +120,16 @@ function buildEntryDomId(entryId: string): string {
 
 function sortEntriesNewestFirst(list: ActaEntry[]): ActaEntry[] {
   return [...list].sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+}
+
+function getRecentCutoffMs(days = 7): number {
+  const today = formatDateYYYYMMDD(new Date());
+  return addDays(new Date(`${today}T00:00:00`), -(days - 1)).getTime();
+}
+
+function isRecentProjectTask(task: ProjectTask, days = 7): boolean {
+  const cutoff = getRecentCutoffMs(days);
+  return Number(task.updatedAtMs || task.createdAtMs || 0) >= cutoff;
 }
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
@@ -731,7 +743,7 @@ export function App() {
     }
   }
 
-  async function moveProjectTask(taskId: string, status: "Inbox" | "InProgress" | "Waiting" | "Done") {
+  async function moveProjectTask(taskId: string, status: ProjectTaskStatus) {
     if (!selectedProject) return;
     const task = selectedProject.tasks.find((item) => item.id === taskId);
     if (task?.status === status) return;
@@ -739,6 +751,7 @@ export function App() {
     try {
       await api.moveProjectTask({ projectId: selectedProject.id, taskId, status });
       await reloadProjects(selectedProject.id);
+      await reload();
       queueBackupSync();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -746,7 +759,7 @@ export function App() {
     }
   }
 
-  function dropProjectTask(status: "Inbox" | "InProgress" | "Waiting" | "Done") {
+  function dropProjectTask(status: ProjectTaskStatus) {
     const taskId = draggingTaskId.trim();
     setDraggingTaskId("");
     if (!taskId) return;
@@ -918,7 +931,7 @@ export function App() {
       const entry = await api.appendProjectInProgressToTodayTodo({ projectId: selectedProject.id });
       await reload();
       queueBackupSync();
-      setProjectStatus(`${entry.date} のToDoにInProgressを追記しました`);
+      setProjectStatus(`${entry.date} のToDoにInProgress / Waitingを追記しました`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setProjectStatus(msg || "ToDoへの追記に失敗しました");
@@ -1153,7 +1166,9 @@ export function App() {
               <button className="ghostBtn" type="button" onClick={() => void copyPreviousTodo()}>
                 昨日のToDoコピー
               </button>
-              <div className="knowledgeStatus">{todoStatus || "新規ToDoは全プロジェクトのInProgressから作成します。"}</div>
+              <div className="knowledgeStatus">
+                {todoStatus || "新規ToDoは全プロジェクトのInProgress / Waitingから作成します。"}
+              </div>
             </div>
             <div className="commentList">
               {loading ? (
@@ -1344,7 +1359,7 @@ export function App() {
                         disabled={Boolean(selectedProject.archivedAtMs)}
                         onClick={() => void appendProjectTasksToTodo()}
                       >
-                        InProgressをToDoへ追記
+                        InProgress / WaitingをToDoへ追記
                       </button>
                       <button
                         className={selectedProject.archivedAtMs ? "ghostBtn" : "dangerGhostBtn"}
@@ -1374,26 +1389,28 @@ export function App() {
                     </button>
                   </div>
                   <div className="kanbanBoard">
-                    {(["Inbox", "InProgress", "Waiting", "Done"] as const).map((status) => (
-                      <section
-                        className={`kanbanColumn ${draggingTaskId ? "isDropReady" : ""}`}
-                        key={status}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.dataTransfer.dropEffect = "move";
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          dropProjectTask(status);
-                        }}
-                      >
-                        <h3>{status}</h3>
-                        {selectedProject.tasks.filter((task) => task.status === status).length === 0 ? (
-                          <div className="kanbanEmpty">空</div>
-                        ) : (
-                          selectedProject.tasks
-                            .filter((task) => task.status === status)
-                            .map((task) => (
+                    {(["Inbox", "InProgress", "Waiting", "Done"] as const).map((status) => {
+                      const visibleTasks = selectedProject.tasks.filter(
+                        (task) => task.status === status && (status !== "Done" || isRecentProjectTask(task))
+                      );
+                      return (
+                        <section
+                          className={`kanbanColumn ${draggingTaskId ? "isDropReady" : ""}`}
+                          key={status}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            dropProjectTask(status);
+                          }}
+                        >
+                          <h3>{status}</h3>
+                          {visibleTasks.length === 0 ? (
+                            <div className="kanbanEmpty">空</div>
+                          ) : (
+                            visibleTasks.map((task) => (
                               <div
                                 className={`kanbanCard ${draggingTaskId === task.id ? "isDragging" : ""}`}
                                 key={task.id}
@@ -1476,9 +1493,10 @@ export function App() {
                                 )}
                               </div>
                             ))
-                        )}
-                      </section>
-                    ))}
+                          )}
+                        </section>
+                      );
+                    })}
                   </div>
                   <div className="projectKnowledge">
                     <h3>ナレッジ</h3>

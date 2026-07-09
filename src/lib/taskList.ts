@@ -23,7 +23,7 @@ export function markerFromTaskState(state: TaskState): string {
     case "checked":
       return "x";
     case "partial":
-      return "/";
+      return "-";
     case "review":
       return "R";
     case "unchecked":
