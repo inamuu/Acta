@@ -1538,7 +1538,7 @@ async function moveProjectTask(payload) {
   });
   if (!changed) throw new Error("タスクが見つかりません");
   const written = await writeProject(project);
-  if (!written.archivedAtMs && movedTask && status !== "Inbox") {
+  if (!written.archivedAtMs && movedTask && (status === "InProgress" || status === "Waiting")) {
     await upsertProjectTasksToLatestTodo(written, [movedTask]);
   }
   return written;
@@ -1687,10 +1687,8 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks) {
   const lines = normalizeNewlines(String(body ?? "")).trimEnd().split("\n");
   const group = findProjectTodoGroup(lines, projectName);
   if (!group) {
-    const separator = lines.length === 1 && lines[0] === "" ? [] : [""];
     return [
       ...lines.filter((line, index) => !(lines.length === 1 && index === 0 && line === "")),
-      ...separator,
       `- ${projectName}`,
       ...normalizedTasks.map((task) => `  - [${task.marker}] ${task.title}`)
     ].join("\n");
@@ -1743,7 +1741,9 @@ async function appendToTodayTodo(body) {
 }
 
 async function upsertProjectTasksToLatestTodo(project, tasks) {
-  const targetTasks = (tasks || []).filter((task) => task?.title);
+  const targetTasks = (tasks || []).filter(
+    (task) => task?.title && (task.status === "InProgress" || task.status === "Waiting")
+  );
   if (!targetTasks.length) return null;
 
   const entries = await listEntries();
