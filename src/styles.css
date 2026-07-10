@@ -1049,6 +1049,19 @@ a:focus-visible {
   margin-bottom: 14px;
 }
 
+.todoWeekNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.todoWeekLabel {
+  color: var(--fg2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .projectsArea {
   flex: 1;
   min-height: 0;

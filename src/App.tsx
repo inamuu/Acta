@@ -186,6 +186,7 @@ export function App() {
   const [projectIssueUrlDraft, setProjectIssueUrlDraft] = useState("");
   const [projectStatus, setProjectStatus] = useState("");
   const [todoStatus, setTodoStatus] = useState("");
+  const [todoWeekOffset, setTodoWeekOffset] = useState(0);
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
   const [knowledgeExcludeTags, setKnowledgeExcludeTags] = useState("");
   const [knowledgeResults, setKnowledgeResults] = useState<KnowledgeSearchResultItem[]>([]);
@@ -501,16 +502,24 @@ export function App() {
     return filteredEntries.slice(0, limit);
   }, [dateFilterMode, filteredEntries, limit]);
 
-  const todoEntries = useMemo(() => {
+  const todoWeekRange = useMemo(() => {
     const today = formatDateYYYYMMDD(new Date());
-    const weekStart = formatDateYYYYMMDD(addDays(new Date(`${today}T00:00:00`), -6));
+    const endDate = addDays(new Date(`${today}T00:00:00`), todoWeekOffset * 7);
+    const startDate = addDays(endDate, -6);
+    return {
+      start: formatDateYYYYMMDD(startDate),
+      end: formatDateYYYYMMDD(endDate)
+    };
+  }, [todoWeekOffset]);
+
+  const todoEntries = useMemo(() => {
     return entries.filter(
       (entry) =>
-        entry.date >= weekStart &&
-        entry.date <= today &&
+        entry.date >= todoWeekRange.start &&
+        entry.date <= todoWeekRange.end &&
         (entry.tags.includes("ToDo") || /^#\s*todo\b/im.test(entry.body))
     );
-  }, [entries]);
+  }, [entries, todoWeekRange]);
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) || null,
     [projects, selectedProjectId]
@@ -1166,6 +1175,30 @@ export function App() {
               <button className="ghostBtn" type="button" onClick={() => void copyPreviousTodo()}>
                 昨日のToDoコピー
               </button>
+              <div className="todoWeekNav">
+                <button className="ghostBtn" type="button" onClick={() => setTodoWeekOffset((value) => value - 1)}>
+                  前週
+                </button>
+                <span className="todoWeekLabel">
+                  {todoWeekRange.start} - {todoWeekRange.end}
+                </span>
+                <button
+                  className="ghostBtn"
+                  type="button"
+                  disabled={todoWeekOffset >= 0}
+                  onClick={() => setTodoWeekOffset((value) => Math.min(0, value + 1))}
+                >
+                  次週
+                </button>
+                <button
+                  className="ghostBtn"
+                  type="button"
+                  disabled={todoWeekOffset === 0}
+                  onClick={() => setTodoWeekOffset(0)}
+                >
+                  今週
+                </button>
+              </div>
               <div className="knowledgeStatus">
                 {todoStatus || "新規ToDoは全プロジェクトのInProgress / Waitingから作成します。"}
               </div>
@@ -1280,7 +1313,10 @@ export function App() {
                       <small>
                         {project.archivedAtMs
                           ? "archived"
-                          : `${project.tasks.filter((task) => task.status === "InProgress").length} active`}
+                          : `${
+                              project.tasks.filter((task) => task.status === "InProgress" || task.status === "Waiting")
+                                .length
+                            } active`}
                       </small>
                     </button>
                   ))
