@@ -444,6 +444,110 @@ a:focus-visible {
 }
 
 /* tag sidebar */
+.sideBrand {
+  margin: 4px 8px 16px;
+}
+
+.sideBrandName {
+  font-size: 19px;
+  font-weight: 820;
+  color: var(--fg0);
+}
+
+.sideBrandSub {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sideNav {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.sideNavItem {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fg1);
+  cursor: pointer;
+  padding: 9px 10px;
+  text-align: left;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.sideNavItem:hover,
+.sideNavItem.isActive {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.16);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.sideNavIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.06);
+  color: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sideNavText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 720;
+}
+
+.sideStats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 6px 14px;
+}
+
+.sideStat {
+  min-width: 0;
+  border: 1px solid var(--borderSoft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 9px;
+}
+
+.sideStat span,
+.sideStat strong {
+  display: block;
+}
+
+.sideStat span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.sideStat strong {
+  margin-top: 4px;
+  color: var(--fg0);
+  font-size: 18px;
+}
+
 .tagSidebarTitle {
   font-size: 12px;
   font-weight: 720;
@@ -589,6 +693,7 @@ a:focus-visible {
   cursor: pointer;
   color: var(--fg1);
   transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+  margin-bottom: 10px;
 }
 
 .tagGroupHeader:hover {

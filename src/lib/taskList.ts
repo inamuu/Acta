@@ -33,6 +33,7 @@ export function markerFromTaskState(state: TaskState): string {
 }
 
 export function nextTaskState(state: TaskState): TaskState {
+  if (state === "review") return "checked";
   const idx = TASK_STATE_ORDER.indexOf(state);
   if (idx < 0) return "unchecked";
   return TASK_STATE_ORDER[(idx + 1) % TASK_STATE_ORDER.length] ?? "unchecked";

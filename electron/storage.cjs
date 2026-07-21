@@ -223,7 +223,8 @@ function normalizeProjectTask(task) {
     title,
     status: normalizeProjectTaskStatus(task?.status),
     createdAtMs: Number(task?.createdAtMs) || now,
-    updatedAtMs: Number(task?.updatedAtMs) || now
+    updatedAtMs: Number(task?.updatedAtMs) || now,
+    completedAtMs: Number(task?.completedAtMs) || 0
   };
 }
 
@@ -1533,7 +1534,13 @@ async function moveProjectTask(payload) {
   project.tasks = project.tasks.map((task) => {
     if (task.id !== taskId) return task;
     changed = true;
-    movedTask = { ...task, status, updatedAtMs: Date.now() };
+    const now = Date.now();
+    movedTask = {
+      ...task,
+      status,
+      updatedAtMs: now,
+      completedAtMs: status === "Done" ? now : 0
+    };
     return movedTask;
   });
   if (!changed) throw new Error("タスクが見つかりません");

@@ -55,6 +55,7 @@ export type ProjectTask = {
   status: ProjectTaskStatus;
   createdAtMs: number;
   updatedAtMs: number;
+  completedAtMs?: number;
 };
 
 export type ActaProject = {

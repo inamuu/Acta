@@ -129,7 +129,8 @@ function getRecentCutoffMs(days = 7): number {
 
 function isRecentProjectTask(task: ProjectTask, days = 7): boolean {
   const cutoff = getRecentCutoffMs(days);
-  return Number(task.updatedAtMs || task.createdAtMs || 0) >= cutoff;
+  const doneAtMs = Number(task.completedAtMs || task.updatedAtMs || task.createdAtMs || 0);
+  return doneAtMs >= cutoff;
 }
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
@@ -532,6 +533,21 @@ export function App() {
     () => (selectedProject ? sortEntriesNewestFirst(selectedProject.knowledgeEntries) : []),
     [selectedProject]
   );
+  const activeProjectCount = useMemo(
+    () => projects.filter((project) => !project.archivedAtMs).length,
+    [projects]
+  );
+  const activeProjectTaskCount = useMemo(
+    () =>
+      projects.reduce(
+        (count, project) =>
+          project.archivedAtMs
+            ? count
+            : count + project.tasks.filter((task) => task.status === "InProgress" || task.status === "Waiting").length,
+        0
+      ),
+    [projects]
+  );
 
   const tagSuggestions = useMemo(() => tagStats.map((t) => t.tag), [tagStats]);
   const popularTagSuggestions = useMemo(() => {
@@ -698,6 +714,7 @@ export function App() {
     setTodoStatus("");
     try {
       const entry = await api.createTodoFromProjects();
+      setTodoWeekOffset(0);
       await reload();
       queueBackupSync();
       setTodoStatus(`${entry.date} のToDoを作成しました`);
@@ -711,6 +728,7 @@ export function App() {
     setTodoStatus("");
     try {
       const entry = await api.copyPreviousTodo();
+      setTodoWeekOffset(0);
       await reload();
       queueBackupSync();
       setTodoStatus(`${entry.date} に前回のToDoをコピーしました`);
@@ -964,11 +982,17 @@ export function App() {
     <div className="shell">
       <aside className="sidebar dragScroll" ref={sidebarRef}>
         <TagSidebar
+          activeView={activeView}
           selectedTags={selectedTags}
           untaggedOnly={untaggedOnly}
           totalCount={entries.length}
+          todoCount={todoEntries.length}
+          activeProjectCount={activeProjectCount}
+          activeProjectTaskCount={activeProjectTaskCount}
           tagStats={tagStats}
           untaggedCount={untaggedCount}
+          selectedProjectName={selectedProject?.name ?? ""}
+          onChangeView={(view) => setActiveView(view)}
           onToggleTag={toggleTagFilter}
           onSelectAll={clearTagFilter}
           onToggleUntagged={toggleUntaggedFilter}
