@@ -1001,47 +1001,6 @@ export function App() {
 
       <main className="main">
         <header className="topbar">
-          <div className="topbarLeft">
-            <div className="appTitle">Acta</div>
-            <div className="viewTabs">
-              <button
-                className={`viewTab ${activeView === "todo" ? "isActive" : ""}`}
-                type="button"
-                onClick={() => setActiveView("todo")}
-              >
-                ToDo
-              </button>
-              <button
-                className={`viewTab ${activeView === "projects" ? "isActive" : ""}`}
-                type="button"
-                onClick={() => setActiveView("projects")}
-              >
-                プロジェクト
-              </button>
-              <button
-                className={`viewTab ${activeView === "journal" ? "isActive" : ""}`}
-                type="button"
-                onClick={() => setActiveView("journal")}
-              >
-                記録
-              </button>
-              <button
-                className={`viewTab ${activeView === "knowledge" ? "isActive" : ""}`}
-                type="button"
-                onClick={() => setActiveView("knowledge")}
-              >
-                検索
-              </button>
-              <button
-                className={`viewTab ${activeView === "ai" ? "isActive" : ""}`}
-                type="button"
-                onClick={() => setActiveView("ai")}
-              >
-                AI対話
-              </button>
-            </div>
-          </div>
-
           {activeView === "todo" ? (
             <div className="topbarCenter">
               <div className="aiTopHint">日々のToDoだけを表示します。</div>

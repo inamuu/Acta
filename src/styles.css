@@ -106,7 +106,7 @@ a:focus-visible {
 
 .topbar {
   display: grid;
-  grid-template-columns: 1fr minmax(300px, 520px) 1fr;
+  grid-template-columns: minmax(300px, 720px) 1fr;
   gap: 18px;
   align-items: center;
   padding: 16px 20px;
@@ -163,7 +163,7 @@ a:focus-visible {
 
 .topbarCenter {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .topbarControls {
