@@ -12,6 +12,7 @@ const PROJECT_FILE = "project.json";
 const PROJECT_KNOWLEDGE_FILE = "knowledge.md";
 const PROJECT_TASK_STATUSES = new Set(["Inbox", "InProgress", "Waiting", "Done"]);
 const TODO_TAG = "ToDo";
+const TODO_NESTED_INDENT = "\t";
 const SETTINGS_FILE = "acta-settings.json";
 const DATA_DIR_SETTINGS_FILE = "settings.json";
 const KNOWLEDGE_DB_FILE = "knowledge-index.sqlite";
@@ -1635,7 +1636,7 @@ function buildTodoBodyFromProjectGroups(groups, heading) {
     if (!group.tasks.length) continue;
     lines.push(`- ${group.name}`);
     for (const task of group.tasks) {
-      lines.push(`  - [${markerFromProjectTaskStatus(task.status)}] ${task.title}`);
+      lines.push(`${TODO_NESTED_INDENT}- [${markerFromProjectTaskStatus(task.status)}] ${task.title}`);
     }
   }
   return lines.join("\n").trimEnd();
@@ -1697,7 +1698,7 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks) {
     return [
       ...lines.filter((line, index) => !(lines.length === 1 && index === 0 && line === "")),
       `- ${projectName}`,
-      ...normalizedTasks.map((task) => `  - [${task.marker}] ${task.title}`)
+      ...normalizedTasks.map((task) => `${TODO_NESTED_INDENT}- [${task.marker}] ${task.title}`)
     ].join("\n");
   }
 
@@ -1720,7 +1721,7 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks) {
       );
       continue;
     }
-    appendLines.push(`  - [${task.marker}] ${task.title}`);
+    appendLines.push(`${TODO_NESTED_INDENT}- [${task.marker}] ${task.title}`);
   }
 
   if (appendLines.length > 0) {

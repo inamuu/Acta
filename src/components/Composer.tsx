@@ -87,6 +87,8 @@ type Props = {
   autoFocusEditor?: boolean;
 };
 
+type ComposerLayout = "write" | "split" | "preview";
+
 export function Composer({
   onSubmit,
   assetBaseUrl,
@@ -105,6 +107,7 @@ export function Composer({
   const [submitting, setSubmitting] = useState(false);
   const [isBodyEmpty, setIsBodyEmpty] = useState(() => initialBodyValue.trim().length === 0);
   const [error, setError] = useState<string>("");
+  const [layout, setLayout] = useState<ComposerLayout>("split");
   const [previewHtml, setPreviewHtml] = useState<string>(() =>
     markdownToHtml(initialBodyValue || EMPTY_PREVIEW_SOURCE, { assetBaseUrl })
   );
@@ -351,13 +354,48 @@ export function Composer({
 
   return (
     <div className="composer">
-      <div className={`composerMode composerMode-${mode}`}>
-        <div className="composerModeTitle">{modeLabel}</div>
-        {sourceLabel ? (
-          <div className="composerModeMeta">
-            {sourcePrefix}: {sourceLabel}
+      <div className="composerHeader">
+        <div className={`composerMode composerMode-${mode}`}>
+          <div className="composerModeIndicator" aria-hidden="true" />
+          <div className="composerModeCopy">
+            <div className="composerModeTitle">{modeLabel}</div>
+            {sourceLabel ? (
+              <div className="composerModeMeta">
+                {sourcePrefix}: {sourceLabel}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
+
+        <div className="composerLayoutSwitch" role="group" aria-label="エディタの表示方法">
+          <button
+            className={`composerLayoutButton${layout === "write" ? " isActive" : ""}`}
+            type="button"
+            aria-pressed={layout === "write"}
+            title="入力欄だけを表示"
+            onClick={() => setLayout("write")}
+          >
+            入力
+          </button>
+          <button
+            className={`composerLayoutButton${layout === "split" ? " isActive" : ""}`}
+            type="button"
+            aria-pressed={layout === "split"}
+            title="入力とプレビューを並べて表示"
+            onClick={() => setLayout("split")}
+          >
+            分割
+          </button>
+          <button
+            className={`composerLayoutButton${layout === "preview" ? " isActive" : ""}`}
+            type="button"
+            aria-pressed={layout === "preview"}
+            title="プレビューだけを表示"
+            onClick={() => setLayout("preview")}
+          >
+            表示
+          </button>
+        </div>
       </div>
 
       {error ? <div className="composerError">{error}</div> : null}
@@ -370,9 +408,14 @@ export function Composer({
         onTabToNext={() => editorRef.current?.focus()}
       />
 
-      <div className="composerGrid">
+      <div className={`composerWorkspace composerWorkspace-${layout}`}>
+        <div className="composerGrid">
         <div className="pane paneWrite">
-          <div className="paneTitle">Write</div>
+          <div className="paneTitle">
+            <span className="paneTitleDot" aria-hidden="true" />
+            <span>入力</span>
+            <span className="paneTitleMeta">Markdown</span>
+          </div>
           <textarea
             ref={editorRef}
             className="editor"
@@ -433,13 +476,17 @@ export function Composer({
                 });
               }
             }}
-            placeholder=""
+            placeholder="今日の記録をMarkdownで入力..."
             spellCheck={false}
           />
         </div>
 
         <div className="pane panePreview">
-          <div className="paneTitle">Preview</div>
+          <div className="paneTitle">
+            <span className="paneTitleDot" aria-hidden="true" />
+            <span>プレビュー</span>
+            <span className="paneTitleMeta">自動更新</span>
+          </div>
           <div className="previewWrap">
             <div
               ref={previewRef}
@@ -463,7 +510,18 @@ export function Composer({
               dangerouslySetInnerHTML={{ __html: previewHtml }}
             />
 
-            <div className="previewActions">
+          </div>
+        </div>
+        </div>
+
+        <div className="composerFooter">
+          <div className="composerFooterHint">
+            <span className="composerSaveState" aria-hidden="true" />
+            Markdown
+            <span className="composerShortcut">⌘ ↵</span>
+          </div>
+
+          <div className="previewActions">
               {mode === "edit" || mode === "copy" ? (
                 <button
                   className="ghostBtn"
@@ -478,12 +536,12 @@ export function Composer({
               ) : null}
 
               <button
-                className="ghostBtn"
+                className="composerLinkButton"
                 type="button"
                 title="クリップボードの投稿IDをリンクとして挿入"
                 onClick={() => void pasteEntryLinkFromClipboard()}
               >
-                IDペースト
+                投稿リンクを挿入
               </button>
 
               <button
@@ -496,7 +554,6 @@ export function Composer({
                 {submitting ? "保存中..." : submitLabel}
               </button>
             </div>
-          </div>
         </div>
       </div>
     </div>

@@ -1000,16 +1000,8 @@ export function App() {
       </aside>
 
       <main className="main">
-        <header className="topbar">
-          {activeView === "todo" ? (
-            <div className="topbarCenter">
-              <div className="aiTopHint">日々のToDoだけを表示します。</div>
-            </div>
-          ) : activeView === "projects" ? (
-            <div className="topbarCenter">
-              <div className="aiTopHint">プロジェクトごとにタスクとナレッジを管理します。</div>
-            </div>
-          ) : activeView === "journal" ? (
+        {activeView === "journal" ? (
+          <header className="topbar topbarJournal">
             <div className="topbarCenter">
               <div className="topbarControls">
                 <div className="search">
@@ -1048,19 +1040,7 @@ export function App() {
                 </div>
               </div>
             </div>
-          ) : activeView === "knowledge" ? (
-            <div className="topbarCenter">
-              <div className="aiTopHint">全投稿をSQLiteに索引化して、GUIとAIの両方で参照しやすくします。</div>
-            </div>
-          ) : (
-            <div className="topbarCenter">
-              <div className="aiTopHint">CLI の進捗と実行コマンドを表示しながら対話します。</div>
-            </div>
-          )}
 
-          {activeView === "todo" || activeView === "projects" ? (
-            <div className="topbarRight" />
-          ) : activeView === "journal" ? (
             <div className="topbarRight">
               <div className="datePicker" title="日付で絞り込み">
                 <div className="dateLabel">日付</div>
@@ -1142,12 +1122,8 @@ export function App() {
                 ) : null}
               </div>
             </div>
-          ) : activeView === "knowledge" ? (
-            <div className="topbarRight" />
-          ) : (
-            <div className="topbarRight" />
-          )}
-        </header>
+          </header>
+        ) : null}
 
         {activeView === "todo" ? (
           <section className="todoArea">
