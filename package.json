@@ -1,6 +1,6 @@
 {
   "name": "acta",
-  "version": "0.1.0",
+  "version": "0.2.2",
   "private": true,
   "description": "Acta - GitHub issue style markdown log",
   "main": "electron/main.cjs",
@@ -8,6 +8,7 @@
     "start": "electron .",
     "dev": "concurrently -k -n VITE,ELECTRON -c cyan,magenta \"vite\" \"wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
     "build": "vite build",
+    "test": "node --test electron/*.test.cjs",
     "dist": "npm run build && electron-builder --mac dmg"
   },
   "dependencies": {
