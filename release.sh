@@ -1,5 +1,12 @@
 #!/bin/bash
 
+set -euo pipefail
+
+npm version patch --no-git-tag-version
 npm run dist
-cp release/Acta-0.1.0-arm64.dmg ~/Downloads
-open ~/Downloads/Acta-0.1.0-arm64.dmg
+version=$(node -p "require('./package.json').version")
+dmg_path="release/Acta-${version}-arm64.dmg"
+download_path="$HOME/Downloads/Acta-${version}-arm64.dmg"
+
+cp "$dmg_path" "$download_path"
+open "$download_path"
