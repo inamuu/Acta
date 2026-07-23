@@ -1546,7 +1546,7 @@ async function moveProjectTask(payload) {
   });
   if (!changed) throw new Error("タスクが見つかりません");
   const written = await writeProject(project);
-  if (!written.archivedAtMs && movedTask && (status === "InProgress" || status === "Waiting")) {
+  if (!written.archivedAtMs && movedTask) {
     await upsertProjectTasksToLatestTodo(written, [movedTask]);
   }
   return written;
@@ -1749,9 +1749,7 @@ async function appendToTodayTodo(body) {
 }
 
 async function upsertProjectTasksToLatestTodo(project, tasks) {
-  const targetTasks = (tasks || []).filter(
-    (task) => task?.title && (task.status === "InProgress" || task.status === "Waiting")
-  );
+  const targetTasks = (tasks || []).filter((task) => task?.title);
   if (!targetTasks.length) return null;
 
   const entries = await listEntries();
@@ -1835,5 +1833,9 @@ module.exports = {
   generateKnowledgeSite,
   getKnowledgeSitePath,
   syncPull,
-  syncBackup
+  syncBackup,
+  _test: {
+    markerFromProjectTaskStatus,
+    upsertProjectTasksInTodoBody
+  }
 };
