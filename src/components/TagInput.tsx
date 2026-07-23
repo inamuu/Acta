@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 function normalizeTag(raw: string): string {
   return String(raw ?? "")
@@ -19,10 +19,26 @@ type Props = {
   onTabToNext?: () => void;
 };
 
+function isImeComposingEvent(e: React.KeyboardEvent<HTMLInputElement>): boolean {
+  const nativeEvent = e.nativeEvent as KeyboardEvent & { isComposing?: boolean };
+  return Boolean(e.isComposing || nativeEvent.isComposing || nativeEvent.keyCode === 229);
+}
+
 function TagInputInner({ tags, onChangeTags, suggestions, popularSuggestions, onTabToNext }: Props) {
   const [draft, setDraft] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isComposingRef = useRef(false);
+  const suppressCommitKeyRef = useRef(false);
+  const compositionEndTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (compositionEndTimerRef.current !== null) {
+        window.clearTimeout(compositionEndTimerRef.current);
+      }
+    };
+  }, []);
 
   function addTagToList(list: string[], raw: string): string[] {
     const t = normalizeTag(raw);
@@ -114,7 +130,27 @@ function TagInputInner({ tags, onChangeTags, suggestions, popularSuggestions, on
           value={draft}
           onChange={(e) => {
             const v = e.target.value;
+            if (isComposingRef.current) {
+              setDraft(v);
+              return;
+            }
             if (!commitFromDraft(v)) setDraft(v);
+          }}
+          onCompositionStart={() => {
+            if (compositionEndTimerRef.current !== null) {
+              window.clearTimeout(compositionEndTimerRef.current);
+              compositionEndTimerRef.current = null;
+            }
+            isComposingRef.current = true;
+            suppressCommitKeyRef.current = false;
+          }}
+          onCompositionEnd={() => {
+            isComposingRef.current = false;
+            suppressCommitKeyRef.current = true;
+            compositionEndTimerRef.current = window.setTimeout(() => {
+              compositionEndTimerRef.current = null;
+              suppressCommitKeyRef.current = false;
+            }, 0);
           }}
           onFocus={() => setIsFocused(true)}
           onBlur={() => {
@@ -122,6 +158,7 @@ function TagInputInner({ tags, onChangeTags, suggestions, popularSuggestions, on
             setIsFocused(false);
           }}
           onKeyDown={(e) => {
+            if (isImeComposingEvent(e) || isComposingRef.current || suppressCommitKeyRef.current) return;
             if (e.key === "Enter") {
               e.preventDefault();
               commitCurrent();

@@ -37,6 +37,9 @@ type SyncIndicatorState = {
   detail: string;
 };
 
+const BACKUP_SYNC_IDLE_DELAY_MS = 60_000;
+const BACKUP_SYNC_MAX_DELAY_MS = 5 * 60_000;
+
 function normalizeQuery(s: string): string {
   return s.trim().toLowerCase();
 }
@@ -223,6 +226,8 @@ export function App() {
   const sidebarRef = useRef<HTMLElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const syncQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const backupSyncTimerRef = useRef<number | null>(null);
+  const backupSyncFirstQueuedAtRef = useRef<number | null>(null);
   const linkHighlightTimerRef = useRef<number | null>(null);
 
   function applySyncResult(result: SyncResult) {
@@ -251,7 +256,7 @@ export function App() {
     });
   }
 
-  function queueBackupSync() {
+  function runQueuedBackupSync() {
     if (!api) return;
     syncQueueRef.current = syncQueueRef.current
       .catch(() => undefined)
@@ -271,6 +276,33 @@ export function App() {
           setSyncBusy(false);
         }
       });
+  }
+
+  function queueBackupSync(options?: { immediate?: boolean }) {
+    if (!api) return;
+
+    if (backupSyncTimerRef.current !== null) {
+      window.clearTimeout(backupSyncTimerRef.current);
+      backupSyncTimerRef.current = null;
+    }
+
+    if (options?.immediate) {
+      backupSyncFirstQueuedAtRef.current = null;
+      runQueuedBackupSync();
+      return;
+    }
+
+    const now = Date.now();
+    const firstQueuedAt = backupSyncFirstQueuedAtRef.current ?? now;
+    backupSyncFirstQueuedAtRef.current = firstQueuedAt;
+    const remainingUntilMaxDelay = Math.max(0, BACKUP_SYNC_MAX_DELAY_MS - (now - firstQueuedAt));
+    const delay = Math.min(BACKUP_SYNC_IDLE_DELAY_MS, remainingUntilMaxDelay);
+
+    backupSyncTimerRef.current = window.setTimeout(() => {
+      backupSyncTimerRef.current = null;
+      backupSyncFirstQueuedAtRef.current = null;
+      runQueuedBackupSync();
+    }, delay);
   }
 
   async function reload(opts?: { keepError?: boolean }) {
@@ -416,6 +448,9 @@ export function App() {
 
   useEffect(() => {
     return () => {
+      if (backupSyncTimerRef.current !== null) {
+        window.clearTimeout(backupSyncTimerRef.current);
+      }
       if (linkHighlightTimerRef.current !== null) {
         window.clearTimeout(linkHighlightTimerRef.current);
       }
@@ -1802,7 +1837,7 @@ export function App() {
       <button
         className="settingsFab syncFab"
         type="button"
-        onClick={() => queueBackupSync()}
+        onClick={() => queueBackupSync({ immediate: true })}
         title="同期"
         disabled={syncBusy}
       >
