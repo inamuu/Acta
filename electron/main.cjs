@@ -678,6 +678,7 @@ app.whenReady().then(() => {
   ipcMain.handle("acta:saveProject", async (_event, payload) => storage.saveProject(payload));
   ipcMain.handle("acta:addProjectTask", async (_event, payload) => storage.addProjectTask(payload));
   ipcMain.handle("acta:moveProjectTask", async (_event, payload) => storage.moveProjectTask(payload));
+  ipcMain.handle("acta:reassignProjectTask", async (_event, payload) => storage.reassignProjectTask(payload));
   ipcMain.handle("acta:renameProjectTask", async (_event, payload) => storage.renameProjectTask(payload));
   ipcMain.handle("acta:deleteProjectTask", async (_event, payload) => storage.deleteProjectTask(payload));
   ipcMain.handle("acta:setProjectArchived", async (_event, payload) => storage.setProjectArchived(payload));
@@ -695,6 +696,7 @@ app.whenReady().then(() => {
     storage.appendProjectInProgressToTodayTodo(payload)
   );
   ipcMain.handle("acta:createTodoFromProjects", async () => storage.createTodoFromProjects());
+  ipcMain.handle("acta:syncGitHubItems", async () => storage.syncGitHubItems());
   ipcMain.handle("acta:copyPreviousTodo", async () => storage.copyPreviousTodo());
   ipcMain.handle("acta:rebuildKnowledgeIndex", async () => storage.rebuildKnowledgeIndex());
   ipcMain.handle("acta:searchKnowledgeIndex", async (_event, payload) => storage.searchKnowledgeIndex(payload));

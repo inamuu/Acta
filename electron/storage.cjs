@@ -10,9 +10,10 @@ const IMAGES_DIR = "images";
 const PROJECTS_DIR = "projects";
 const PROJECT_FILE = "project.json";
 const PROJECT_KNOWLEDGE_FILE = "knowledge.md";
-const PROJECT_TASK_STATUSES = new Set(["Inbox", "InProgress", "Waiting", "Done"]);
+const PROJECT_TASK_STATUSES = new Set(["Backlog", "InProgress", "GitHub", "Done"]);
 const TODO_TAG = "ToDo";
-const TODO_NESTED_INDENT = "\t";
+const TODO_NESTED_INDENT = "  ";
+const TODO_GITHUB_INDENT = "    ";
 const SETTINGS_FILE = "acta-settings.json";
 const DATA_DIR_SETTINGS_FILE = "settings.json";
 const KNOWLEDGE_DB_FILE = "knowledge-index.sqlite";
@@ -22,6 +23,10 @@ const SYNC_SUCCESS = "Sync Success";
 const SYNC_ERROR = "Sync Error";
 const DEFAULT_AI_CLI_PATH = "/opt/homebrew/bin/codex";
 const DEFAULT_THEME = "default";
+const GITHUB_SEARCH_LIMIT = 1000;
+const GITHUB_UNCLASSIFIED_PROJECT_NAME = "未分類";
+const GITHUB_OTHER_PROJECT_NAME = "その他";
+const GITHUB_CLASSIFICATION_THRESHOLD = 0.2;
 const ALLOWED_THEMES = new Set([
   "default",
   "dracula",
@@ -212,20 +217,32 @@ function slugifyProjectName(name) {
 
 function normalizeProjectTaskStatus(raw) {
   const value = String(raw ?? "").trim();
-  return PROJECT_TASK_STATUSES.has(value) ? value : "Inbox";
+  if (value === "Inbox") return "Backlog";
+  if (value === "Waiting") return "GitHub";
+  return PROJECT_TASK_STATUSES.has(value) ? value : "Backlog";
 }
 
 function normalizeProjectTask(task) {
   const now = Date.now();
   const id = String(task?.id ?? "").trim() || crypto.randomUUID();
   const title = String(task?.title ?? "").trim();
+  const source = task?.source === "github" ? "github" : "local";
+  const sourceType = ["Issue", "PullRequest"].includes(task?.sourceType)
+    ? task.sourceType
+    : undefined;
+  const sourceState = ["open", "closed"].includes(task?.sourceState) ? task.sourceState : undefined;
   return {
     id,
     title,
     status: normalizeProjectTaskStatus(task?.status),
     createdAtMs: Number(task?.createdAtMs) || now,
     updatedAtMs: Number(task?.updatedAtMs) || now,
-    completedAtMs: Number(task?.completedAtMs) || 0
+    completedAtMs: Number(task?.completedAtMs) || 0,
+    source,
+    sourceUrl: String(task?.sourceUrl ?? "").trim(),
+    sourceType,
+    repository: String(task?.repository ?? "").trim(),
+    sourceState
   };
 }
 
@@ -290,7 +307,6 @@ function getAiSettings() {
       ? s.aiInstructionMarkdown
       : buildDefaultAiInstruction(getDataDir());
   const theme = normalizeTheme(s.theme);
-
   return {
     cliPath: cliPath || DEFAULT_AI_CLI_PATH,
     instructionMarkdown,
@@ -302,10 +318,17 @@ function setAiSettings(payload) {
   const cliPath = String(payload?.cliPath ?? "").trim() || DEFAULT_AI_CLI_PATH;
   const instructionMarkdown = String(payload?.instructionMarkdown ?? "").trim() || buildDefaultAiInstruction(getDataDir());
   const theme = normalizeTheme(payload?.theme);
-
   const s = loadSettings();
+  const {
+    githubProjects: _githubProjects,
+    githubProjectOwner: _githubProjectOwner,
+    githubProjectNumber: _githubProjectNumber,
+    githubProjectFieldName: _githubProjectFieldName,
+    githubProjectMaxItems: _githubProjectMaxItems,
+    ...settingsWithoutLegacyGitHubProjects
+  } = s;
   saveSettings({
-    ...s,
+    ...settingsWithoutLegacyGitHubProjects,
     aiCliPath: cliPath,
     aiInstructionMarkdown: instructionMarkdown,
     theme
@@ -441,6 +464,51 @@ function runGitCommand(args) {
       stderr += String(chunk ?? "");
     });
 
+    child.on("error", (err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      finish({ code: 1, stdout: stdout.trim(), stderr: msg || stderr.trim() });
+    });
+    child.on("close", (code) => {
+      finish({
+        code: typeof code === "number" ? code : 1,
+        stdout: stdout.trim(),
+        stderr: stderr.trim()
+      });
+    });
+  });
+}
+
+function runGhCommand(args) {
+  return new Promise((resolve) => {
+    let done = false;
+    let stdout = "";
+    let stderr = "";
+    const child = spawn("gh", args, {
+      cwd: getDataDir(),
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    const timer = setTimeout(() => {
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        // ignore
+      }
+      finish({ code: 1, stdout: stdout.trim(), stderr: "GitHubのIssue・PR取得が60秒でタイムアウトしました" });
+    }, 60_000);
+
+    function finish(result) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(result);
+    }
+
+    child.stdout?.on("data", (chunk) => {
+      stdout += String(chunk ?? "");
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += String(chunk ?? "");
+    });
     child.on("error", (err) => {
       const msg = err instanceof Error ? err.message : String(err);
       finish({ code: 1, stdout: stdout.trim(), stderr: msg || stderr.trim() });
@@ -1552,6 +1620,25 @@ async function moveProjectTask(payload) {
   return written;
 }
 
+async function reassignProjectTask(payload) {
+  const sourceProjectId = String(payload?.sourceProjectId ?? "").trim();
+  const targetProjectId = String(payload?.targetProjectId ?? "").trim();
+  const taskId = String(payload?.taskId ?? "").trim();
+  if (!sourceProjectId || !targetProjectId || !taskId) throw new Error("移動先が不正です");
+  if (sourceProjectId === targetProjectId) return getProjectById(sourceProjectId);
+
+  const sourceProject = await getProjectById(sourceProjectId);
+  const targetProject = await getProjectById(targetProjectId);
+  const task = sourceProject.tasks.find((item) => item.id === taskId);
+  if (!task) throw new Error("タスクが見つかりません");
+  if (targetProject.tasks.some((item) => item.id === taskId)) throw new Error("移動先に同じタスクがあります");
+
+  sourceProject.tasks = sourceProject.tasks.filter((item) => item.id !== taskId);
+  targetProject.tasks.unshift({ ...task, updatedAtMs: Date.now() });
+  await writeProject(sourceProject);
+  return writeProject(targetProject);
+}
+
 async function renameProjectTask(payload) {
   const project = await getProjectById(payload?.projectId);
   const taskId = String(payload?.taskId ?? "").trim();
@@ -1577,6 +1664,239 @@ async function deleteProjectTask(payload) {
   project.tasks = project.tasks.filter((task) => task.id !== taskId);
   if (project.tasks.length === before) throw new Error("タスクが見つかりません");
   return writeProject(project);
+}
+
+function githubSearchItemContent(item) {
+  const number = Math.max(0, Math.trunc(Number(item?.number) || 0));
+  const rawTitle = String(item?.title ?? "").trim();
+  const repository = String(item?.repository?.nameWithOwner ?? item?.repository?.name ?? item?.repository ?? "").trim();
+  return {
+    title: number > 0 ? `${rawTitle} #${number}` : rawTitle,
+    sourceType: item?.isPullRequest ? "PullRequest" : "Issue",
+    sourceUrl: String(item?.url ?? "").trim(),
+    repository
+  };
+}
+
+function normalizeGitHubClassificationText(value) {
+  return String(value ?? "")
+    .toLocaleLowerCase("ja")
+    .replace(/#\d+/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+function characterBigrams(value) {
+  const normalized = normalizeGitHubClassificationText(value);
+  const result = new Set();
+  for (let index = 0; index < normalized.length - 1; index += 1) {
+    result.add(normalized.slice(index, index + 2));
+  }
+  return result;
+}
+
+function githubTitleSimilarity(left, right) {
+  const leftGrams = characterBigrams(left);
+  const rightGrams = characterBigrams(right);
+  if (leftGrams.size === 0 || rightGrams.size === 0) return 0;
+  let overlap = 0;
+  for (const gram of leftGrams) {
+    if (rightGrams.has(gram)) overlap += 1;
+  }
+  return (2 * overlap) / (leftGrams.size + rightGrams.size);
+}
+
+function classifyGitHubItem(item, projects) {
+  const content = githubSearchItemContent(item);
+  const labels = Array.isArray(item?.labels)
+    ? item.labels.map((label) => String(label?.name ?? label ?? "").trim()).filter(Boolean)
+    : [];
+  const candidates = projects.filter(
+    (project) => project.name !== GITHUB_UNCLASSIFIED_PROJECT_NAME && project.name !== GITHUB_OTHER_PROJECT_NAME
+  );
+
+  for (const label of labels) {
+    const labelKey = normalizeGitHubClassificationText(label);
+    const exactProject = candidates.find((project) => normalizeGitHubClassificationText(project.name) === labelKey);
+    if (exactProject) return { project: exactProject, kind: "label", score: 1 };
+  }
+
+  let bestProject = null;
+  let bestScore = 0;
+  for (const project of candidates) {
+    for (const task of project.tasks || []) {
+      const score = githubTitleSimilarity(content.title, task.title);
+      if (score <= bestScore) continue;
+      bestProject = project;
+      bestScore = score;
+    }
+  }
+  if (bestProject && bestScore >= GITHUB_CLASSIFICATION_THRESHOLD) {
+    return { project: bestProject, kind: "similarity", score: bestScore };
+  }
+
+  const otherProject = projects.find((project) => project.name === GITHUB_OTHER_PROJECT_NAME) || null;
+  return { project: otherProject, kind: "other", score: bestScore };
+}
+
+function projectTaskStatusFromGitHubItem(item, previousTask) {
+  const sourceState = githubSourceState(item);
+  if (sourceState === "closed") return "Done";
+  if (item?.isPullRequest) return "GitHub";
+  if (!previousTask || previousTask.sourceState === "closed") return "Backlog";
+  return normalizeProjectTaskStatus(previousTask.status);
+}
+
+function githubSourceState(item) {
+  const state = String(item?.state ?? "").toLocaleLowerCase("en-US");
+  return state === "closed" || state === "merged" ? "closed" : "open";
+}
+
+function githubTaskChanged(previousTask, nextTask) {
+  if (!previousTask) return true;
+  return previousTask.title !== nextTask.title ||
+    previousTask.status !== nextTask.status ||
+    previousTask.sourceUrl !== nextTask.sourceUrl ||
+    previousTask.sourceType !== nextTask.sourceType ||
+    previousTask.repository !== nextTask.repository ||
+    previousTask.sourceState !== nextTask.sourceState;
+}
+
+async function syncGitHubItems() {
+  const commonArgs = [
+    "--author", "@me",
+    "--include-prs",
+    "--sort", "updated",
+    "--order", "desc",
+    "--limit", String(GITHUB_SEARCH_LIMIT),
+    "--json", "id,title,url,state,isPullRequest,number,repository,labels,createdAt,updatedAt,closedAt"
+  ];
+  const result = await runGhCommand(["search", "issues", "--state", "open", ...commonArgs]);
+  if (result.code !== 0) {
+    const detail = result.stderr || result.stdout || "GitHubのIssue・PRを取得できませんでした";
+    if (/auth|login|token|credential/i.test(detail)) {
+      throw new Error("ghの認証が無効です。ターミナルで gh auth login を実行してください");
+    }
+    throw new Error(detail);
+  }
+
+  const parsedItems = safeJsonParse(result.stdout);
+  if (!Array.isArray(parsedItems)) throw new Error("GitHubから取得したデータを読み取れませんでした");
+  const items = parsedItems.sort(
+    (a, b) => Date.parse(String(b?.updatedAt ?? "")) - Date.parse(String(a?.updatedAt ?? ""))
+  );
+
+  const projects = await listProjects();
+  let unclassifiedProject = projects.find((project) => project.name === GITHUB_UNCLASSIFIED_PROJECT_NAME) || null;
+  const touchedProjectIds = new Set();
+  let importedTasks = 0;
+  let updatedTasks = 0;
+  let unclassifiedItems = 0;
+  let automaticallyClassifiedItems = 0;
+  let otherItems = 0;
+  const seenIds = new Set();
+
+  for (const item of [...items].reverse()) {
+    const content = githubSearchItemContent(item);
+    const githubItemId = String(item?.id ?? "").trim();
+    if (!githubItemId || !content.title || !content.sourceUrl) continue;
+    seenIds.add(githubItemId);
+
+    let targetProject = null;
+    let previousTask = null;
+    let previousTaskIndex = -1;
+    for (const project of projects) {
+      const index = project.tasks.findIndex(
+        (task) => task.source === "github" && (task.id === githubItemId || task.sourceUrl === content.sourceUrl)
+      );
+      if (index < 0) continue;
+      targetProject = project;
+      previousTask = project.tasks[index];
+      previousTaskIndex = index;
+      break;
+    }
+
+    if (!targetProject || targetProject.name === GITHUB_UNCLASSIFIED_PROJECT_NAME) {
+      const classification = classifyGitHubItem(item, projects);
+      if (classification.project) {
+        if (targetProject && targetProject.id !== classification.project.id && previousTaskIndex >= 0) {
+          targetProject.tasks.splice(previousTaskIndex, 1);
+          touchedProjectIds.add(targetProject.id);
+          previousTaskIndex = -1;
+        }
+        targetProject = classification.project;
+        previousTaskIndex = targetProject.tasks.findIndex(
+          (task) => task.source === "github" && (task.id === githubItemId || task.sourceUrl === content.sourceUrl)
+        );
+        if (classification.kind === "other") otherItems += 1;
+        else automaticallyClassifiedItems += 1;
+      } else {
+        if (!unclassifiedProject) {
+          unclassifiedProject = await createProject({ name: GITHUB_UNCLASSIFIED_PROJECT_NAME });
+          projects.push(unclassifiedProject);
+        }
+        targetProject = unclassifiedProject;
+        unclassifiedItems += 1;
+      }
+    }
+
+    const now = Date.now();
+    const status = projectTaskStatusFromGitHubItem(item, previousTask);
+    const nextTask = normalizeProjectTask({
+      id: githubItemId,
+      title: content.title,
+      status,
+      createdAtMs: previousTask?.createdAtMs || Date.parse(String(item?.createdAt ?? "")) || now,
+      updatedAtMs: now,
+      completedAtMs: status === "Done" ? previousTask?.completedAtMs || Date.parse(String(item?.closedAt ?? "")) || now : 0,
+      source: "github",
+      sourceUrl: content.sourceUrl,
+      sourceType: content.sourceType,
+      repository: content.repository,
+      sourceState: githubSourceState(item)
+    });
+
+    if (previousTaskIndex >= 0) {
+      if (githubTaskChanged(previousTask, nextTask)) {
+        targetProject.tasks[previousTaskIndex] = nextTask;
+        updatedTasks += 1;
+        touchedProjectIds.add(targetProject.id);
+      }
+    } else {
+      targetProject.tasks.unshift(nextTask);
+      importedTasks += 1;
+      touchedProjectIds.add(targetProject.id);
+    }
+  }
+
+  if (items.length < GITHUB_SEARCH_LIMIT) {
+    for (const project of projects) {
+      const before = project.tasks.length;
+      project.tasks = project.tasks.filter((task) => task.source !== "github" || seenIds.has(task.id));
+      if (project.tasks.length !== before) touchedProjectIds.add(project.id);
+    }
+  }
+
+  for (const project of projects) {
+    if (touchedProjectIds.has(project.id)) await writeProject(project);
+  }
+
+  const syncedAtMs = Date.now();
+  return {
+    ok: true,
+    fetchedItems: items.length,
+    importedTasks,
+    updatedTasks,
+    unclassifiedItems,
+    detail: [
+      `${items.length}件取得`,
+      `新規${importedTasks}件`,
+      `更新${updatedTasks}件`,
+      automaticallyClassifiedItems ? `自動分類${automaticallyClassifiedItems}件` : "",
+      otherItems ? `その他${otherItems}件` : "",
+      unclassifiedItems ? `要分類${unclassifiedItems}件` : ""
+    ].filter(Boolean).join(" / "),
+    syncedAtMs
+  };
 }
 
 async function addProjectKnowledgeEntry(payload) {
@@ -1634,23 +1954,36 @@ function buildTodoBodyFromProjectGroups(groups, heading) {
   const lines = [`# ${heading}`];
   for (const group of groups) {
     if (!group.tasks.length) continue;
-    lines.push(`- ${group.name}`);
-    for (const task of group.tasks) {
-      lines.push(`${TODO_NESTED_INDENT}- [${markerFromProjectTaskStatus(task.status)}] ${task.title}`);
-    }
+    lines.push(...todoLinesForProjectGroup(group));
   }
   return lines.join("\n").trimEnd();
+}
+
+function todoLinesForProjectGroup(group) {
+  const localTasks = group.tasks.filter((task) => task.source !== "github");
+  const githubTasks = group.tasks.filter((task) => task.source === "github");
+  const lines = [`- ${group.name}`];
+  for (const task of localTasks) {
+    lines.push(`${TODO_NESTED_INDENT}- [${markerFromProjectTaskStatus(task.status)}] ${task.title}`);
+  }
+  if (githubTasks.length > 0) {
+    lines.push(`${TODO_NESTED_INDENT}- GitHub`);
+    for (const task of githubTasks) {
+      lines.push(`${TODO_GITHUB_INDENT}- [${markerFromProjectTaskStatus(task.status)}] ${task.title}`);
+    }
+  }
+  return lines;
 }
 
 function markerFromProjectTaskStatus(status) {
   switch (normalizeProjectTaskStatus(status)) {
     case "InProgress":
       return "-";
-    case "Waiting":
+    case "GitHub":
       return "R";
     case "Done":
       return "x";
-    case "Inbox":
+    case "Backlog":
     default:
       return " ";
   }
@@ -1687,7 +2020,9 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks) {
   const normalizedTasks = (tasks || [])
     .map((task) => ({
       title: normalizeTodoTaskTitle(task?.title),
-      marker: markerFromProjectTaskStatus(task?.status)
+      status: normalizeProjectTaskStatus(task?.status),
+      marker: markerFromProjectTaskStatus(task?.status),
+      source: task?.source === "github" ? "github" : "local"
     }))
     .filter((task) => task.title);
   if (normalizedTasks.length === 0) return String(body ?? "").trimEnd();
@@ -1697,8 +2032,7 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks) {
   if (!group) {
     return [
       ...lines.filter((line, index) => !(lines.length === 1 && index === 0 && line === "")),
-      `- ${projectName}`,
-      ...normalizedTasks.map((task) => `${TODO_NESTED_INDENT}- [${task.marker}] ${task.title}`)
+      ...todoLinesForProjectGroup({ name: projectName, tasks: normalizedTasks })
     ].join("\n");
   }
 
@@ -1711,7 +2045,8 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks) {
     if (title && !titleToLine.has(title)) titleToLine.set(title, i);
   }
 
-  const appendLines = [];
+  const appendLocalTasks = [];
+  const appendGitHubTasks = [];
   for (const task of normalizedTasks) {
     const existingLine = titleToLine.get(task.title);
     if (typeof existingLine === "number") {
@@ -1721,11 +2056,40 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks) {
       );
       continue;
     }
-    appendLines.push(`${TODO_NESTED_INDENT}- [${task.marker}] ${task.title}`);
+    if (task.source === "github") appendGitHubTasks.push(task);
+    else appendLocalTasks.push(task);
   }
 
-  if (appendLines.length > 0) {
-    lines.splice(group.end, 0, ...appendLines);
+  if (appendGitHubTasks.length > 0) {
+    const githubHeading = lines.findIndex(
+      (line, index) => index > group.start && index < group.end && /^\s{2}-\s+GitHub\s*$/.test(line)
+    );
+    if (githubHeading >= 0) {
+      let githubEnd = githubHeading + 1;
+      while (githubEnd < lines.length && /^\s{4,}\S/.test(lines[githubEnd] ?? "")) githubEnd += 1;
+      lines.splice(
+        githubEnd,
+        0,
+        ...appendGitHubTasks.map((task) => `${TODO_GITHUB_INDENT}- [${task.marker}] ${task.title}`)
+      );
+    } else {
+      lines.splice(
+        group.end,
+        0,
+        `${TODO_NESTED_INDENT}- GitHub`,
+        ...appendGitHubTasks.map((task) => `${TODO_GITHUB_INDENT}- [${task.marker}] ${task.title}`)
+      );
+    }
+  }
+
+  if (appendLocalTasks.length > 0) {
+    const refreshedGroup = findProjectTodoGroup(lines, projectName);
+    const insertAt = refreshedGroup?.end ?? lines.length;
+    lines.splice(
+      insertAt,
+      0,
+      ...appendLocalTasks.map((task) => `${TODO_NESTED_INDENT}- [${task.marker}] ${task.title}`)
+    );
   }
 
   return lines.join("\n").trimEnd();
@@ -1775,8 +2139,8 @@ function isTodoEntry(entry) {
 async function appendProjectInProgressToTodayTodo(payload) {
   const project = await getProjectById(payload?.projectId);
   if (project.archivedAtMs) throw new Error("アーカイブ済みプロジェクトはToDoに追記できません");
-  const tasks = project.tasks.filter((task) => task.status === "InProgress" || task.status === "Waiting");
-  if (tasks.length === 0) throw new Error("InProgress / Waiting のタスクがありません");
+  const tasks = project.tasks.filter((task) => task.status === "InProgress" || task.status === "GitHub");
+  if (tasks.length === 0) throw new Error("InProgress / GitHub のタスクがありません");
   return upsertProjectTasksToLatestTodo(project, tasks);
 }
 
@@ -1786,10 +2150,10 @@ async function createTodoFromProjects() {
     .filter((project) => !project.archivedAtMs)
     .map((project) => ({
       name: project.name,
-      tasks: project.tasks.filter((task) => task.status === "InProgress" || task.status === "Waiting")
+      tasks: project.tasks.filter((task) => task.status === "InProgress" || task.status === "GitHub")
     }))
     .filter((group) => group.tasks.length > 0);
-  if (groups.length === 0) throw new Error("InProgress / Waiting のプロジェクトタスクがありません");
+  if (groups.length === 0) throw new Error("InProgress / GitHub のプロジェクトタスクがありません");
   return addTodoEntry(buildTodoBodyFromProjectGroups(groups, "ToDo"));
 }
 
@@ -1820,6 +2184,7 @@ module.exports = {
   setProjectIssueUrl,
   addProjectTask,
   moveProjectTask,
+  reassignProjectTask,
   renameProjectTask,
   deleteProjectTask,
   addProjectKnowledgeEntry,
@@ -1827,6 +2192,7 @@ module.exports = {
   deleteProjectKnowledgeEntry,
   appendProjectInProgressToTodayTodo,
   createTodoFromProjects,
+  syncGitHubItems,
   copyPreviousTodo,
   rebuildKnowledgeIndex,
   searchKnowledgeIndex,
@@ -1836,6 +2202,13 @@ module.exports = {
   syncBackup,
   _test: {
     markerFromProjectTaskStatus,
-    upsertProjectTasksInTodoBody
+    buildTodoBodyFromProjectGroups,
+    upsertProjectTasksInTodoBody,
+    githubSearchItemContent,
+    githubSourceState,
+    githubTitleSimilarity,
+    classifyGitHubItem,
+    projectTaskStatusFromGitHubItem,
+    githubTaskChanged
   }
 };
