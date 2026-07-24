@@ -8,6 +8,15 @@ GitHub issue 風の「コメント」UIで、Markdown を日次ファイルへ�
 - 画面上部の検索（`Ctrl+F` / `Cmd+F` でフォーカス）
 - 追記保存（テキスト/Markdown）
 - 既存投稿の編集/削除
+- 自分が作成したGitHub Issue・PRをActaのTaskへ同期
+
+## GitHubのIssue・PRを同期する
+
+プロジェクト画面の「GitHub同期」を押すと、GitHub Projectsへの所属とは関係なく、自分が作成したOpenなIssue・Pull Requestを取得します。Closed・Mergedは同期対象外です。初回のみターミナルで`gh auth login`を実行してください。
+
+新しい項目は、ラベルと既存のActaタスク名との類似度からActaプロジェクトへ自動分類されます。十分な関連がないものだけ「その他」へ入り、Actaプロジェクトが自動作成されることはありません。カード内のプロジェクト選択欄から所属を修正すると、次回以降の同期でもその所属が維持されます。
+
+Projectsの状態は`Backlog`、`InProgress`、`GitHub`、`Done`です。同期したOpenなPRは`GitHub`、Issueは`Backlog`に入ります。GitHub由来の項目をToDoへ追加すると、各Actaプロジェクト内の`GitHub`階層へまとめられます。GitHub由来のURLはプロジェクト画面でのみ表示し、ToDo本文には出力しません。
 
 ## 保存先
 既定: `~/Documents/Acta/YYYY-MM-DD.md`
