@@ -22,7 +22,7 @@ Projectsの状態は`Backlog`、`InProgress`、`GitHub`、`Done`です。同期�
 既定: `~/Documents/Acta/YYYY-MM-DD.md`
 
 日付ファイルが存在しない場合は作成し、追記します。  
-同一日のファイルが既に存在する場合は、記録に日時（`YYYY-MM-DD HH:mm`）を含めます。
+同一日のファイルが既に存在する場合は、ナレッジに日時（`YYYY-MM-DD HH:mm`）を含めます。
 
 保存先はアプリ右上の「保存先 -> 変更」からフォルダを選択して切り替えできます。
 
