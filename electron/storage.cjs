@@ -864,7 +864,7 @@ function makeArticleTitle(entry) {
     .map((line) => line.trim())
     .find(Boolean);
   if (firstLine) return firstLine.replace(/^[-*]\s+/, "").slice(0, 80);
-  return `${entry.date} の記録`;
+  return `${entry.date} のナレッジ`;
 }
 
 function renderWikiBody(markdown) {
