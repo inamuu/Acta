@@ -47,7 +47,7 @@ export type UpdateEntryResult = {
   updated: boolean;
 };
 
-export type ProjectTaskStatus = "Inbox" | "InProgress" | "Waiting" | "Done";
+export type ProjectTaskStatus = "Backlog" | "InProgress" | "GitHub" | "Done";
 
 export type ProjectTask = {
   id: string;
@@ -56,6 +56,11 @@ export type ProjectTask = {
   createdAtMs: number;
   updatedAtMs: number;
   completedAtMs?: number;
+  source?: "local" | "github";
+  sourceUrl?: string;
+  sourceType?: "Issue" | "PullRequest";
+  repository?: string;
+  sourceState?: "open" | "closed";
 };
 
 export type ActaProject = {
@@ -90,6 +95,12 @@ export type MoveProjectTaskPayload = {
   projectId: string;
   taskId: string;
   status: ProjectTaskStatus;
+};
+
+export type ReassignProjectTaskPayload = {
+  sourceProjectId: string;
+  targetProjectId: string;
+  taskId: string;
 };
 
 export type RenameProjectTaskPayload = {
@@ -210,6 +221,16 @@ export type ActaAiSettings = {
   cliPath: string;
   instructionMarkdown: string;
   theme: ActaThemeId;
+};
+
+export type GitHubSyncResult = {
+  ok: boolean;
+  fetchedItems: number;
+  importedTasks: number;
+  updatedTasks: number;
+  unclassifiedItems: number;
+  detail: string;
+  syncedAtMs: number;
 };
 
 export type SaveAiSettingsPayload = ActaAiSettings;
