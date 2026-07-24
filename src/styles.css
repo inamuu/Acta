@@ -1184,7 +1184,6 @@ a:focus-visible {
 
 .projectCreate,
 .projectTaskCreate,
-.projectKnowledgeHeader,
 .projectHeader,
 .projectHeaderActions {
   display: flex;
@@ -1224,8 +1223,7 @@ a:focus-visible {
   font-size: 14px;
 }
 
-.projectInput:focus,
-.projectKnowledgeTextarea:focus {
+.projectInput:focus {
   border-color: rgba(37, 99, 235, 0.36);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
@@ -1280,7 +1278,6 @@ a:focus-visible {
 }
 
 .projectHeader h2,
-.projectKnowledgeHeader h3,
 .kanbanColumn h3 {
   margin: 0;
 }
@@ -1472,46 +1469,6 @@ a:focus-visible {
   color: var(--muted);
   font-size: 12px;
   padding: 8px 0;
-}
-
-.projectKnowledge {
-  margin-top: 18px;
-}
-
-.projectKnowledge h3 {
-  margin: 0 0 10px;
-}
-
-.projectKnowledgeHeader {
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.projectKnowledge .composerArea {
-  border: 1px solid var(--borderSoft);
-  border-radius: 12px;
-  margin-bottom: 14px;
-}
-
-.projectKnowledgeList {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.projectKnowledgeTextarea {
-  width: 100%;
-  min-height: 280px;
-  resize: vertical;
-  border: 1px solid var(--borderSoft);
-  border-radius: 12px;
-  background: var(--bg1);
-  color: var(--fg0);
-  outline: none;
-  padding: 12px;
-  font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.6;
 }
 
 .knowledgeToolbar {
@@ -4171,7 +4128,6 @@ html .sidebar .tagItem.isSelected .tagCount {
     .projectInput,
     .projectNameInput,
     .projectIssueUrlInput,
-    .projectKnowledgeTextarea,
     .kanbanEditInput,
     .kanbanProjectSelect,
     .aiConsoleInput,
@@ -4191,7 +4147,6 @@ html .sidebar .tagItem.isSelected .tagCount {
     .projectDetail,
     .kanbanColumn,
     .kanbanCard,
-    .projectKnowledgeCard,
     .knowledgeResultCard,
     .todoArea,
     .projectsArea,
@@ -4201,7 +4156,7 @@ html .sidebar .tagItem.isSelected .tagCount {
   border-color: var(--theme-border-soft) !important;
 }
 
-[data-acta-theme] :is(.projectList, .kanbanColumn, .projectKnowledgeCard, .knowledgeResultCard) {
+[data-acta-theme] :is(.projectList, .kanbanColumn, .knowledgeResultCard) {
   background: var(--theme-surface-alt) !important;
 }
 
@@ -5149,7 +5104,6 @@ body,
     .commentBody,
     .projectList,
     .kanbanColumn,
-    .projectKnowledgeCard,
     .knowledgeResultCard,
     .pane,
     .paneWrite,

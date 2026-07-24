@@ -181,7 +181,6 @@ export function App() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectTaskTitle, setNewProjectTaskTitle] = useState("");
-  const [editingProjectKnowledge, setEditingProjectKnowledge] = useState<ActaEntry | null>(null);
   const [showArchivedProjects, setShowArchivedProjects] = useState(false);
   const [draggingTaskId, setDraggingTaskId] = useState("");
   const [editingProjectTaskId, setEditingProjectTaskId] = useState("");
@@ -350,23 +349,6 @@ export function App() {
           setAiSettings({ ...aiRes.value, theme: normalizeTheme(aiRes.value.theme) });
         }
 
-        setSyncBusy(true);
-        setSyncIndicator({
-          kind: "running",
-          label: "Syncing...",
-          detail: ""
-        });
-        try {
-          const syncRes = await api.syncPull();
-          if (cancelled) return;
-          applySyncResult(syncRes);
-        } catch (err) {
-          if (cancelled) return;
-          applySyncError(err);
-        } finally {
-          if (!cancelled) setSyncBusy(false);
-        }
-
         try {
           const [list, projectList] = await Promise.all([api.listEntries(), api.listProjects()]);
           if (cancelled) return;
@@ -383,6 +365,33 @@ export function App() {
         }
       } finally {
         if (!cancelled) setLoading(false);
+      }
+
+      if (cancelled) return;
+      setSyncBusy(true);
+      setSyncIndicator({
+        kind: "running",
+        label: "Syncing...",
+        detail: ""
+      });
+      try {
+        const syncRes = await api.syncPull();
+        if (cancelled) return;
+        applySyncResult(syncRes);
+        if (syncRes.ok) {
+          const [list, projectList] = await Promise.all([api.listEntries(), api.listProjects()]);
+          if (cancelled) return;
+          setEntries(list);
+          setProjects(projectList);
+          setSelectedProjectId((current) =>
+            projectList.some((project) => project.id === current) ? current : projectList[0]?.id ?? ""
+          );
+        }
+      } catch (err) {
+        if (cancelled) return;
+        applySyncError(err);
+      } finally {
+        if (!cancelled) setSyncBusy(false);
       }
     }
 
@@ -406,7 +415,6 @@ export function App() {
   }, [aiSettings.theme]);
 
   useEffect(() => {
-    setEditingProjectKnowledge(null);
     setEditingProjectTaskId("");
     setProjectTaskTitleDraft("");
     const selected = projects.find((project) => project.id === selectedProjectId);
@@ -564,10 +572,6 @@ export function App() {
   const visibleProjects = useMemo(
     () => projects.filter((project) => Boolean(project.archivedAtMs) === showArchivedProjects),
     [projects, showArchivedProjects]
-  );
-  const selectedProjectKnowledgeEntries = useMemo(
-    () => (selectedProject ? sortEntriesNewestFirst(selectedProject.knowledgeEntries) : []),
-    [selectedProject]
   );
   const activeProjectCount = useMemo(
     () => projects.filter((project) => !project.archivedAtMs).length,
@@ -914,46 +918,6 @@ export function App() {
     }
   }
 
-  async function saveProjectKnowledge(body: string) {
-    if (!selectedProject) return;
-    setProjectStatus("");
-    try {
-      if (editingProjectKnowledge) {
-        await api.updateProjectKnowledgeEntry({
-          projectId: selectedProject.id,
-          entryId: editingProjectKnowledge.id,
-          body
-        });
-        setEditingProjectKnowledge(null);
-      } else {
-        await api.addProjectKnowledgeEntry({ projectId: selectedProject.id, body });
-      }
-      await reloadProjects(selectedProject.id);
-      queueBackupSync();
-      setProjectStatus("ナレッジを保存しました");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setProjectStatus(msg || "ナレッジ保存に失敗しました");
-    }
-  }
-
-  async function deleteProjectKnowledge(entry: ActaEntry) {
-    if (!selectedProject) return;
-    const ok = window.confirm("このナレッジ投稿を削除しますか？");
-    if (!ok) return;
-    setProjectStatus("");
-    try {
-      await api.deleteProjectKnowledgeEntry({ projectId: selectedProject.id, entryId: entry.id });
-      if (editingProjectKnowledge?.id === entry.id) setEditingProjectKnowledge(null);
-      await reloadProjects(selectedProject.id);
-      queueBackupSync();
-      setProjectStatus("ナレッジを削除しました");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setProjectStatus(msg || "ナレッジ削除に失敗しました");
-    }
-  }
-
   async function setProjectArchived(archived: boolean) {
     if (!selectedProject) return;
     setProjectStatus("");
@@ -992,13 +956,12 @@ export function App() {
 
   async function deleteSelectedProject() {
     if (!selectedProject) return;
-    const ok = window.confirm(`プロジェクト「${selectedProject.name}」を削除しますか？\nタスクとナレッジも削除されます。`);
+    const ok = window.confirm(`プロジェクト「${selectedProject.name}」を削除しますか？\n関連データも削除されます。`);
     if (!ok) return;
     setProjectStatus("");
     try {
       const res = await api.deleteProject({ projectId: selectedProject.id });
       if (!res?.deleted) throw new Error("削除対象が見つかりませんでした");
-      setEditingProjectKnowledge(null);
       await reloadProjects();
       queueBackupSync();
       setProjectStatus("プロジェクトを削除しました");
@@ -1607,41 +1570,6 @@ export function App() {
                       );
                     })}
                   </div>
-                  <div className="projectKnowledge">
-                    <h3>ナレッジ</h3>
-                    <Composer
-                      assetBaseUrl={assetBaseUrl}
-                      tagSuggestions={[]}
-                      popularTagSuggestions={[]}
-                      mode={editingProjectKnowledge ? "edit" : "create"}
-                      draftKey={editingProjectKnowledge?.id ?? `project:${selectedProject.id}`}
-                      initialBody={editingProjectKnowledge?.body ?? ""}
-                      initialTags={[]}
-                      autoFocusEditor={Boolean(editingProjectKnowledge)}
-                      onCancel={() => setEditingProjectKnowledge(null)}
-                      onSubmit={async (body) => {
-                        await saveProjectKnowledge(body);
-                      }}
-                    />
-                    <div className="projectKnowledgeList">
-                      {selectedProjectKnowledgeEntries.length === 0 ? (
-                        <div className="empty">ナレッジ投稿はまだありません</div>
-                      ) : (
-                        selectedProjectKnowledgeEntries.map((entry) => (
-                          <CommentCard
-                            key={entry.id}
-                            entry={entry}
-                            assetBaseUrl={assetBaseUrl}
-                            onEdit={(item) => setEditingProjectKnowledge(item)}
-                            onCopyId={(item) => {
-                              void copyEntryId(item);
-                            }}
-                            onDelete={(item) => void deleteProjectKnowledge(item)}
-                          />
-                        ))
-                      )}
-                    </div>
-                  </div>
                 </>
               ) : (
                 <div className="empty">左側でプロジェクトを作成してください</div>
@@ -1861,9 +1789,9 @@ export function App() {
                         className="knowledgeResultTitle"
                         type="button"
                         onClick={() => openLinkedEntry(item.id)}
-                        title="記録で開く"
+                        title="ナレッジで開く"
                       >
-                        {item.title || `${item.date} の記録`}
+                        {item.title || `${item.date} のナレッジ`}
                       </button>
                       <span className="knowledgeScore">score {item.score}</span>
                     </div>

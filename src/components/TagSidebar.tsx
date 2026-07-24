@@ -127,7 +127,7 @@ export function TagSidebar({
           onClick={() => onChangeView("journal")}
         >
           <span className="sideNavIcon">◷</span>
-          <span className="sideNavText">記録</span>
+          <span className="sideNavText">ナレッジ</span>
           <span className="tagCount">{totalCount}</span>
         </button>
         <button
@@ -164,7 +164,7 @@ export function TagSidebar({
         type="button"
         onClick={() => setFiltersOpen((v) => !v)}
       >
-        <span className="tagGroupName">記録フィルター</span>
+        <span className="tagGroupName">ナレッジフィルター</span>
         <span className="tagCount">{selectedTags.length + (untaggedOnly ? 1 : 0)}</span>
       </button>
 

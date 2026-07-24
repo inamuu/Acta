@@ -476,7 +476,7 @@ export function Composer({
                 });
               }
             }}
-            placeholder="今日の記録をMarkdownで入力..."
+            placeholder="今日のナレッジをMarkdownで入力..."
             spellCheck={false}
           />
         </div>
