@@ -24,7 +24,9 @@ import type {
   KnowledgeSearchPayload,
   KnowledgeSearchResult,
   KnowledgeSiteResult,
+  GitHubSyncResult,
   MoveProjectTaskPayload,
+  ReassignProjectTaskPayload,
   RenameProjectPayload,
   RenameProjectTaskPayload,
   SaveAiSettingsPayload,
@@ -56,6 +58,7 @@ declare global {
       saveProject: (payload: SaveProjectPayload) => Promise<ActaProject>;
       addProjectTask: (payload: AddProjectTaskPayload) => Promise<ActaProject>;
       moveProjectTask: (payload: MoveProjectTaskPayload) => Promise<ActaProject>;
+      reassignProjectTask: (payload: ReassignProjectTaskPayload) => Promise<ActaProject>;
       renameProjectTask: (payload: RenameProjectTaskPayload) => Promise<ActaProject>;
       deleteProjectTask: (payload: DeleteProjectTaskPayload) => Promise<ActaProject>;
       setProjectArchived: (payload: SetProjectArchivedPayload) => Promise<ActaProject>;
@@ -67,6 +70,7 @@ declare global {
       deleteProjectKnowledgeEntry: (payload: DeleteProjectKnowledgePayload) => Promise<ActaProject>;
       appendProjectInProgressToTodayTodo: (payload: { projectId: string }) => Promise<ActaEntry>;
       createTodoFromProjects: () => Promise<ActaEntry>;
+      syncGitHubItems: () => Promise<GitHubSyncResult>;
       copyPreviousTodo: () => Promise<ActaEntry>;
       rebuildKnowledgeIndex: () => Promise<KnowledgeIndexResult>;
       searchKnowledgeIndex: (payload: KnowledgeSearchPayload) => Promise<KnowledgeSearchResult>;

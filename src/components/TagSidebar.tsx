@@ -97,7 +97,7 @@ export function TagSidebar({
 
   return (
     <nav className="tagSidebar" aria-label="メニュー">
-      <div className="sideBrand">
+      <div className="sideBrand" data-no-drag-scroll title="ドラッグしてウィンドウを移動">
         <div className="sideBrandName">Acta</div>
         <div className="sideBrandSub">{selectedProjectName || "今日の作業"}</div>
       </div>

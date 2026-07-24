@@ -203,6 +203,7 @@ export function App() {
     instructionMarkdown: "",
     theme: "default"
   });
+  const [githubSyncBusy, setGithubSyncBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncIndicator, setSyncIndicator] = useState<SyncIndicatorState>({
     kind: "idle",
@@ -578,7 +579,7 @@ export function App() {
         (count, project) =>
           project.archivedAtMs
             ? count
-            : count + project.tasks.filter((task) => task.status === "InProgress" || task.status === "Waiting").length,
+            : count + project.tasks.filter((task) => task.status === "InProgress" || task.status === "GitHub").length,
         0
       ),
     [projects]
@@ -789,13 +790,31 @@ export function App() {
     }
   }
 
+  async function syncGitHubItems() {
+    if (githubSyncBusy) return;
+    setGithubSyncBusy(true);
+    setProjectStatus("");
+    try {
+      const result = await api.syncGitHubItems();
+      await reloadProjects(selectedProjectId);
+      await reload();
+      queueBackupSync();
+      setProjectStatus(`GitHub同期: ${result.detail}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "GitHubのIssue・PR同期に失敗しました");
+    } finally {
+      setGithubSyncBusy(false);
+    }
+  }
+
   async function addProjectTask() {
     if (!selectedProject) return;
     const title = newProjectTaskTitle.trim();
     if (!title) return;
     setProjectStatus("");
     try {
-      await api.addProjectTask({ projectId: selectedProject.id, title, status: "Inbox" });
+      await api.addProjectTask({ projectId: selectedProject.id, title, status: "Backlog" });
       setNewProjectTaskTitle("");
       await reloadProjects(selectedProject.id);
       queueBackupSync();
@@ -818,6 +837,25 @@ export function App() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setProjectStatus(msg || "タスク移動に失敗しました");
+    }
+  }
+
+  async function reassignProjectTask(taskId: string, targetProjectId: string) {
+    if (!selectedProject || targetProjectId === selectedProject.id) return;
+    setProjectStatus("");
+    try {
+      await api.reassignProjectTask({
+        sourceProjectId: selectedProject.id,
+        targetProjectId,
+        taskId
+      });
+      await reloadProjects(selectedProject.id);
+      queueBackupSync();
+      const target = projects.find((project) => project.id === targetProjectId);
+      setProjectStatus(`${target?.name || "移動先"}へ移動しました`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "タスクのプロジェクト移動に失敗しました");
     }
   }
 
@@ -993,7 +1031,7 @@ export function App() {
       const entry = await api.appendProjectInProgressToTodayTodo({ projectId: selectedProject.id });
       await reload();
       queueBackupSync();
-      setProjectStatus(`${entry.date} のToDoにInProgress / Waitingを追記しました`);
+      setProjectStatus(`${entry.date} のToDoにInProgress / GitHubを追記しました`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setProjectStatus(msg || "ToDoへの追記に失敗しました");
@@ -1194,7 +1232,7 @@ export function App() {
                 </button>
               </div>
               <div className="knowledgeStatus">
-                {todoStatus || "新規ToDoは全プロジェクトのInProgress / Waitingから作成します。"}
+                {todoStatus || "新規ToDoは全プロジェクトのInProgress / GitHubから作成します。"}
               </div>
             </div>
             <div className="commentList">
@@ -1273,6 +1311,15 @@ export function App() {
                 <button className="primaryActionBtn" type="button" onClick={() => void createProject()}>
                   作成
                 </button>
+                <button
+                  className="ghostBtn"
+                  type="button"
+                  disabled={githubSyncBusy}
+                  onClick={() => void syncGitHubItems()}
+                  title="自分が作成したGitHub Issue・PRを同期"
+                >
+                  {githubSyncBusy ? "同期中..." : "GitHub同期"}
+                </button>
               </div>
               <div className="projectArchiveToggle">
                 <button
@@ -1308,7 +1355,7 @@ export function App() {
                         {project.archivedAtMs
                           ? "archived"
                           : `${
-                              project.tasks.filter((task) => task.status === "InProgress" || task.status === "Waiting")
+                              project.tasks.filter((task) => task.status === "InProgress" || task.status === "GitHub")
                                 .length
                             } active`}
                       </small>
@@ -1389,7 +1436,7 @@ export function App() {
                         disabled={Boolean(selectedProject.archivedAtMs)}
                         onClick={() => void appendProjectTasksToTodo()}
                       >
-                        InProgress / WaitingをToDoへ追記
+                        InProgress / GitHubをToDoへ追記
                       </button>
                       <button
                         className={selectedProject.archivedAtMs ? "ghostBtn" : "dangerGhostBtn"}
@@ -1412,14 +1459,14 @@ export function App() {
                         if (isImeComposingEvent(e)) return;
                         if (e.key === "Enter") void addProjectTask();
                       }}
-                      placeholder="Inboxへタスク追加"
+                      placeholder="Backlogへタスク追加"
                     />
                     <button className="primaryActionBtn" type="button" onClick={() => void addProjectTask()}>
                       追加
                     </button>
                   </div>
                   <div className="kanbanBoard">
-                    {(["Inbox", "InProgress", "Waiting", "Done"] as const).map((status) => {
+                    {(["Backlog", "InProgress", "GitHub", "Done"] as const).map((status) => {
                       const visibleTasks = selectedProject.tasks.filter(
                         (task) => task.status === status && (status !== "Done" || isRecentProjectTask(task))
                       );
@@ -1497,27 +1544,59 @@ export function App() {
                                 ) : (
                                   <>
                                     <div>{task.title}</div>
+                                    {task.source === "github" ? (
+                                      <div className="kanbanSourceMeta">
+                                        <span>{task.sourceType === "PullRequest" ? "PR" : task.sourceType === "Issue" ? "Issue" : "Task"}</span>
+                                        {task.sourceUrl ? (
+                                          <a href={task.sourceUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+                                            GitHubで開く
+                                          </a>
+                                        ) : null}
+                                        <select
+                                          className="kanbanProjectSelect"
+                                          value={selectedProject.id}
+                                          aria-label="Actaプロジェクト"
+                                          onClick={(e) => e.stopPropagation()}
+                                          onChange={(e) => {
+                                            e.stopPropagation();
+                                            void reassignProjectTask(task.id, e.target.value);
+                                          }}
+                                        >
+                                          {projects
+                                            .filter((project) => !project.archivedAtMs)
+                                            .map((project) => (
+                                              <option key={project.id} value={project.id}>
+                                                {project.name}
+                                              </option>
+                                            ))}
+                                        </select>
+                                      </div>
+                                    ) : null}
                                     <div className="kanbanCardActions">
-                                      <button
-                                        className="ghostBtn"
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          startProjectTaskEdit(task.id, task.title);
-                                        }}
-                                      >
-                                        編集
-                                      </button>
-                                      <button
-                                        className="dangerGhostBtn"
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          void deleteProjectTask(task.id, task.title);
-                                        }}
-                                      >
-                                        削除
-                                      </button>
+                                      {task.source !== "github" ? (
+                                        <>
+                                          <button
+                                            className="ghostBtn"
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              startProjectTaskEdit(task.id, task.title);
+                                            }}
+                                          >
+                                            編集
+                                          </button>
+                                          <button
+                                            className="dangerGhostBtn"
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              void deleteProjectTask(task.id, task.title);
+                                            }}
+                                          >
+                                            削除
+                                          </button>
+                                        </>
+                                      ) : null}
                                     </div>
                                   </>
                                 )}

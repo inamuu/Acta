@@ -1197,6 +1197,15 @@ a:focus-visible {
   margin-bottom: 14px;
 }
 
+.projectCreate {
+  flex-wrap: wrap;
+}
+
+.projectCreate .projectInput {
+  min-width: 150px;
+  flex: 1 1 150px;
+}
+
 .projectArchiveToggle {
   display: flex;
   gap: 8px;
@@ -1397,6 +1406,36 @@ a:focus-visible {
   gap: 6px;
   flex-wrap: wrap;
   margin-top: 10px;
+}
+
+.kanbanSourceMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.kanbanSourceMeta a {
+  color: var(--link, #2563eb);
+  text-decoration: none;
+}
+
+.kanbanSourceMeta a:hover {
+  text-decoration: underline;
+}
+
+.kanbanProjectSelect {
+  min-width: 0;
+  max-width: 130px;
+  height: 24px;
+  border: 1px solid var(--borderSoft);
+  border-radius: 7px;
+  background: var(--bg1);
+  color: var(--fg1);
+  font-size: 11px;
 }
 
 .kanbanCardActions .ghostBtn,
@@ -2614,7 +2653,7 @@ a:focus-visible {
 }
 
 .modalCard {
-  width: min(520px, calc(100vw - 32px));
+  width: min(720px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   overflow: auto;
   border-radius: 16px;
@@ -3122,8 +3161,8 @@ a:focus-visible {
   --theme-surface-soft-2: #0f4452;
   --theme-surface-selected: #145060;
   --theme-text: #eee8d5;
-  --theme-text-subtle: #93a1a1;
-  --theme-text-muted: #839496;
+  --theme-text-subtle: #b8c4c4;
+  --theme-text-muted: #93a1a1;
   --theme-border: #365965;
   --theme-border-soft: #446773;
   --theme-border-strong: #567b87;
@@ -3164,7 +3203,7 @@ a:focus-visible {
   --theme-surface-selected: #e9dfc7;
   --theme-text: #073642;
   --theme-text-subtle: #586e75;
-  --theme-text-muted: #657b83;
+  --theme-text-muted: #60767e;
   --theme-border: #d6ccb2;
   --theme-border-soft: #dfd5bc;
   --theme-border-strong: #c8bea5;
@@ -3205,7 +3244,7 @@ a:focus-visible {
   --theme-surface-selected: #4a4d3f;
   --theme-text: #f8f8f2;
   --theme-text-subtle: #d8d8c9;
-  --theme-text-muted: #a7aa95;
+  --theme-text-muted: #b9bba9;
   --theme-border: #4a4d3f;
   --theme-border-soft: #575b4a;
   --theme-border-strong: #646955;
@@ -3287,7 +3326,7 @@ a:focus-visible {
   --theme-surface-selected: #333d5f;
   --theme-text: #c0caf5;
   --theme-text-subtle: #a9b1d6;
-  --theme-text-muted: #7f89b0;
+  --theme-text-muted: #9aa5ce;
   --theme-border: #3b4261;
   --theme-border-soft: #4a5278;
   --theme-border-strong: #5b6490;
@@ -3333,7 +3372,7 @@ a:focus-visible {
   --theme-border-soft: #67748f;
   --theme-border-strong: #7a88a5;
   --theme-border-selected: #88c0d0;
-  --theme-accent: #81a1c1;
+  --theme-accent: #88c0d0;
   --theme-accent2: #88c0d0;
   --theme-danger: #bf616a;
   --theme-overlay: #1f2631;
@@ -3374,7 +3413,7 @@ a:focus-visible {
   --theme-border-soft: #7c6f64;
   --theme-border-strong: #928374;
   --theme-border-selected: #d79921;
-  --theme-accent: #458588;
+  --theme-accent: #83a598;
   --theme-accent2: #b8bb26;
   --theme-danger: #fb4934;
   --theme-overlay: #1d2021;
@@ -3406,12 +3445,14 @@ a:focus-visible {
   --bg1: var(--theme-surface);
   --fg0: var(--theme-text);
   --fg1: var(--theme-text-subtle);
+  --fg2: var(--theme-text-muted);
   --muted: var(--theme-text-muted);
   --accent: var(--theme-accent);
   --accent2: var(--theme-accent2);
   --tagBg: var(--theme-tag-bg);
   --tagFg: var(--theme-tag-fg);
   --danger: var(--theme-danger);
+  --link: var(--theme-accent);
   --border: var(--theme-border);
   --borderSoft: var(--theme-border-soft);
 }
@@ -4094,6 +4135,159 @@ html .sidebar .tagItem.isSelected .tagCount {
       .tagCount
     ) {
   color: #0f172a !important;
+}
+
+/* Final semantic color layer: every screen follows the selected palette. */
+:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"]) {
+  color-scheme: light;
+}
+
+:is(
+    [data-acta-theme="dracula"],
+    [data-acta-theme="solarized-dark"],
+    [data-acta-theme="morokai"],
+    [data-acta-theme="tokyo-night"],
+    [data-acta-theme="nord"],
+    [data-acta-theme="gruvbox-dark"]
+  ) {
+  color-scheme: dark;
+}
+
+[data-acta-theme] :is(input, textarea, select, button) {
+  color: var(--theme-text-subtle);
+}
+
+[data-acta-theme] :is(input, textarea, select)::placeholder {
+  color: var(--theme-text-muted) !important;
+  opacity: 0.86;
+}
+
+[data-acta-theme] select option {
+  color: var(--theme-text);
+  background: var(--theme-surface);
+}
+
+[data-acta-theme] :is(
+    .projectInput,
+    .projectNameInput,
+    .projectIssueUrlInput,
+    .projectKnowledgeTextarea,
+    .kanbanEditInput,
+    .kanbanProjectSelect,
+    .aiConsoleInput,
+    .tagInput,
+    .dateInput,
+    .limitSelect
+  ) {
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border-strong) !important;
+  caret-color: var(--theme-text);
+}
+
+[data-acta-theme] :is(
+    .projectList,
+    .projectDetail,
+    .kanbanColumn,
+    .kanbanCard,
+    .projectKnowledgeCard,
+    .knowledgeResultCard,
+    .todoArea,
+    .projectsArea,
+    .knowledgeArea
+  ) {
+  color: var(--theme-text);
+  border-color: var(--theme-border-soft) !important;
+}
+
+[data-acta-theme] :is(.projectList, .kanbanColumn, .projectKnowledgeCard, .knowledgeResultCard) {
+  background: var(--theme-surface-alt) !important;
+}
+
+[data-acta-theme] :is(.projectDetail, .kanbanCard) {
+  background: var(--theme-surface) !important;
+}
+
+[data-acta-theme] .kanbanColumn.isDropReady {
+  border-color: var(--theme-border-selected) !important;
+  background: var(--theme-surface-selected) !important;
+}
+
+[data-acta-theme] :is(.projectNavItem, .viewTab) {
+  color: var(--theme-text-subtle) !important;
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+[data-acta-theme] :is(.projectNavItem:hover, .projectNavItem.isActive, .viewTab:hover, .viewTab.isActive) {
+  color: var(--theme-text) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.38) !important;
+  background: rgba(var(--theme-accent-rgb), 0.16) !important;
+}
+
+[data-acta-theme] :is(.primaryBtn, .primaryActionBtn, .aiSendBtn) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+[data-acta-theme] .dangerGhostBtn {
+  color: var(--theme-danger) !important;
+  border-color: rgba(var(--theme-danger-rgb), 0.36) !important;
+  background: rgba(var(--theme-danger-rgb), 0.1) !important;
+}
+
+[data-acta-theme] :is(.appError, .composerError, .syncStatus.isError) {
+  color: var(--theme-danger) !important;
+  border-color: rgba(var(--theme-danger-rgb), 0.42) !important;
+  background: rgba(var(--theme-danger-rgb), 0.12) !important;
+}
+
+[data-acta-theme] .syncStatus.isSuccess {
+  color: var(--theme-accent2) !important;
+  border-color: rgba(var(--theme-accent2-rgb), 0.42) !important;
+  background: rgba(var(--theme-accent2-rgb), 0.12) !important;
+}
+
+[data-acta-theme] .syncStatus.isRunning {
+  color: var(--theme-accent) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.42) !important;
+  background: rgba(var(--theme-accent-rgb), 0.12) !important;
+}
+
+[data-acta-theme] :is(.composerMode-copy, .composerMode-edit, .composerMode-create) {
+  color: var(--theme-text);
+  background: var(--theme-surface-alt) !important;
+}
+
+[data-acta-theme] :is(.md, .preview, .commentBody, .commentBody .md) {
+  color: var(--theme-text) !important;
+}
+
+[data-acta-theme] .md :is(h1, h2, h3, h4, h5, h6, strong) {
+  color: var(--theme-text) !important;
+}
+
+[data-acta-theme] .md :is(blockquote, hr) {
+  border-color: var(--theme-border-strong) !important;
+}
+
+[data-acta-theme] .md a {
+  color: var(--theme-accent) !important;
+}
+
+[data-acta-theme] ::selection {
+  color: var(--theme-text);
+  background: rgba(var(--theme-accent2-rgb), 0.28);
+}
+
+[data-acta-theme] *::-webkit-scrollbar-thumb {
+  background: var(--theme-border-strong);
+  border-color: var(--theme-surface);
+}
+
+[data-acta-theme] *::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-border-selected);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4891,4 +5085,137 @@ body,
   .composerArea .preview {
     padding: 18px 20px 26px;
   }
+}
+
+/* Canonical theme layer. Keep this last so later layout rules cannot reset colors. */
+:root,
+[data-acta-theme="default"] {
+  --theme-on-accent: #ffffff;
+}
+
+[data-acta-theme="solarized-light"] {
+  --theme-on-accent: #001f27;
+}
+
+[data-acta-theme="morokai-light"] {
+  --theme-on-accent: #151a12;
+}
+
+:is(
+    [data-acta-theme="dracula"],
+    [data-acta-theme="solarized-dark"],
+    [data-acta-theme="morokai"],
+    [data-acta-theme="tokyo-night"],
+    [data-acta-theme="nord"],
+    [data-acta-theme="gruvbox-dark"]
+  ) {
+  --theme-on-accent: var(--theme-bg-color);
+}
+
+[data-acta-theme="solarized-dark"] {
+  --theme-on-accent: #001f27;
+}
+
+[data-acta-theme] {
+  color: var(--theme-text);
+  background: var(--theme-bg-color);
+}
+
+[data-acta-theme] :is(
+    .topbar,
+    .sidebar,
+    .composerArea,
+    .commentCard,
+    .modalCard,
+    .settingBlock,
+    .projectDetail,
+    .kanbanCard,
+    .todoCard,
+    .projectPanel,
+    .aiConsole,
+    .aiConsoleHeader,
+    .aiMetaItem,
+    .aiChatFeed,
+    .aiConsoleInputRow,
+    .noApiCard
+  ) {
+  color: var(--theme-text) !important;
+  background-color: var(--theme-surface) !important;
+  border-color: var(--theme-border-soft) !important;
+}
+
+[data-acta-theme] :is(
+    .scrollArea,
+    .commentBody,
+    .projectList,
+    .kanbanColumn,
+    .projectKnowledgeCard,
+    .knowledgeResultCard,
+    .pane,
+    .paneWrite,
+    .panePreview,
+    .paneTitle,
+    .tagPickerList
+  ) {
+  color: var(--theme-text) !important;
+  background-color: var(--theme-surface-alt) !important;
+  border-color: var(--theme-border-soft) !important;
+}
+
+[data-acta-theme] :is(
+    input,
+    textarea,
+    select,
+    .editor,
+    .searchInput,
+    .tagSearchInput,
+    .tagPickerInput,
+    .settingValue,
+    .settingTextInput,
+    .settingTextarea
+  ) {
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  caret-color: var(--theme-text);
+  background-color: var(--theme-surface) !important;
+  border-color: var(--theme-border-strong) !important;
+}
+
+[data-acta-theme] :is(input, textarea)::placeholder {
+  color: var(--theme-text-muted) !important;
+  -webkit-text-fill-color: var(--theme-text-muted) !important;
+  opacity: 0.9;
+}
+
+[data-acta-theme] :is(.primaryBtn, .primaryActionBtn, .aiSendBtn) {
+  color: var(--theme-on-accent) !important;
+  -webkit-text-fill-color: var(--theme-on-accent) !important;
+  background-color: var(--theme-accent) !important;
+  border-color: var(--theme-accent) !important;
+}
+
+[data-acta-theme] :is(.viewTab, .projectNavItem, .ghostBtn, .settingsFab, .modalClose) {
+  color: var(--theme-text-subtle) !important;
+}
+
+[data-acta-theme] :is(.viewTab:hover, .viewTab.isActive, .projectNavItem:hover, .projectNavItem.isActive) {
+  color: var(--theme-text) !important;
+  background-color: rgba(var(--theme-accent-rgb), 0.16) !important;
+  border-color: rgba(var(--theme-accent-rgb), 0.4) !important;
+}
+
+[data-acta-theme] :is(.commentMeta, .settingHint, .empty, .tagEmpty, .aiTopHint, .composerFooterHint) {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-acta-theme] :is(.md, .preview, .commentBody, .commentBody .md) {
+  color: var(--theme-text) !important;
+}
+
+[data-acta-theme] .md :is(h1, h2, h3, h4, h5, h6, strong) {
+  color: var(--theme-text) !important;
+}
+
+[data-acta-theme] .md a {
+  color: var(--theme-accent) !important;
 }
