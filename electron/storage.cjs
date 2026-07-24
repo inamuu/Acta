@@ -5,6 +5,7 @@ const { spawn } = require("node:child_process");
 const { app } = require("electron");
 
 const DATE_FILE_RE = /^\d{4}-\d{2}-\d{2}\.md$/;
+const DATE_SCAN_IGNORED_DIRS = new Set([".git", "node_modules", "dist", "release", "wiki", "images"]);
 const POSTS_DIR = "posts";
 const IMAGES_DIR = "images";
 const PROJECTS_DIR = "projects";
@@ -384,6 +385,7 @@ async function collectDateFiles(dir = getDataDir()) {
   for (const entry of names) {
     const p = path.join(dir, entry.name);
     if (entry.isDirectory()) {
+      if (DATE_SCAN_IGNORED_DIRS.has(entry.name)) continue;
       out.push(...(await collectDateFiles(p)));
       continue;
     }
@@ -450,10 +452,19 @@ function runGitCommand(args) {
       cwd: dataDir,
       stdio: ["ignore", "pipe", "pipe"]
     });
+    const timer = setTimeout(() => {
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        // ignore
+      }
+      finish({ code: 1, stdout: stdout.trim(), stderr: "gitコマンドが30秒でタイムアウトしました" });
+    }, 30_000);
 
     function finish(result) {
       if (done) return;
       done = true;
+      clearTimeout(timer);
       resolve(result);
     }
 
@@ -478,12 +489,54 @@ function runGitCommand(args) {
   });
 }
 
+function resolveGhExecutable(options = {}) {
+  const env = options.env ?? process.env;
+  const platform = options.platform ?? process.platform;
+  const exists =
+    options.exists ??
+    ((candidate) => {
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+  const candidates = [];
+  const configured = String(env.ACTA_GH_PATH ?? "").trim();
+  if (configured) candidates.push(configured);
+  for (const dir of String(env.PATH ?? "").split(path.delimiter)) {
+    const cleanDir = dir.trim();
+    if (cleanDir) candidates.push(path.join(cleanDir, platform === "win32" ? "gh.exe" : "gh"));
+  }
+  if (platform === "darwin") {
+    candidates.push("/opt/homebrew/bin/gh", "/usr/local/bin/gh");
+  } else if (platform !== "win32") {
+    candidates.push("/usr/local/bin/gh", "/usr/bin/gh", "/snap/bin/gh");
+  }
+  return (
+    candidates.find(
+      (candidate, index) => candidate && candidates.indexOf(candidate) === index && exists(candidate)
+    ) || ""
+  );
+}
+
 function runGhCommand(args) {
   return new Promise((resolve) => {
     let done = false;
     let stdout = "";
     let stderr = "";
-    const child = spawn("gh", args, {
+    const ghExecutable = resolveGhExecutable();
+    if (!ghExecutable) {
+      resolve({
+        code: 1,
+        stdout: "",
+        stderr:
+          "ghコマンドが見つかりません。Homebrewでghをインストールするか、ACTA_GH_PATHにghの絶対パスを指定してください"
+      });
+      return;
+    }
+    const child = spawn(ghExecutable, args, {
       cwd: getDataDir(),
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -2209,6 +2262,7 @@ module.exports = {
     githubTitleSimilarity,
     classifyGitHubItem,
     projectTaskStatusFromGitHubItem,
-    githubTaskChanged
+    githubTaskChanged,
+    resolveGhExecutable
   }
 };

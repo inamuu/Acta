@@ -126,3 +126,19 @@ test("GitHub items are classified from existing Acta project task titles", () =>
   assert.equal(unrelated.project.id, "other");
   assert.equal(unrelated.kind, "other");
 });
+
+test("Electron resolves gh from PATH or Homebrew locations", () => {
+  const fromPath = _test.resolveGhExecutable({
+    env: { PATH: "/custom/bin:/usr/bin" },
+    platform: "darwin",
+    exists: (candidate) => candidate === "/custom/bin/gh"
+  });
+  assert.equal(fromPath, "/custom/bin/gh");
+
+  const fromHomebrew = _test.resolveGhExecutable({
+    env: { PATH: "/usr/bin" },
+    platform: "darwin",
+    exists: (candidate) => candidate === "/opt/homebrew/bin/gh"
+  });
+  assert.equal(fromHomebrew, "/opt/homebrew/bin/gh");
+});
