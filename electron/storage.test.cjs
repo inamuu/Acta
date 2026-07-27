@@ -57,7 +57,7 @@ test("GitHub closes tasks but keeps Acta workflow state while they remain open",
   assert.equal(_test.githubSourceState({ state: "open" }), "open");
 });
 
-test("GitHub URLs are metadata and never leak into generated ToDo text", () => {
+test("GitHub URLs are metadata and GitHub tasks stay at the project task level", () => {
   const body = _test.upsertProjectTasksInTodoBody("# ToDo", "認証基盤", [
     {
       title: "OIDC対応",
@@ -67,8 +67,18 @@ test("GitHub URLs are metadata and never leak into generated ToDo text", () => {
     }
   ]);
 
-  assert.match(body, /  - GitHub\n    - \[-\] OIDC対応/);
+  assert.match(body, /  - \[-\] OIDC対応/);
+  assert.doesNotMatch(body, /  - GitHub/);
   assert.doesNotMatch(body, /github\.com/);
+});
+
+test("appending a GitHub task to an existing project does not add a GitHub hierarchy", () => {
+  const body = ["# ToDo", "- 認証基盤", "  - [-] 既存タスク"].join("\n");
+  const nextBody = _test.upsertProjectTasksInTodoBody(body, "認証基盤", [
+    { title: "OIDC対応", status: "GitHub", source: "github" }
+  ]);
+
+  assert.equal(nextBody, ["# ToDo", "- 認証基盤", "  - [-] 既存タスク", "  - [R] OIDC対応"].join("\n"));
 });
 
 test("GitHub sync only updates when source metadata or state changed", () => {
@@ -83,7 +93,7 @@ test("GitHub sync only updates when source metadata or state changed", () => {
   assert.equal(_test.githubTaskChanged(task, { ...task, status: "Done" }), true);
 });
 
-test("GitHub tasks use a GitHub hierarchy and two-space indentation in ToDo", () => {
+test("GitHub tasks use the same two-space indentation as local tasks in ToDo", () => {
   const body = _test.buildTodoBodyFromProjectGroups([
     {
       name: "コンテナOSの最新化",
@@ -100,8 +110,7 @@ test("GitHub tasks use a GitHub hierarchy and two-space indentation in ToDo", ()
       "# ToDo",
       "- コンテナOSの最新化",
       "  - [-] 新Op",
-      "  - GitHub",
-      "    - [R] イメージ更新 #6048"
+      "  - [R] イメージ更新 #6048"
     ].join("\n")
   );
   assert.doesNotMatch(body, /\t/);

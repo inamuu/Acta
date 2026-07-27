@@ -188,6 +188,7 @@ export function App() {
   const [projectNameDraft, setProjectNameDraft] = useState("");
   const [projectIssueUrlDraft, setProjectIssueUrlDraft] = useState("");
   const [projectStatus, setProjectStatus] = useState("");
+  const [projectTodoBusy, setProjectTodoBusy] = useState(false);
   const [todoStatus, setTodoStatus] = useState("");
   const [todoWeekOffset, setTodoWeekOffset] = useState(0);
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
@@ -987,17 +988,19 @@ export function App() {
     }
   }
 
-  async function appendProjectTasksToTodo() {
-    if (!selectedProject) return;
+  async function appendActiveProjectTasksToTodo() {
     setProjectStatus("");
+    setProjectTodoBusy(true);
     try {
-      const entry = await api.appendProjectInProgressToTodayTodo({ projectId: selectedProject.id });
+      const entry = await api.appendActiveProjectsInProgressToTodayTodo();
       await reload();
       queueBackupSync();
-      setProjectStatus(`${entry.date} のToDoにInProgress / GitHubを追記しました`);
+      setProjectStatus(`${entry.date} のToDoにActiveプロジェクトのInProgress / GitHubを追記しました`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setProjectStatus(msg || "ToDoへの追記に失敗しました");
+    } finally {
+      setProjectTodoBusy(false);
     }
   }
 
@@ -1396,10 +1399,10 @@ export function App() {
                       <button
                         className="ghostBtn"
                         type="button"
-                        disabled={Boolean(selectedProject.archivedAtMs)}
-                        onClick={() => void appendProjectTasksToTodo()}
+                        disabled={projectTodoBusy}
+                        onClick={() => void appendActiveProjectTasksToTodo()}
                       >
-                        InProgress / GitHubをToDoへ追記
+                        {projectTodoBusy ? "追記中..." : "ActiveのInProgress / GitHubをToDoへ追記"}
                       </button>
                       <button
                         className={selectedProject.archivedAtMs ? "ghostBtn" : "dangerGhostBtn"}

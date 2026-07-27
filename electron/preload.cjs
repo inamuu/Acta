@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld("acta", {
   updateProjectKnowledgeEntry: (payload) => ipcRenderer.invoke("acta:updateProjectKnowledgeEntry", payload),
   deleteProjectKnowledgeEntry: (payload) => ipcRenderer.invoke("acta:deleteProjectKnowledgeEntry", payload),
   appendProjectInProgressToTodayTodo: (payload) => ipcRenderer.invoke("acta:appendProjectInProgressToTodayTodo", payload),
+  appendActiveProjectsInProgressToTodayTodo: () =>
+    ipcRenderer.invoke("acta:appendActiveProjectsInProgressToTodayTodo"),
   createTodoFromProjects: () => ipcRenderer.invoke("acta:createTodoFromProjects"),
   syncGitHubItems: () => ipcRenderer.invoke("acta:syncGitHubItems"),
   copyPreviousTodo: () => ipcRenderer.invoke("acta:copyPreviousTodo"),

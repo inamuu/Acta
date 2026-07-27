@@ -14,7 +14,6 @@ const PROJECT_KNOWLEDGE_FILE = "knowledge.md";
 const PROJECT_TASK_STATUSES = new Set(["Backlog", "InProgress", "GitHub", "Done"]);
 const TODO_TAG = "ToDo";
 const TODO_NESTED_INDENT = "  ";
-const TODO_GITHUB_INDENT = "    ";
 const SETTINGS_FILE = "acta-settings.json";
 const DATA_DIR_SETTINGS_FILE = "settings.json";
 const KNOWLEDGE_DB_FILE = "knowledge-index.sqlite";
@@ -2013,17 +2012,9 @@ function buildTodoBodyFromProjectGroups(groups, heading) {
 }
 
 function todoLinesForProjectGroup(group) {
-  const localTasks = group.tasks.filter((task) => task.source !== "github");
-  const githubTasks = group.tasks.filter((task) => task.source === "github");
   const lines = [`- ${group.name}`];
-  for (const task of localTasks) {
+  for (const task of group.tasks) {
     lines.push(`${TODO_NESTED_INDENT}- [${markerFromProjectTaskStatus(task.status)}] ${task.title}`);
-  }
-  if (githubTasks.length > 0) {
-    lines.push(`${TODO_NESTED_INDENT}- GitHub`);
-    for (const task of githubTasks) {
-      lines.push(`${TODO_GITHUB_INDENT}- [${markerFromProjectTaskStatus(task.status)}] ${task.title}`);
-    }
   }
   return lines;
 }
@@ -2098,8 +2089,7 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks) {
     if (title && !titleToLine.has(title)) titleToLine.set(title, i);
   }
 
-  const appendLocalTasks = [];
-  const appendGitHubTasks = [];
+  const appendTasks = [];
   for (const task of normalizedTasks) {
     const existingLine = titleToLine.get(task.title);
     if (typeof existingLine === "number") {
@@ -2109,39 +2099,16 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks) {
       );
       continue;
     }
-    if (task.source === "github") appendGitHubTasks.push(task);
-    else appendLocalTasks.push(task);
+    appendTasks.push(task);
   }
 
-  if (appendGitHubTasks.length > 0) {
-    const githubHeading = lines.findIndex(
-      (line, index) => index > group.start && index < group.end && /^\s{2}-\s+GitHub\s*$/.test(line)
-    );
-    if (githubHeading >= 0) {
-      let githubEnd = githubHeading + 1;
-      while (githubEnd < lines.length && /^\s{4,}\S/.test(lines[githubEnd] ?? "")) githubEnd += 1;
-      lines.splice(
-        githubEnd,
-        0,
-        ...appendGitHubTasks.map((task) => `${TODO_GITHUB_INDENT}- [${task.marker}] ${task.title}`)
-      );
-    } else {
-      lines.splice(
-        group.end,
-        0,
-        `${TODO_NESTED_INDENT}- GitHub`,
-        ...appendGitHubTasks.map((task) => `${TODO_GITHUB_INDENT}- [${task.marker}] ${task.title}`)
-      );
-    }
-  }
-
-  if (appendLocalTasks.length > 0) {
+  if (appendTasks.length > 0) {
     const refreshedGroup = findProjectTodoGroup(lines, projectName);
     const insertAt = refreshedGroup?.end ?? lines.length;
     lines.splice(
       insertAt,
       0,
-      ...appendLocalTasks.map((task) => `${TODO_NESTED_INDENT}- [${task.marker}] ${task.title}`)
+      ...appendTasks.map((task) => `${TODO_NESTED_INDENT}- [${task.marker}] ${task.title}`)
     );
   }
 
@@ -2197,6 +2164,40 @@ async function appendProjectInProgressToTodayTodo(payload) {
   return upsertProjectTasksToLatestTodo(project, tasks);
 }
 
+async function appendActiveProjectsInProgressToTodayTodo() {
+  const projects = await listProjects();
+  const groups = projects
+    .filter((project) => !project.archivedAtMs)
+    .map((project) => ({
+      project,
+      tasks: project.tasks.filter((task) => task.status === "InProgress" || task.status === "GitHub")
+    }))
+    .filter((group) => group.tasks.length > 0);
+  if (groups.length === 0) throw new Error("InProgress / GitHub のプロジェクトタスクがありません");
+
+  const entries = await listEntries();
+  const current = entries.find((entry) => isTodoEntry(entry));
+  if (!current) {
+    return addTodoEntry(
+      buildTodoBodyFromProjectGroups(
+        groups.map(({ project, tasks }) => ({ name: project.name, tasks })),
+        "ToDo"
+      )
+    );
+  }
+
+  const nextBody = groups.reduce(
+    (body, { project, tasks }) => upsertProjectTasksInTodoBody(body, project.name, tasks),
+    current.body
+  );
+  if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
+
+  const tags = Array.from(new Set([...(current.tags || []), TODO_TAG]));
+  const res = await updateEntry({ id: current.id, body: nextBody, tags });
+  if (!res.updated) throw new Error("最新のToDo更新に失敗しました");
+  return { ...current, body: nextBody, tags };
+}
+
 async function createTodoFromProjects() {
   const projects = await listProjects();
   const groups = projects
@@ -2244,6 +2245,7 @@ module.exports = {
   updateProjectKnowledgeEntry,
   deleteProjectKnowledgeEntry,
   appendProjectInProgressToTodayTodo,
+  appendActiveProjectsInProgressToTodayTodo,
   createTodoFromProjects,
   syncGitHubItems,
   copyPreviousTodo,

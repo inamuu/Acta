@@ -69,6 +69,7 @@ declare global {
       updateProjectKnowledgeEntry: (payload: UpdateProjectKnowledgePayload) => Promise<ActaProject>;
       deleteProjectKnowledgeEntry: (payload: DeleteProjectKnowledgePayload) => Promise<ActaProject>;
       appendProjectInProgressToTodayTodo: (payload: { projectId: string }) => Promise<ActaEntry>;
+      appendActiveProjectsInProgressToTodayTodo: () => Promise<ActaEntry>;
       createTodoFromProjects: () => Promise<ActaEntry>;
       syncGitHubItems: () => Promise<GitHubSyncResult>;
       copyPreviousTodo: () => Promise<ActaEntry>;

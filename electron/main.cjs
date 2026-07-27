@@ -695,6 +695,9 @@ app.whenReady().then(() => {
   ipcMain.handle("acta:appendProjectInProgressToTodayTodo", async (_event, payload) =>
     storage.appendProjectInProgressToTodayTodo(payload)
   );
+  ipcMain.handle("acta:appendActiveProjectsInProgressToTodayTodo", async () =>
+    storage.appendActiveProjectsInProgressToTodayTodo()
+  );
   ipcMain.handle("acta:createTodoFromProjects", async () => storage.createTodoFromProjects());
   ipcMain.handle("acta:syncGitHubItems", async () => storage.syncGitHubItems());
   ipcMain.handle("acta:copyPreviousTodo", async () => storage.copyPreviousTodo());
