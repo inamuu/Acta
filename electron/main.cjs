@@ -583,6 +583,65 @@ async function writeAiSessionInput(sessionId, input, articlePaths) {
   return { sent: true };
 }
 
+// データフォルダを監視して、アプリ外（CLI/AI/git pull など）からの変更も自動で画面へ反映する。
+const DATA_WATCH_DEBOUNCE_MS = 600;
+const DATA_WATCH_IGNORED_RE = /(^|[\\/])(\.git|node_modules|wiki|\.DS_Store)([\\/]|$)|knowledge-index/;
+
+let dataWatcher = null;
+let dataWatchTimer = null;
+let watchedDataDir = "";
+
+function notifyDataChanged() {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send("acta:dataChanged");
+  }
+}
+
+function scheduleDataChangedNotice() {
+  if (dataWatchTimer) clearTimeout(dataWatchTimer);
+  dataWatchTimer = setTimeout(() => {
+    dataWatchTimer = null;
+    notifyDataChanged();
+  }, DATA_WATCH_DEBOUNCE_MS);
+}
+
+function stopDataDirWatcher() {
+  if (dataWatchTimer) {
+    clearTimeout(dataWatchTimer);
+    dataWatchTimer = null;
+  }
+  if (dataWatcher) {
+    try {
+      dataWatcher.close();
+    } catch {
+      // ignore
+    }
+  }
+  dataWatcher = null;
+  watchedDataDir = "";
+}
+
+function startDataDirWatcher() {
+  const dir = storage.getDataDir();
+  if (dataWatcher && watchedDataDir === dir) return;
+
+  stopDataDirWatcher();
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const watcher = fs.watch(dir, { recursive: true }, (_eventType, fileName) => {
+      const name = String(fileName ?? "");
+      if (name && DATA_WATCH_IGNORED_RE.test(name)) return;
+      scheduleDataChangedNotice();
+    });
+    watcher.on("error", () => stopDataDirWatcher());
+    dataWatcher = watcher;
+    watchedDataDir = dir;
+  } catch {
+    dataWatcher = null;
+    watchedDataDir = "";
+  }
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1180,
@@ -666,6 +725,7 @@ app.whenReady().then(() => {
     }
 
     await storage.setDataDir(dir);
+    startDataDirWatcher();
     return { canceled: false, dataDir: storage.getDataDir() };
   });
   ipcMain.handle("acta:listEntries", async () => storage.listEntries());
@@ -735,6 +795,7 @@ app.whenReady().then(() => {
   ipcMain.handle("acta:aiStopSession", async (_event, payload) => stopAiSession(payload?.sessionId));
 
   createWindow();
+  startDataDirWatcher();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -742,6 +803,7 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  stopDataDirWatcher();
   for (const session of aiSessions.values()) {
     if (session.worker) {
       try {

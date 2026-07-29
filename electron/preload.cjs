@@ -41,5 +41,12 @@ contextBridge.exposeInMainWorld("acta", {
   aiStartSession: (payload) => ipcRenderer.invoke("acta:aiStartSession", payload),
   aiSendInput: (payload) => ipcRenderer.invoke("acta:aiSendInput", payload),
   aiReadOutput: (payload) => ipcRenderer.invoke("acta:aiReadOutput", payload),
-  aiStopSession: (payload) => ipcRenderer.invoke("acta:aiStopSession", payload)
+  aiStopSession: (payload) => ipcRenderer.invoke("acta:aiStopSession", payload),
+  onDataChanged: (listener) => {
+    const handler = () => {
+      if (typeof listener === "function") listener();
+    };
+    ipcRenderer.on("acta:dataChanged", handler);
+    return () => ipcRenderer.removeListener("acta:dataChanged", handler);
+  }
 });
