@@ -9,6 +9,9 @@ GitHub issue 風の「コメント」UIで、Markdown を日次ファイルへ�
 - 追記保存（テキスト/Markdown）
 - 既存投稿の編集/削除
 - 自分が作成したGitHub Issue・PRをActaのTaskへ同期
+- 保存先フォルダの変更を監視して自動再読み込み（CLIやAIが直接書いたToDo・ナレッジもリロード不要で反映）
+- ToDoカードにチェックボックスの進捗（完了数/全体）を表示
+- キーボードショートカット: `Cmd+1`〜`Cmd+5` で ToDo / プロジェクト / ナレッジ / 検索 / AI対話 を切り替え
 
 ## GitHubのIssue・PRを同期する
 
