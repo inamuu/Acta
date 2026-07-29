@@ -121,6 +121,35 @@ export function setTaskStateOnLine(markdown: string, line0: number, state: TaskS
   return lines.join(hasCrlf ? "\r\n" : "\n");
 }
 
+export type TaskSummary = {
+  total: number;
+  done: number;
+  doing: number;
+  review: number;
+  todo: number;
+};
+
+const TASK_LINE_RE = /^\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s*\[([ xX\-\/rR])\]\s+/;
+
+/** ToDo本文のチェックボックス行を数えて進捗を出す。 */
+export function summarizeTaskStates(markdown: string): TaskSummary {
+  const summary: TaskSummary = { total: 0, done: 0, doing: 0, review: 0, todo: 0 };
+
+  for (const line of String(markdown ?? "").split(/\r?\n/)) {
+    const m = TASK_LINE_RE.exec(line);
+    if (!m) continue;
+    const state = taskStateFromMarker(m[1] ?? "");
+    if (!state) continue;
+    summary.total += 1;
+    if (state === "checked") summary.done += 1;
+    else if (state === "partial") summary.doing += 1;
+    else if (state === "review") summary.review += 1;
+    else summary.todo += 1;
+  }
+
+  return summary;
+}
+
 export function setTaskCheckedOnLine(markdown: string, line0: number, checked: boolean): string | null {
   return setTaskStateOnLine(markdown, line0, checked ? "checked" : "unchecked");
 }

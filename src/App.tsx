@@ -17,7 +17,7 @@ import { Composer } from "./components/Composer";
 import { SettingsModal } from "./components/SettingsModal";
 import { TagSidebar } from "./components/TagSidebar";
 import { installDragScroll } from "./lib/dragScroll";
-import { setTaskStateOnLine, type TaskState } from "./lib/taskList";
+import { setTaskStateOnLine, summarizeTaskStates, type TaskState } from "./lib/taskList";
 
 type TagStat = { tag: string; count: number };
 type DateFilterMode = "week" | "day" | "all";
@@ -125,6 +125,10 @@ function sortEntriesNewestFirst(list: ActaEntry[]): ActaEntry[] {
   return [...list].sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
 }
 
+function isTodoEntry(entry: ActaEntry): boolean {
+  return entry.tags.includes("ToDo") || /^#\s*todo\b/im.test(entry.body);
+}
+
 function getRecentCutoffMs(days = 7): number {
   const today = formatDateYYYYMMDD(new Date());
   return addDays(new Date(`${today}T00:00:00`), -(days - 1)).getTime();
@@ -190,6 +194,7 @@ export function App() {
   const [projectStatus, setProjectStatus] = useState("");
   const [projectTodoBusy, setProjectTodoBusy] = useState(false);
   const [todoStatus, setTodoStatus] = useState("");
+  const [todoBusy, setTodoBusy] = useState(false);
   const [todoWeekOffset, setTodoWeekOffset] = useState(0);
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
   const [knowledgeExcludeTags, setKnowledgeExcludeTags] = useState("");
@@ -306,6 +311,12 @@ export function App() {
     }, delay);
   }
 
+  // 追加直後に一覧へ差し込み、再読込を待たずに表示する。
+  function mergeEntry(entry: ActaEntry | null | undefined) {
+    if (!entry?.id) return;
+    setEntries((prev) => sortEntriesNewestFirst([entry, ...prev.filter((e) => e.id !== entry.id)]));
+  }
+
   async function reload(opts?: { keepError?: boolean }) {
     if (!api) return;
     try {
@@ -402,6 +413,26 @@ export function App() {
     };
   }, [api]);
 
+  // データフォルダが外部（CLI/AI/git）から更新されたら黙って読み直す。
+  const refreshFromDiskRef = useRef<() => void>(() => {});
+  refreshFromDiskRef.current = () => {
+    if (!api || loading) return;
+    void (async () => {
+      try {
+        const [list, projectList] = await Promise.all([api.listEntries(), api.listProjects()]);
+        setEntries(list);
+        setProjects(projectList);
+      } catch {
+        // 監視由来の再読込は失敗しても既存表示を保つ。
+      }
+    })();
+  };
+
+  useEffect(() => {
+    if (!api?.onDataChanged) return;
+    return api.onDataChanged(() => refreshFromDiskRef.current());
+  }, [api]);
+
   useEffect(() => {
     try {
       localStorage.setItem("acta:limit", String(limit));
@@ -430,8 +461,30 @@ export function App() {
   }, [projects, selectedProjectId, showArchivedProjects]);
 
   useEffect(() => {
+    if (!todoStatus) return;
+    const timer = window.setTimeout(() => setTodoStatus(""), 6000);
+    return () => window.clearTimeout(timer);
+  }, [todoStatus]);
+
+  useEffect(() => {
+    if (!projectStatus) return;
+    const timer = window.setTimeout(() => setProjectStatus(""), 6000);
+    return () => window.clearTimeout(timer);
+  }, [projectStatus]);
+
+  useEffect(() => {
+    const VIEW_ORDER: ActiveView[] = ["todo", "projects", "journal", "knowledge", "ai"];
+
     function onKeyDown(e: KeyboardEvent) {
       const key = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && /^[1-5]$/.test(key)) {
+        const next = VIEW_ORDER[Number(key) - 1];
+        if (next) {
+          e.preventDefault();
+          setActiveView(next);
+        }
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && key === "f" && activeView === "journal") {
         e.preventDefault();
         searchRef.current?.focus();
@@ -560,10 +613,7 @@ export function App() {
 
   const todoEntries = useMemo(() => {
     return entries.filter(
-      (entry) =>
-        entry.date >= todoWeekRange.start &&
-        entry.date <= todoWeekRange.end &&
-        (entry.tags.includes("ToDo") || /^#\s*todo\b/im.test(entry.body))
+      (entry) => entry.date >= todoWeekRange.start && entry.date <= todoWeekRange.end && isTodoEntry(entry)
     );
   }, [entries, todoWeekRange]);
   const selectedProject = useMemo(
@@ -752,30 +802,46 @@ export function App() {
   }
 
   async function createTodoFromProjects() {
+    if (todoBusy) return;
+    const today = formatDateYYYYMMDD(new Date());
+    if (entries.some((entry) => entry.date === today && isTodoEntry(entry))) {
+      const ok = window.confirm("今日のToDoはすでにあります。もう1件作成しますか？");
+      if (!ok) return;
+    }
+
     setTodoStatus("");
+    setTodoBusy(true);
     try {
       const entry = await api.createTodoFromProjects();
       setTodoWeekOffset(0);
+      mergeEntry(entry);
       await reload();
       queueBackupSync();
       setTodoStatus(`${entry.date} のToDoを作成しました`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setTodoStatus(msg || "ToDo作成に失敗しました");
+    } finally {
+      setTodoBusy(false);
     }
   }
 
   async function copyPreviousTodo() {
+    if (todoBusy) return;
     setTodoStatus("");
+    setTodoBusy(true);
     try {
       const entry = await api.copyPreviousTodo();
       setTodoWeekOffset(0);
+      mergeEntry(entry);
       await reload();
       queueBackupSync();
       setTodoStatus(`${entry.date} に前回のToDoをコピーしました`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setTodoStatus(msg || "前回ToDoのコピーに失敗しました");
+    } finally {
+      setTodoBusy(false);
     }
   }
 
@@ -1167,29 +1233,50 @@ export function App() {
         {activeView === "todo" ? (
           <section className="todoArea">
             <div className="todoToolbar">
-              <button className="primaryActionBtn" type="button" onClick={() => void createTodoFromProjects()}>
-                新規ToDo
+              <button
+                className="primaryActionBtn"
+                type="button"
+                disabled={todoBusy}
+                title="全プロジェクトのInProgress / GitHubから今日のToDoを作成"
+                onClick={() => void createTodoFromProjects()}
+              >
+                {todoBusy ? "作成中..." : "新規ToDo"}
               </button>
-              <button className="ghostBtn" type="button" onClick={() => void copyPreviousTodo()}>
-                昨日のToDoコピー
+              <button
+                className="ghostBtn"
+                type="button"
+                disabled={todoBusy}
+                title="直近のToDoをそのまま今日へコピー"
+                onClick={() => void copyPreviousTodo()}
+              >
+                前回のToDoをコピー
               </button>
-              <div className="todoWeekNav">
-                <button className="ghostBtn" type="button" onClick={() => setTodoWeekOffset((value) => value - 1)}>
-                  前週
+
+              <div className="todoToolbarSpacer" />
+
+              <div className="segmented todoWeekNav" role="group" aria-label="表示する週">
+                <button
+                  className="segmentedBtn"
+                  type="button"
+                  aria-label="前週"
+                  onClick={() => setTodoWeekOffset((value) => value - 1)}
+                >
+                  ‹
                 </button>
                 <span className="todoWeekLabel">
-                  {todoWeekRange.start} - {todoWeekRange.end}
+                  {todoWeekRange.start} 〜 {todoWeekRange.end}
                 </span>
                 <button
-                  className="ghostBtn"
+                  className="segmentedBtn"
                   type="button"
+                  aria-label="次週"
                   disabled={todoWeekOffset >= 0}
                   onClick={() => setTodoWeekOffset((value) => Math.min(0, value + 1))}
                 >
-                  次週
+                  ›
                 </button>
                 <button
-                  className="ghostBtn"
+                  className="segmentedBtn isText"
                   type="button"
                   disabled={todoWeekOffset === 0}
                   onClick={() => setTodoWeekOffset(0)}
@@ -1197,10 +1284,8 @@ export function App() {
                   今週
                 </button>
               </div>
-              <div className="knowledgeStatus">
-                {todoStatus || "新規ToDoは全プロジェクトのInProgress / GitHubから作成します。"}
-              </div>
             </div>
+            {todoStatus ? <div className="inlineToast">{todoStatus}</div> : null}
             <div className="commentList">
               {loading ? (
                 <div className="empty">読み込み中...</div>
@@ -1214,6 +1299,7 @@ export function App() {
                     assetBaseUrl={assetBaseUrl}
                     domId={buildEntryDomId(e.id)}
                     isLinkedTarget={linkedTargetEntryId === e.id}
+                    taskSummary={summarizeTaskStates(e.body)}
                     onEdit={(entry) => {
                       setActiveView("journal");
                       setEditing(entry);
@@ -1339,7 +1425,9 @@ export function App() {
                         {selectedProject.name}
                         {selectedProject.archivedAtMs ? <span className="projectArchivedBadge">Archived</span> : null}
                       </h2>
-                      <div className="knowledgeStatus">{projectStatus || selectedProject.sourceDir}</div>
+                      <div className="projectPath" title={selectedProject.sourceDir}>
+                        {selectedProject.sourceDir}
+                      </div>
                       <div className="projectInlineEditors">
                         <label className="projectInlineField">
                           <span>プロジェクト名</span>
@@ -1400,9 +1488,10 @@ export function App() {
                         className="ghostBtn"
                         type="button"
                         disabled={projectTodoBusy}
+                        title="Activeプロジェクト全体のInProgress / GitHubを最新のToDoへ追記"
                         onClick={() => void appendActiveProjectTasksToTodo()}
                       >
-                        {projectTodoBusy ? "追記中..." : "ActiveのInProgress / GitHubをToDoへ追記"}
+                        {projectTodoBusy ? "追記中..." : "ToDoへ追記"}
                       </button>
                       <button
                         className={selectedProject.archivedAtMs ? "ghostBtn" : "dangerGhostBtn"}
@@ -1427,10 +1516,16 @@ export function App() {
                       }}
                       placeholder="Backlogへタスク追加"
                     />
-                    <button className="primaryActionBtn" type="button" onClick={() => void addProjectTask()}>
+                    <button
+                      className="primaryActionBtn"
+                      type="button"
+                      disabled={!newProjectTaskTitle.trim()}
+                      onClick={() => void addProjectTask()}
+                    >
                       追加
                     </button>
                   </div>
+                  {projectStatus ? <div className="inlineToast">{projectStatus}</div> : null}
                   <div className="kanbanBoard">
                     {(["Backlog", "InProgress", "GitHub", "Done"] as const).map((status) => {
                       const visibleTasks = selectedProject.tasks.filter(
@@ -1449,9 +1544,12 @@ export function App() {
                             dropProjectTask(status);
                           }}
                         >
-                          <h3>{status}</h3>
+                          <h3>
+                            <span>{status}</span>
+                            <span className="kanbanCount">{visibleTasks.length}</span>
+                          </h3>
                           {visibleTasks.length === 0 ? (
-                            <div className="kanbanEmpty">空</div>
+                            <div className="kanbanEmpty">タスクなし</div>
                           ) : (
                             visibleTasks.map((task) => (
                               <div

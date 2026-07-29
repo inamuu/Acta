@@ -84,6 +84,7 @@ declare global {
       aiSendInput: (payload: AiSendInputPayload) => Promise<{ sent: boolean }>;
       aiReadOutput: (payload: AiReadOutputPayload) => Promise<AiReadOutputResult>;
       aiStopSession: (payload: AiStopSessionPayload) => Promise<{ stopped: boolean }>;
+      onDataChanged?: (listener: () => void) => () => void;
     };
   }
 }

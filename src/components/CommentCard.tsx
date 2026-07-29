@@ -2,7 +2,13 @@ import React, { useEffect, useMemo, useRef } from "react";
 import type { ActaEntry } from "../../shared/types";
 import { markdownToHtml } from "../lib/markdown";
 import { renderMermaid } from "../lib/mermaid";
-import { hydrateTaskCheckboxStates, nextTaskState, taskStateFromInput, type TaskState } from "../lib/taskList";
+import {
+  hydrateTaskCheckboxStates,
+  nextTaskState,
+  taskStateFromInput,
+  type TaskState,
+  type TaskSummary
+} from "../lib/taskList";
 
 type Props = {
   entry: ActaEntry;
@@ -16,6 +22,7 @@ type Props = {
   onToggleTask?: (entry: ActaEntry, line0: number, nextState: TaskState) => void | Promise<void>;
   domId?: string;
   isLinkedTarget?: boolean;
+  taskSummary?: TaskSummary;
 };
 
 function decodeUriSafe(value: string): string {
@@ -66,7 +73,8 @@ export function CommentCard({
   onOpenLinkedEntry,
   onToggleTask,
   domId,
-  isLinkedTarget
+  isLinkedTarget,
+  taskSummary
 }: Props) {
   const html = useMemo(() => markdownToHtml(entry.body, { assetBaseUrl }), [assetBaseUrl, entry.body]);
   const when = formatWhen(entry.createdAtMs);
@@ -90,33 +98,49 @@ export function CommentCard({
                 <span className="commentDate">{entry.date}</span>
                 {when ? <span className="commentWhen">{when}</span> : null}
               </span>
-              <button className="ghostBtn" type="button" onClick={() => onEdit?.(entry)} title="編集">
-                編集
-              </button>
-              <button
-                className="ghostBtn"
-                type="button"
-                onClick={() => onCopy?.(entry)}
-                title="入力欄にコピー"
-              >
-                コピー
-              </button>
-              <button
-                className="ghostBtn"
-                type="button"
-                onClick={() => onCopyId?.(entry)}
-                title="投稿IDをコピー（リンクは [任意の文](#post:ID) 形式）"
-              >
-                IDコピー
-              </button>
-              <button
-                className="dangerGhostBtn"
-                type="button"
-                onClick={() => onDelete?.(entry)}
-                title="削除"
-              >
-                削除
-              </button>
+              {taskSummary && taskSummary.total > 0 ? (
+                <span
+                  className="taskProgress"
+                  title={`完了 ${taskSummary.done} / 作業中 ${taskSummary.doing} / レビュー ${taskSummary.review} / 未着手 ${taskSummary.todo}`}
+                >
+                  <span className="taskProgressBar">
+                    <span
+                      className="taskProgressFill"
+                      style={{ width: `${Math.round((taskSummary.done / taskSummary.total) * 100)}%` }}
+                    />
+                  </span>
+                  <span className="taskProgressText">
+                    {taskSummary.done}/{taskSummary.total}
+                  </span>
+                </span>
+              ) : null}
+              <span className="commentActions">
+                {onEdit ? (
+                  <button className="ghostBtn" type="button" onClick={() => onEdit(entry)} title="編集">
+                    編集
+                  </button>
+                ) : null}
+                {onCopy ? (
+                  <button className="ghostBtn" type="button" onClick={() => onCopy(entry)} title="入力欄にコピー">
+                    コピー
+                  </button>
+                ) : null}
+                {onCopyId ? (
+                  <button
+                    className="ghostBtn"
+                    type="button"
+                    onClick={() => onCopyId(entry)}
+                    title="投稿IDをコピー（リンクは [任意の文](#post:ID) 形式）"
+                  >
+                    IDコピー
+                  </button>
+                ) : null}
+                {onDelete ? (
+                  <button className="dangerGhostBtn" type="button" onClick={() => onDelete(entry)} title="削除">
+                    削除
+                  </button>
+                ) : null}
+              </span>
             </div>
           </div>
 

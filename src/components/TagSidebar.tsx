@@ -107,6 +107,7 @@ export function TagSidebar({
           className={`sideNavItem ${activeView === "todo" ? "isActive" : ""}`}
           type="button"
           onClick={() => onChangeView("todo")}
+          title="⌘1"
         >
           <span className="sideNavIcon">✓</span>
           <span className="sideNavText">ToDo</span>
@@ -116,6 +117,7 @@ export function TagSidebar({
           className={`sideNavItem ${activeView === "projects" ? "isActive" : ""}`}
           type="button"
           onClick={() => onChangeView("projects")}
+          title="⌘2"
         >
           <span className="sideNavIcon">▦</span>
           <span className="sideNavText">プロジェクト</span>
@@ -125,6 +127,7 @@ export function TagSidebar({
           className={`sideNavItem ${activeView === "journal" ? "isActive" : ""}`}
           type="button"
           onClick={() => onChangeView("journal")}
+          title="⌘3"
         >
           <span className="sideNavIcon">◷</span>
           <span className="sideNavText">ナレッジ</span>
@@ -134,6 +137,7 @@ export function TagSidebar({
           className={`sideNavItem ${activeView === "knowledge" ? "isActive" : ""}`}
           type="button"
           onClick={() => onChangeView("knowledge")}
+          title="⌘4"
         >
           <span className="sideNavIcon">⌕</span>
           <span className="sideNavText">検索</span>
@@ -142,6 +146,7 @@ export function TagSidebar({
           className={`sideNavItem ${activeView === "ai" ? "isActive" : ""}`}
           type="button"
           onClick={() => onChangeView("ai")}
+          title="⌘5"
         >
           <span className="sideNavIcon">✦</span>
           <span className="sideNavText">AI対話</span>

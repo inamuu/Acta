@@ -5173,3 +5173,182 @@ body,
 [data-acta-theme] .md a {
   color: var(--theme-accent) !important;
 }
+
+/* ---------------------------------------------------------------------------
+   ToDo / プロジェクト画面のツールバーと進捗表示（テーマ変数にフォールバック）
+   --------------------------------------------------------------------------- */
+
+.todoToolbar {
+  position: sticky;
+  top: -18px;
+  z-index: 2;
+  padding: 10px 0;
+  margin-bottom: 10px;
+  background: linear-gradient(
+    180deg,
+    var(--theme-bg-color, #eef4ff) 0%,
+    var(--theme-bg-color, #eef4ff) 72%,
+    transparent 100%
+  );
+  backdrop-filter: blur(18px) saturate(1.1);
+}
+
+.todoToolbarSpacer {
+  flex: 1 1 auto;
+}
+
+.primaryActionBtn,
+.ghostBtn,
+.dangerGhostBtn {
+  white-space: nowrap;
+}
+
+/* セグメントコントロール（週切り替え） */
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--theme-border-soft, var(--borderSoft));
+  border-radius: 999px;
+  background: var(--theme-surface-soft, rgba(255, 255, 255, 0.45));
+}
+
+.segmentedBtn {
+  border: 0;
+  background: transparent;
+  color: var(--theme-text-subtle, var(--fg1));
+  min-width: 26px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.segmentedBtn.isText {
+  font-size: 12px;
+}
+
+.segmentedBtn:hover:not(:disabled) {
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.14);
+  color: var(--theme-text, var(--fg0));
+}
+
+.segmentedBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.todoWeekNav .todoWeekLabel {
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--theme-text-muted, var(--muted));
+}
+
+/* 処理結果の一時表示（数秒で自動的に消える） */
+.inlineToast {
+  margin: -4px 0 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--theme-accent-rgb, 37, 99, 235), 0.24);
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.09);
+  color: var(--theme-text, var(--fg0));
+  font-size: 12px;
+  animation: riseIn 200ms ease-out both;
+}
+
+/* ToDoカードの進捗 */
+.taskProgress {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: auto;
+}
+
+.taskProgressBar {
+  display: block;
+  width: 74px;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.16);
+}
+
+.taskProgressFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--theme-accent, var(--accent));
+  transition: width 220ms ease;
+}
+
+.taskProgressText {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--theme-text-muted, var(--muted));
+}
+
+/* ヘッダー右側は幅いっぱいに広げ、操作ボタンを右寄せにする */
+.commentHeaderLine1 > .commentHeaderRight {
+  flex: 1 1 auto;
+}
+
+/* カード操作はホバー/フォーカス時に出す */
+.commentActions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.commentCard:hover .commentActions,
+.commentCard:focus-within .commentActions {
+  opacity: 1;
+}
+
+/* プロジェクト詳細 */
+.projectPath {
+  max-width: 520px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--theme-text-muted, var(--muted));
+}
+
+.kanbanBoard {
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+/* 幅が狭いときは2列に折り返してカードを読める幅に保つ */
+@media (max-width: 1180px) {
+  .kanbanBoard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.kanbanColumn {
+  min-width: 0;
+}
+
+.kanbanColumn h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kanbanCount {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.12);
+  color: var(--theme-text-muted, var(--muted));
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
