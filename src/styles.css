@@ -174,11 +174,6 @@ a:focus-visible {
   align-items: center;
 }
 
-.aiTopHint {
-  font-size: 12px;
-  color: var(--muted);
-}
-
 .topbarRight {
   display: flex;
   flex-direction: column;
@@ -1119,16 +1114,6 @@ a:focus-visible {
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
-.aiArea {
-  flex: 1;
-  min-height: 0;
-  padding: 14px 20px 18px;
-}
-
-.aiArea.isHidden {
-  display: none;
-}
-
 .knowledgeArea {
   flex: 1;
   min-height: 0;
@@ -1585,115 +1570,6 @@ a:focus-visible {
   line-height: 1.65;
 }
 
-.aiConsole {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  height: 100%;
-  min-height: 520px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border: 1px solid rgba(37, 99, 235, 0.2);
-  border-radius: 18px;
-  background:
-    radial-gradient(1200px 360px at -8% -24%, rgba(37, 99, 235, 0.24), rgba(37, 99, 235, 0) 62%),
-    radial-gradient(900px 320px at 110% -20%, rgba(6, 182, 212, 0.22), rgba(6, 182, 212, 0) 65%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(246, 250, 255, 0.88));
-  box-shadow: 0 24px 52px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.76);
-  padding: 14px;
-}
-
-.aiConsole::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0));
-}
-
-.aiConsole > * {
-  position: relative;
-  z-index: 1;
-}
-
-.aiConsoleHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.66);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(18px) saturate(1.22);
-  padding: 10px 12px;
-}
-
-.aiConsoleTitle {
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.aiConsoleStatus {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--muted);
-  padding: 3px 9px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  background: rgba(255, 255, 255, 0.74);
-}
-
-.aiConsoleStatus.isLive {
-  color: #0f766e;
-  border-color: rgba(15, 118, 110, 0.34);
-  background: rgba(15, 118, 110, 0.12);
-}
-
-.aiThinking {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--muted);
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  background: rgba(15, 23, 42, 0.03);
-}
-
-.aiThinking.isActive {
-  color: #1d4ed8;
-  border-color: rgba(37, 99, 235, 0.28);
-  background: rgba(37, 99, 235, 0.08);
-}
-
-.aiThinkingDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: 0.35;
-}
-
-.aiThinking.isActive .aiThinkingDot {
-  animation: aiThinkingPulse 1100ms ease-in-out infinite;
-  opacity: 1;
-}
-
-.aiLatencyBadge {
-  font-size: 11px;
-  font-weight: 700;
-  color: #0f4c81;
-  padding: 3px 9px;
-  border-radius: 999px;
-  border: 1px solid rgba(14, 116, 144, 0.22);
-  background: rgba(14, 165, 233, 0.1);
-}
-
 @keyframes aiThinkingPulse {
   0% {
     transform: scale(0.75);
@@ -1709,359 +1585,6 @@ a:focus-visible {
   }
 }
 
-.aiConsoleActions {
-  margin-left: auto;
-  display: flex;
-  gap: 8px;
-}
-
-.aiConsoleActions .ghostBtn {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  background: rgba(255, 255, 255, 0.76);
-}
-
-.aiConsoleActions .ghostBtn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(37, 99, 235, 0.26);
-}
-
-.aiConsoleMeta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.aiMetaItem {
-  min-width: 0;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.66);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
-  padding: 8px 10px;
-}
-
-.aiMetaLabel {
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 0.08em;
-  font-weight: 700;
-}
-
-.aiMetaValue {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--fg1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.aiProgressPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(239, 246, 255, 0.82));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
-  padding: 12px;
-}
-
-.aiProgressSummary {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.aiProgressLabel {
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 0.08em;
-  font-weight: 700;
-}
-
-.aiProgressValue {
-  margin-top: 4px;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--fg0);
-}
-
-.aiProgressValue.isActive {
-  color: #1d4ed8;
-}
-
-.aiProgressMetric {
-  align-self: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  padding: 5px 9px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.74);
-}
-
-.aiProgressCommand {
-  font-size: 12px;
-  color: #0f4c81;
-  border-radius: 10px;
-  border: 1px solid rgba(14, 116, 144, 0.18);
-  background: rgba(14, 165, 233, 0.08);
-  padding: 8px 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.aiProgressSteps {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-
-.aiProgressEmpty {
-  font-size: 12px;
-  color: var(--muted);
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px dashed rgba(15, 23, 42, 0.16);
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.aiProgressStep {
-  flex: 0 0 200px;
-  min-width: 0;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: rgba(255, 255, 255, 0.88);
-  padding: 9px 10px;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
-}
-
-.aiProgressStep--active {
-  border-color: rgba(37, 99, 235, 0.24);
-  background: rgba(239, 246, 255, 0.94);
-}
-
-.aiProgressStep--done {
-  border-color: rgba(15, 118, 110, 0.22);
-  background: rgba(240, 253, 250, 0.96);
-}
-
-.aiProgressStep--error {
-  border-color: rgba(209, 36, 47, 0.24);
-  background: rgba(254, 242, 242, 0.98);
-}
-
-.aiProgressStepLabel {
-  font-size: 12px;
-  font-weight: 760;
-  color: var(--fg0);
-}
-
-.aiProgressStepDetail {
-  margin-top: 4px;
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--muted);
-  word-break: break-word;
-}
-
-.aiChatFeed {
-  flex: 1;
-  min-height: 240px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0;
-  padding: 14px;
-  overflow: auto;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: linear-gradient(180deg, rgba(243, 248, 255, 0.92), rgba(255, 255, 255, 0.94));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74), inset 0 -24px 32px rgba(15, 23, 42, 0.02);
-}
-
-.aiChatEmpty {
-  color: var(--muted);
-  font-size: 13px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px dashed rgba(15, 23, 42, 0.18);
-  background: rgba(255, 255, 255, 0.72);
-  align-self: center;
-}
-
-.aiMsg {
-  max-width: min(92%, 760px);
-  padding: 9px 12px 10px;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--fg0);
-  white-space: pre-wrap;
-  word-break: break-word;
-  animation: aiMsgEnter 220ms cubic-bezier(0.2, 0.78, 0.2, 1) both;
-}
-
-.aiMsg--assistant {
-  align-self: flex-start;
-  border-color: rgba(37, 99, 235, 0.18);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 247, 255, 0.95));
-}
-
-.aiMsg--assistant.isStreaming {
-  border-color: rgba(37, 99, 235, 0.34);
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.12);
-}
-
-.aiMsg--user {
-  align-self: flex-end;
-  border-color: rgba(37, 99, 235, 0.34);
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.14), rgba(14, 165, 233, 0.11));
-}
-
-.aiMsg--system {
-  align-self: center;
-  border-style: dashed;
-  border-color: rgba(15, 23, 42, 0.2);
-  background: rgba(15, 23, 42, 0.05);
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.aiMsg--error {
-  align-self: flex-start;
-  border-color: rgba(209, 36, 47, 0.32);
-  background: rgba(209, 36, 47, 0.08);
-  color: #8a0f19;
-}
-
-.aiMsgRole {
-  font-size: 10px;
-  font-weight: 760;
-  letter-spacing: 0.08em;
-  margin-bottom: 4px;
-  color: var(--muted);
-}
-
-.aiMsg--assistant .aiMsgRole {
-  color: #1d4ed8;
-}
-
-.aiMsg--user .aiMsgRole {
-  color: #0f4bb8;
-}
-
-.aiMsgBody {
-  margin: 0;
-}
-
-.aiArticlePanel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: rgba(255, 255, 255, 0.72);
-  padding: 10px;
-}
-
-.aiArticleHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.aiArticleTitle {
-  font-size: 12px;
-  font-weight: 760;
-  color: var(--fg0);
-}
-
-.aiArticleHint {
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.aiArticlePathRow {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-}
-
-.aiArticlePathInput {
-  min-width: 0;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.96);
-  color: var(--fg0);
-  padding: 0 10px;
-  outline: none;
-  font-size: 12px;
-}
-
-.aiArticlePathInput:focus {
-  border-color: rgba(37, 99, 235, 0.5);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-}
-
-.aiArticleList {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.aiArticleItem {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  min-height: 30px;
-  border-radius: 10px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  background: rgba(37, 99, 235, 0.06);
-  padding: 5px 6px 5px 10px;
-}
-
-.aiArticlePath {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--fg0);
-}
-
-.aiArticleRemove {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.aiArticleRemove:hover:not(:disabled) {
-  background: rgba(15, 23, 42, 0.08);
-  color: var(--fg0);
-}
-
 @keyframes aiMsgEnter {
   0% {
     opacity: 0;
@@ -2071,41 +1594,6 @@ a:focus-visible {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
-}
-
-.aiConsoleInputRow {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
-  align-items: stretch;
-  border-radius: 14px;
-  border: 1px solid rgba(37, 99, 235, 0.22);
-  padding: 10px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(244, 248, 255, 0.74));
-  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.84);
-}
-
-.aiConsoleInput {
-  min-height: 88px;
-  max-height: 240px;
-  resize: vertical;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.96);
-  padding: 10px 12px;
-  outline: none;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.aiConsoleInput:focus {
-  border-color: rgba(37, 99, 235, 0.5);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
-}
-
-.aiSendBtn {
-  align-self: stretch;
-  min-width: 92px;
 }
 
 .appError {
@@ -3524,26 +3012,6 @@ body {
   border-color: var(--theme-border-selected) !important;
 }
 
-.composerArea .tagInputWrap,
-.composerArea .pane,
-.composerArea .paneWrite,
-.composerArea .panePreview,
-.composerArea .paneTitle,
-.composerArea .tagPickerList,
-.modalCard,
-.settingBlock,
-.noApiCard,
-.aiConsole,
-.aiConsoleHeader,
-.aiProgressPanel,
-.aiMetaItem,
-.aiChatFeed,
-.aiConsoleInputRow {
-  background: linear-gradient(180deg, var(--theme-surface), var(--theme-surface-alt)) !important;
-  border-color: var(--theme-border-strong) !important;
-  box-shadow: 0 12px 26px rgba(var(--theme-shadow-rgb), 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
-}
-
 .paneWrite:focus-within .editor {
   box-shadow: 0 0 0 4px rgba(var(--theme-accent-rgb), 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
@@ -3556,86 +3024,6 @@ body {
 
 .modalOverlay {
   background: var(--theme-overlay) !important;
-}
-
-.aiConsoleStatus,
-.aiThinking,
-.aiMsgRole,
-.aiMetaLabel,
-.aiMetaValue,
-.aiProgressLabel,
-.aiProgressMetric,
-.aiProgressStepDetail,
-.aiTopHint,
-.settingHint,
-.empty,
-.tagEmpty {
-  color: var(--theme-text-muted) !important;
-}
-
-.aiConsoleStatus.isLive {
-  border-color: rgba(var(--theme-accent2-rgb), 0.4) !important;
-  background: rgba(var(--theme-accent2-rgb), 0.16) !important;
-  color: var(--theme-accent2) !important;
-}
-
-.aiThinking.isActive {
-  border-color: rgba(var(--theme-accent-rgb), 0.38) !important;
-  background: rgba(var(--theme-accent-rgb), 0.14) !important;
-  color: var(--theme-accent) !important;
-}
-
-.aiMsg {
-  border-color: var(--theme-border-soft) !important;
-  background: linear-gradient(180deg, var(--theme-surface), var(--theme-surface-alt)) !important;
-  color: var(--theme-text) !important;
-}
-
-.aiMsg--assistant {
-  border-color: rgba(var(--theme-accent-rgb), 0.34) !important;
-}
-
-.aiProgressValue.isActive,
-.aiLatencyBadge,
-.aiProgressCommand {
-  color: var(--theme-accent) !important;
-}
-
-.aiLatencyBadge,
-.aiProgressCommand,
-.aiProgressStep--active {
-  border-color: rgba(var(--theme-accent-rgb), 0.28) !important;
-  background: rgba(var(--theme-accent-rgb), 0.12) !important;
-}
-
-.aiProgressStep--done {
-  border-color: rgba(var(--theme-accent2-rgb), 0.28) !important;
-  background: rgba(var(--theme-accent2-rgb), 0.12) !important;
-}
-
-.aiProgressStep--error {
-  border-color: rgba(var(--theme-danger-rgb), 0.32) !important;
-  background: rgba(var(--theme-danger-rgb), 0.14) !important;
-}
-
-.aiMsg--user {
-  border-color: rgba(var(--theme-accent-rgb), 0.45) !important;
-  background: linear-gradient(
-    180deg,
-    rgba(var(--theme-accent-rgb), 0.2),
-    rgba(var(--theme-accent2-rgb), 0.16)
-  ) !important;
-}
-
-.aiMsg--system {
-  border-color: var(--theme-border) !important;
-  background: linear-gradient(180deg, var(--theme-surface-soft), var(--theme-surface-soft-2)) !important;
-}
-
-.aiMsg--error {
-  border-color: rgba(var(--theme-danger-rgb), 0.55) !important;
-  background: rgba(var(--theme-danger-rgb), 0.16) !important;
-  color: var(--theme-danger) !important;
 }
 
 :is(
@@ -4130,7 +3518,6 @@ html .sidebar .tagItem.isSelected .tagCount {
     .projectIssueUrlInput,
     .kanbanEditInput,
     .kanbanProjectSelect,
-    .aiConsoleInput,
     .tagInput,
     .dateInput,
     .limitSelect
@@ -4179,11 +3566,6 @@ html .sidebar .tagItem.isSelected .tagCount {
   color: var(--theme-text) !important;
   border-color: rgba(var(--theme-accent-rgb), 0.38) !important;
   background: rgba(var(--theme-accent-rgb), 0.16) !important;
-}
-
-[data-acta-theme] :is(.primaryBtn, .primaryActionBtn, .aiSendBtn) {
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff !important;
 }
 
 [data-acta-theme] .dangerGhostBtn {
@@ -4363,40 +3745,6 @@ html .sidebar .tagItem.isSelected .tagCount {
   .composerGrid {
     grid-template-columns: 1fr;
   }
-  .aiConsoleHeader {
-    align-items: flex-start;
-  }
-  .aiConsoleActions {
-    margin-left: 0;
-    width: 100%;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-  }
-  .aiConsoleMeta {
-    grid-template-columns: 1fr;
-  }
-  .aiProgressSummary {
-    flex-direction: column;
-  }
-  .aiProgressMetric {
-    align-self: flex-start;
-  }
-  .aiProgressStep {
-    flex-basis: 180px;
-  }
-  .aiArticleHeader {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .aiArticlePathRow {
-    grid-template-columns: 1fr;
-  }
-  .aiConsoleInputRow {
-    grid-template-columns: 1fr;
-  }
-  .aiSendBtn {
-    min-height: 40px;
-  }
   .editor {
     min-height: 300px;
     max-height: 440px;
@@ -4454,58 +3802,6 @@ html .sidebar .tagItem.isSelected .tagCount {
 }
 
 /* Final override: flat UI across the app */
-body,
-.topbar,
-.sidebar,
-.composerArea,
-.aiArea,
-.scrollArea,
-.commentHeader,
-.modalHeader,
-.commentBody,
-.commentCard,
-.modalCard,
-.settingBlock,
-.tagInputWrap,
-.tagPickerList,
-.pane,
-.paneWrite,
-.panePreview,
-.paneTitle,
-.aiConsole,
-.aiConsoleHeader,
-.aiMetaItem,
-.aiChatFeed,
-.aiConsoleInputRow,
-.noApiCard {
-  background-image: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-.topbar,
-.sidebar,
-.composerArea,
-.commentCard,
-.modalCard,
-.settingBlock,
-.tagInputWrap,
-.tagPickerList,
-.pane,
-.paneWrite,
-.panePreview,
-.paneTitle,
-.aiConsole,
-.aiConsoleHeader,
-.aiMetaItem,
-.aiChatFeed,
-.aiConsoleInputRow,
-.noApiCard {
-  background-color: var(--theme-surface) !important;
-  border-color: var(--theme-border-soft) !important;
-}
-
 .viewTab,
 .viewTab:hover,
 .viewTab.isActive,
@@ -5087,11 +4383,6 @@ body,
     .kanbanCard,
     .todoCard,
     .projectPanel,
-    .aiConsole,
-    .aiConsoleHeader,
-    .aiMetaItem,
-    .aiChatFeed,
-    .aiConsoleInputRow,
     .noApiCard
   ) {
   color: var(--theme-text) !important;
@@ -5141,13 +4432,6 @@ body,
   opacity: 0.9;
 }
 
-[data-acta-theme] :is(.primaryBtn, .primaryActionBtn, .aiSendBtn) {
-  color: var(--theme-on-accent) !important;
-  -webkit-text-fill-color: var(--theme-on-accent) !important;
-  background-color: var(--theme-accent) !important;
-  border-color: var(--theme-accent) !important;
-}
-
 [data-acta-theme] :is(.viewTab, .projectNavItem, .ghostBtn, .settingsFab, .modalClose) {
   color: var(--theme-text-subtle) !important;
 }
@@ -5156,10 +4440,6 @@ body,
   color: var(--theme-text) !important;
   background-color: rgba(var(--theme-accent-rgb), 0.16) !important;
   border-color: rgba(var(--theme-accent-rgb), 0.4) !important;
-}
-
-[data-acta-theme] :is(.commentMeta, .settingHint, .empty, .tagEmpty, .aiTopHint, .composerFooterHint) {
-  color: var(--theme-text-muted) !important;
 }
 
 [data-acta-theme] :is(.md, .preview, .commentBody, .commentBody .md) {

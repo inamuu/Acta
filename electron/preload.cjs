@@ -2,8 +2,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("acta", {
   getDataDir: () => ipcRenderer.invoke("acta:getDataDir"),
-  getAiSettings: () => ipcRenderer.invoke("acta:getAiSettings"),
-  saveAiSettings: (payload) => ipcRenderer.invoke("acta:saveAiSettings", payload),
+  getSettings: () => ipcRenderer.invoke("acta:getSettings"),
+  saveSettings: (payload) => ipcRenderer.invoke("acta:saveSettings", payload),
   listEntries: () => ipcRenderer.invoke("acta:listEntries"),
   addEntry: (payload) => ipcRenderer.invoke("acta:addEntry", payload),
   saveImage: (payload) => ipcRenderer.invoke("acta:saveImage", payload),
@@ -37,11 +37,6 @@ contextBridge.exposeInMainWorld("acta", {
   openKnowledgeSite: () => ipcRenderer.invoke("acta:openKnowledgeSite"),
   syncPull: () => ipcRenderer.invoke("acta:syncPull"),
   syncBackup: () => ipcRenderer.invoke("acta:syncBackup"),
-  chooseAiArticleFiles: () => ipcRenderer.invoke("acta:chooseAiArticleFiles"),
-  aiStartSession: (payload) => ipcRenderer.invoke("acta:aiStartSession", payload),
-  aiSendInput: (payload) => ipcRenderer.invoke("acta:aiSendInput", payload),
-  aiReadOutput: (payload) => ipcRenderer.invoke("acta:aiReadOutput", payload),
-  aiStopSession: (payload) => ipcRenderer.invoke("acta:aiStopSession", payload),
   onDataChanged: (listener) => {
     const handler = () => {
       if (typeof listener === "function") listener();

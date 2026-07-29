@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type {
-  ActaAiSettings,
+  ActaSettings,
   ActaEntry,
   ActaProject,
   ActaThemeId,
@@ -11,7 +11,6 @@ import type {
   KnowledgeSiteResult,
   SyncResult
 } from "../shared/types";
-import { AiConsole } from "./components/AiConsole";
 import { CommentCard } from "./components/CommentCard";
 import { Composer } from "./components/Composer";
 import { SettingsModal } from "./components/SettingsModal";
@@ -21,7 +20,7 @@ import { setTaskStateOnLine, summarizeTaskStates, type TaskState } from "./lib/t
 
 type TagStat = { tag: string; count: number };
 type DateFilterMode = "week" | "day" | "all";
-type ActiveView = "todo" | "projects" | "journal" | "knowledge" | "ai";
+type ActiveView = "todo" | "projects" | "journal" | "knowledge";
 type DraftPost = {
   key: string;
   body: string;
@@ -203,11 +202,7 @@ export function App() {
   const [knowledgeStatus, setKnowledgeStatus] = useState("");
   const [knowledgeIndex, setKnowledgeIndex] = useState<KnowledgeIndexResult | null>(null);
   const [knowledgeSite, setKnowledgeSite] = useState<KnowledgeSiteResult | null>(null);
-  const [aiSettings, setAiSettings] = useState<ActaAiSettings>({
-    cliPath: "/opt/homebrew/bin/codex",
-    instructionMarkdown: "",
-    theme: "default"
-  });
+  const [settings, setSettings] = useState<ActaSettings>({ theme: "default" });
   const [githubSyncBusy, setGithubSyncBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncIndicator, setSyncIndicator] = useState<SyncIndicatorState>({
@@ -348,7 +343,7 @@ export function App() {
       setLoading(true);
       setAppError("");
       try {
-        const [dirRes, aiRes] = await Promise.allSettled([api.getDataDir(), api.getAiSettings()]);
+        const [dirRes, settingsRes] = await Promise.allSettled([api.getDataDir(), api.getSettings()]);
         if (cancelled) return;
 
         if (dirRes.status === "fulfilled") {
@@ -357,8 +352,8 @@ export function App() {
           setDataDir("");
         }
 
-        if (aiRes.status === "fulfilled") {
-          setAiSettings({ ...aiRes.value, theme: normalizeTheme(aiRes.value.theme) });
+        if (settingsRes.status === "fulfilled") {
+          setSettings({ theme: normalizeTheme(settingsRes.value.theme) });
         }
 
         try {
@@ -413,7 +408,7 @@ export function App() {
     };
   }, [api]);
 
-  // データフォルダが外部（CLI/AI/git）から更新されたら黙って読み直す。
+  // データフォルダが外部（CLI/git）から更新されたら黙って読み直す。
   const refreshFromDiskRef = useRef<() => void>(() => {});
   refreshFromDiskRef.current = () => {
     if (!api || loading) return;
@@ -442,9 +437,9 @@ export function App() {
   }, [limit]);
 
   useEffect(() => {
-    const nextTheme = normalizeTheme(aiSettings.theme);
+    const nextTheme = normalizeTheme(settings.theme);
     document.documentElement.setAttribute("data-acta-theme", nextTheme);
-  }, [aiSettings.theme]);
+  }, [settings.theme]);
 
   useEffect(() => {
     setEditingProjectTaskId("");
@@ -473,11 +468,11 @@ export function App() {
   }, [projectStatus]);
 
   useEffect(() => {
-    const VIEW_ORDER: ActiveView[] = ["todo", "projects", "journal", "knowledge", "ai"];
+    const VIEW_ORDER: ActiveView[] = ["todo", "projects", "journal", "knowledge"];
 
     function onKeyDown(e: KeyboardEvent) {
       const key = e.key.toLowerCase();
-      if ((e.ctrlKey || e.metaKey) && /^[1-5]$/.test(key)) {
+      if ((e.ctrlKey || e.metaKey) && /^[1-4]$/.test(key)) {
         const next = VIEW_ORDER[Number(key) - 1];
         if (next) {
           e.preventDefault();
@@ -1926,9 +1921,6 @@ export function App() {
           </section>
         ) : null}
 
-        <section className={`aiArea ${activeView === "ai" ? "" : "isHidden"}`}>
-          <AiConsole settings={aiSettings} dataDir={dataDir} />
-        </section>
       </main>
 
       {syncIndicator.label ? (
@@ -1959,9 +1951,7 @@ export function App() {
       {settingsOpen ? (
         <SettingsModal
           dataDir={dataDir}
-          aiCliPath={aiSettings.cliPath}
-          aiInstructionMarkdown={aiSettings.instructionMarkdown}
-          aiTheme={normalizeTheme(aiSettings.theme)}
+          theme={normalizeTheme(settings.theme)}
           onClose={() => setSettingsOpen(false)}
           onChooseDataDir={async () => {
             try {
@@ -1979,9 +1969,9 @@ export function App() {
               setAppError(msg || "保存先の変更に失敗しました");
             }
           }}
-          onSaveAiSettings={async (payload) => {
-            const saved = await api.saveAiSettings(payload);
-            setAiSettings({ ...saved, theme: normalizeTheme(saved.theme) });
+          onSaveSettings={async (payload) => {
+            const saved = await api.saveSettings(payload);
+            setSettings({ theme: normalizeTheme(saved.theme) });
           }}
         />
       ) : null}

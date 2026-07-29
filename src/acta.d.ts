@@ -1,17 +1,10 @@
 import type {
   ActaEntry,
-  ActaAiSettings,
+  ActaSettings,
   ActaProject,
   AddEntryPayload,
   AddProjectKnowledgePayload,
   AddProjectTaskPayload,
-  AiReadOutputPayload,
-  AiReadOutputResult,
-  AiChooseArticleFilesResult,
-  AiSendInputPayload,
-  AiStartSessionPayload,
-  AiStartSessionResult,
-  AiStopSessionPayload,
   ChooseDataDirResult,
   CreateProjectPayload,
   DeleteProjectKnowledgePayload,
@@ -29,7 +22,7 @@ import type {
   ReassignProjectTaskPayload,
   RenameProjectPayload,
   RenameProjectTaskPayload,
-  SaveAiSettingsPayload,
+  SaveSettingsPayload,
   SaveImagePayload,
   SaveImageResult,
   SaveProjectPayload,
@@ -45,8 +38,8 @@ declare global {
   interface Window {
     acta?: {
       getDataDir: () => Promise<string>;
-      getAiSettings: () => Promise<ActaAiSettings>;
-      saveAiSettings: (payload: SaveAiSettingsPayload) => Promise<ActaAiSettings>;
+      getSettings: () => Promise<ActaSettings>;
+      saveSettings: (payload: SaveSettingsPayload) => Promise<ActaSettings>;
       listEntries: () => Promise<ActaEntry[]>;
       addEntry: (payload: AddEntryPayload) => Promise<ActaEntry>;
       saveImage: (payload: SaveImagePayload) => Promise<SaveImageResult>;
@@ -79,11 +72,6 @@ declare global {
       openKnowledgeSite: () => Promise<{ opened: boolean; path: string; error?: string }>;
       syncPull: () => Promise<SyncResult>;
       syncBackup: () => Promise<SyncResult>;
-      chooseAiArticleFiles: () => Promise<AiChooseArticleFilesResult>;
-      aiStartSession: (payload: AiStartSessionPayload) => Promise<AiStartSessionResult>;
-      aiSendInput: (payload: AiSendInputPayload) => Promise<{ sent: boolean }>;
-      aiReadOutput: (payload: AiReadOutputPayload) => Promise<AiReadOutputResult>;
-      aiStopSession: (payload: AiStopSessionPayload) => Promise<{ stopped: boolean }>;
       onDataChanged?: (listener: () => void) => () => void;
     };
   }

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import type { ActaThemeId, SaveAiSettingsPayload } from "../../shared/types";
+import type { ActaThemeId, SaveSettingsPayload } from "../../shared/types";
 
 const THEME_OPTIONS: Array<{ value: ActaThemeId; label: string }> = [
   { value: "default", label: "default（現在のテーマ）" },
@@ -15,27 +15,15 @@ const THEME_OPTIONS: Array<{ value: ActaThemeId; label: string }> = [
 
 type Props = {
   dataDir: string;
-  aiCliPath: string;
-  aiInstructionMarkdown: string;
-  aiTheme: ActaThemeId;
+  theme: ActaThemeId;
   onChooseDataDir: () => Promise<void>;
-  onSaveAiSettings: (payload: SaveAiSettingsPayload) => Promise<void>;
+  onSaveSettings: (payload: SaveSettingsPayload) => Promise<void>;
   onClose: () => void;
 };
 
-export function SettingsModal({
-  dataDir,
-  aiCliPath,
-  aiInstructionMarkdown,
-  aiTheme,
-  onChooseDataDir,
-  onSaveAiSettings,
-  onClose
-}: Props) {
+export function SettingsModal({ dataDir, theme: themeProp, onChooseDataDir, onSaveSettings, onClose }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  const [cliPath, setCliPath] = useState(aiCliPath);
-  const [instructionMarkdown, setInstructionMarkdown] = useState(aiInstructionMarkdown);
-  const [theme, setTheme] = useState<ActaThemeId>(aiTheme);
+  const [theme, setTheme] = useState<ActaThemeId>(themeProp);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -44,16 +32,8 @@ export function SettingsModal({
   }, []);
 
   useEffect(() => {
-    setCliPath(aiCliPath);
-  }, [aiCliPath]);
-
-  useEffect(() => {
-    setInstructionMarkdown(aiInstructionMarkdown);
-  }, [aiInstructionMarkdown]);
-
-  useEffect(() => {
-    setTheme(aiTheme);
-  }, [aiTheme]);
+    setTheme(themeProp);
+  }, [themeProp]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -63,17 +43,13 @@ export function SettingsModal({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  async function saveAiSettings() {
+  async function saveSettings() {
     if (saving) return;
 
     setSaving(true);
     setSaveMessage("");
     try {
-      await onSaveAiSettings({
-        cliPath,
-        instructionMarkdown,
-        theme
-      });
+      await onSaveSettings({ theme });
       setSaveMessage("保存しました");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -105,40 +81,17 @@ export function SettingsModal({
           </div>
 
           <div className="settingBlock">
-            <div className="settingLabel">生成AI CLI</div>
-            <input
-              className="settingTextInput"
-              type="text"
-              value={cliPath}
-              onChange={(e) => setCliPath(e.target.value)}
-              placeholder="/opt/homebrew/bin/codex"
-              spellCheck={false}
-            />
-
-            <div className="settingCol">
-              <div className="settingSubLabel">テーマ</div>
-              <select className="settingTextInput" value={theme} onChange={(e) => setTheme(e.target.value as ActaThemeId)}>
-                {THEME_OPTIONS.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="settingCol">
-              <div className="settingSubLabel">指示 (Markdown)</div>
-              <textarea
-                className="settingTextarea"
-                value={instructionMarkdown}
-                onChange={(e) => setInstructionMarkdown(e.target.value)}
-                spellCheck={false}
-                placeholder="生成AIへ毎回渡す指示をMarkdownで記載"
-              />
-            </div>
+            <div className="settingLabel">テーマ</div>
+            <select className="settingTextInput" value={theme} onChange={(e) => setTheme(e.target.value as ActaThemeId)}>
+              {THEME_OPTIONS.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
 
             <div className="settingActions">
-              <button className="primaryBtn" type="button" onClick={() => void saveAiSettings()} disabled={saving}>
+              <button className="primaryBtn" type="button" onClick={() => void saveSettings()} disabled={saving}>
                 {saving ? "保存中..." : "保存"}
               </button>
               {saveMessage ? <div className="settingHint">{saveMessage}</div> : null}

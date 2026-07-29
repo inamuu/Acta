@@ -21,7 +21,6 @@ const KNOWLEDGE_STATE_FILE = "knowledge-index-state.json";
 const KNOWLEDGE_SITE_DIR = "wiki";
 const SYNC_SUCCESS = "Sync Success";
 const SYNC_ERROR = "Sync Error";
-const DEFAULT_AI_CLI_PATH = "/opt/homebrew/bin/codex";
 const DEFAULT_THEME = "default";
 const GITHUB_SEARCH_LIMIT = 1000;
 const GITHUB_UNCLASSIFIED_PROJECT_NAME = "未分類";
@@ -284,39 +283,17 @@ async function ensureUniqueProjectDirName(name) {
   return candidate;
 }
 
-function buildDefaultAiInstruction(dataDir) {
-  const dir = String(dataDir ?? "").trim() || getDefaultDataDir();
-  return [
-    `<data>${dir}</data> の中身を読み込んでください。`,
-    "検索や調査を求められた場合は、必要に応じて data 直下の knowledge-index.sqlite を SQLite で検索してください。Wiki 形式で俯瞰したい場合は wiki/index.html も参照できます。",
-    "例えば、今日から一週間分のサマリーを作成してと言われたら、今日の日付から一週間分の内容を読み込んでサマリーを作成して、他のファイルと同じように今の日時でファイルを作成、またはすでにファイルがあれば追記するようにしてください。",
-    "作成してと言われたファイルはすべて、上記 data に保存するようにしてください。"
-  ].join("\n");
-}
-
 function normalizeTheme(raw) {
   const t = String(raw ?? "").trim().toLowerCase();
   return ALLOWED_THEMES.has(t) ? t : DEFAULT_THEME;
 }
 
-function getAiSettings() {
+function getSettings() {
   const s = loadSettings();
-  const cliPath = typeof s.aiCliPath === "string" ? s.aiCliPath.trim() : "";
-  const instructionMarkdown =
-    typeof s.aiInstructionMarkdown === "string" && s.aiInstructionMarkdown.trim().length > 0
-      ? s.aiInstructionMarkdown
-      : buildDefaultAiInstruction(getDataDir());
-  const theme = normalizeTheme(s.theme);
-  return {
-    cliPath: cliPath || DEFAULT_AI_CLI_PATH,
-    instructionMarkdown,
-    theme
-  };
+  return { theme: normalizeTheme(s.theme) };
 }
 
-function setAiSettings(payload) {
-  const cliPath = String(payload?.cliPath ?? "").trim() || DEFAULT_AI_CLI_PATH;
-  const instructionMarkdown = String(payload?.instructionMarkdown ?? "").trim() || buildDefaultAiInstruction(getDataDir());
+function setSettings(payload) {
   const theme = normalizeTheme(payload?.theme);
   const s = loadSettings();
   const {
@@ -325,16 +302,13 @@ function setAiSettings(payload) {
     githubProjectNumber: _githubProjectNumber,
     githubProjectFieldName: _githubProjectFieldName,
     githubProjectMaxItems: _githubProjectMaxItems,
-    ...settingsWithoutLegacyGitHubProjects
+    aiCliPath: _aiCliPath,
+    aiInstructionMarkdown: _aiInstructionMarkdown,
+    ...settingsWithoutRemovedKeys
   } = s;
-  saveSettings({
-    ...settingsWithoutLegacyGitHubProjects,
-    aiCliPath: cliPath,
-    aiInstructionMarkdown: instructionMarkdown,
-    theme
-  });
+  saveSettings({ ...settingsWithoutRemovedKeys, theme });
 
-  return getAiSettings();
+  return getSettings();
 }
 
 async function setDataDir(dir) {
@@ -1667,7 +1641,7 @@ async function moveProjectTask(payload) {
   if (!changed) throw new Error("タスクが見つかりません");
   const written = await writeProject(project);
   if (!written.archivedAtMs && movedTask) {
-    await upsertProjectTasksToLatestTodo(written, [movedTask]);
+    await upsertProjectTasksToTodayTodo(written, [movedTask]);
   }
   return written;
 }
@@ -2132,12 +2106,18 @@ async function appendToTodayTodo(body) {
   return { ...current, body: nextBody };
 }
 
-async function upsertProjectTasksToLatestTodo(project, tasks) {
+// 追記先は常に「今日のToDo」。無ければ今日の日付で新規作成する。
+async function findTodayTodoEntry() {
+  const today = formatDate(new Date());
+  const entries = await listEntries();
+  return entries.find((entry) => entry.date === today && isTodoEntry(entry)) || null;
+}
+
+async function upsertProjectTasksToTodayTodo(project, tasks) {
   const targetTasks = (tasks || []).filter((task) => task?.title);
   if (!targetTasks.length) return null;
 
-  const entries = await listEntries();
-  const current = entries.find((entry) => isTodoEntry(entry));
+  const current = await findTodayTodoEntry();
   if (!current) {
     return addTodoEntry(buildTodoBodyFromProjectGroups([{ name: project.name, tasks: targetTasks }], "ToDo"));
   }
@@ -2147,7 +2127,7 @@ async function upsertProjectTasksToLatestTodo(project, tasks) {
 
   const tags = Array.from(new Set([...(current.tags || []), TODO_TAG]));
   const res = await updateEntry({ id: current.id, body: nextBody, tags });
-  if (!res.updated) throw new Error("最新のToDo更新に失敗しました");
+  if (!res.updated) throw new Error("今日のToDo更新に失敗しました");
   return { ...current, body: nextBody, tags };
 }
 
@@ -2161,7 +2141,7 @@ async function appendProjectInProgressToTodayTodo(payload) {
   if (project.archivedAtMs) throw new Error("アーカイブ済みプロジェクトはToDoに追記できません");
   const tasks = project.tasks.filter((task) => task.status === "InProgress" || task.status === "GitHub");
   if (tasks.length === 0) throw new Error("InProgress / GitHub のタスクがありません");
-  return upsertProjectTasksToLatestTodo(project, tasks);
+  return upsertProjectTasksToTodayTodo(project, tasks);
 }
 
 async function appendActiveProjectsInProgressToTodayTodo() {
@@ -2175,8 +2155,7 @@ async function appendActiveProjectsInProgressToTodayTodo() {
     .filter((group) => group.tasks.length > 0);
   if (groups.length === 0) throw new Error("InProgress / GitHub のプロジェクトタスクがありません");
 
-  const entries = await listEntries();
-  const current = entries.find((entry) => isTodoEntry(entry));
+  const current = await findTodayTodoEntry();
   if (!current) {
     return addTodoEntry(
       buildTodoBodyFromProjectGroups(
@@ -2194,7 +2173,7 @@ async function appendActiveProjectsInProgressToTodayTodo() {
 
   const tags = Array.from(new Set([...(current.tags || []), TODO_TAG]));
   const res = await updateEntry({ id: current.id, body: nextBody, tags });
-  if (!res.updated) throw new Error("最新のToDo更新に失敗しました");
+  if (!res.updated) throw new Error("今日のToDo更新に失敗しました");
   return { ...current, body: nextBody, tags };
 }
 
@@ -2222,8 +2201,8 @@ async function copyPreviousTodo() {
 module.exports = {
   getDataDir,
   setDataDir,
-  getAiSettings,
-  setAiSettings,
+  getSettings,
+  setSettings,
   listEntries,
   addEntry,
   saveImage,

@@ -11,7 +11,7 @@ type TagGroup = {
 };
 
 type Props = {
-  activeView: "todo" | "projects" | "journal" | "knowledge" | "ai";
+  activeView: "todo" | "projects" | "journal" | "knowledge";
   selectedTags: string[];
   untaggedOnly: boolean;
   totalCount: number;
@@ -21,7 +21,7 @@ type Props = {
   tagStats: TagStat[];
   untaggedCount: number;
   selectedProjectName: string;
-  onChangeView: (view: "todo" | "projects" | "journal" | "knowledge" | "ai") => void;
+  onChangeView: (view: "todo" | "projects" | "journal" | "knowledge") => void;
   onToggleTag: (tag: string) => void;
   onSelectAll: () => void;
   onToggleUntagged: () => void;
@@ -141,15 +141,6 @@ export function TagSidebar({
         >
           <span className="sideNavIcon">⌕</span>
           <span className="sideNavText">検索</span>
-        </button>
-        <button
-          className={`sideNavItem ${activeView === "ai" ? "isActive" : ""}`}
-          type="button"
-          onClick={() => onChangeView("ai")}
-          title="⌘5"
-        >
-          <span className="sideNavIcon">✦</span>
-          <span className="sideNavText">AI対話</span>
         </button>
       </div>
 
