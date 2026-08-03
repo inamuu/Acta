@@ -54,6 +54,18 @@ function formatDate(d) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
+const WEEKDAY_JA = ["日", "月", "火", "水", "木", "金", "土"];
+
+/** ToDo見出し用の日付表記（例: 2026/08/03（月））。 */
+function formatDateJa(d) {
+  return `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}（${WEEKDAY_JA[d.getDay()]}）`;
+}
+
+/** ToDoエントリの見出し。日付が分かるように「ToDo: 2026/08/03（月）」形式にする。 */
+function todoHeading(date = new Date()) {
+  return `${TODO_TAG}: ${formatDateJa(date)}`;
+}
+
 function formatTime(d) {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
@@ -2100,7 +2112,7 @@ async function appendToTodayTodo(body) {
   if (!current) return addTodoEntry(body);
 
   const separator = current.body.trimEnd() ? "\n" : "";
-  const nextBody = `${current.body.trimEnd()}${separator}${String(body ?? "").replace(/^#\s+ToDo\s*\n*/i, "").trim()}`;
+  const nextBody = `${current.body.trimEnd()}${separator}${String(body ?? "").replace(/^#\s*todo\b[^\n]*\n*/i, "").trim()}`;
   const res = await updateEntry({ id: current.id, body: nextBody, tags: current.tags });
   if (!res.updated) throw new Error("今日のToDo更新に失敗しました");
   return { ...current, body: nextBody };
@@ -2119,7 +2131,7 @@ async function upsertProjectTasksToTodayTodo(project, tasks) {
 
   const current = await findTodayTodoEntry();
   if (!current) {
-    return addTodoEntry(buildTodoBodyFromProjectGroups([{ name: project.name, tasks: targetTasks }], "ToDo"));
+    return addTodoEntry(buildTodoBodyFromProjectGroups([{ name: project.name, tasks: targetTasks }], todoHeading()));
   }
 
   const nextBody = upsertProjectTasksInTodoBody(current.body, project.name, targetTasks);
@@ -2160,7 +2172,7 @@ async function appendActiveProjectsInProgressToTodayTodo() {
     return addTodoEntry(
       buildTodoBodyFromProjectGroups(
         groups.map(({ project, tasks }) => ({ name: project.name, tasks })),
-        "ToDo"
+        todoHeading()
       )
     );
   }
@@ -2187,7 +2199,15 @@ async function createTodoFromProjects() {
     }))
     .filter((group) => group.tasks.length > 0);
   if (groups.length === 0) throw new Error("InProgress / GitHub のプロジェクトタスクがありません");
-  return addTodoEntry(buildTodoBodyFromProjectGroups(groups, "ToDo"));
+  return addTodoEntry(buildTodoBodyFromProjectGroups(groups, todoHeading()));
+}
+
+/** 先頭のToDo見出しを今日の日付に差し替える（無ければ付ける）。 */
+function replaceTodoHeading(body, date = new Date()) {
+  const text = String(body ?? "").trim();
+  const heading = `# ${todoHeading(date)}`;
+  if (/^#\s*todo\b[^\n]*/i.test(text)) return text.replace(/^#\s*todo\b[^\n]*/i, heading);
+  return text ? `${heading}\n${text}` : heading;
 }
 
 async function copyPreviousTodo() {
@@ -2195,7 +2215,7 @@ async function copyPreviousTodo() {
   const today = formatDate(new Date());
   const previous = entries.find((entry) => entry.date < today && isTodoEntry(entry));
   if (!previous) throw new Error("コピーできる前回のToDoがありません");
-  return addTodoEntry(previous.body);
+  return addTodoEntry(replaceTodoHeading(previous.body));
 }
 
 module.exports = {

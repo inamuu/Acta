@@ -1080,21 +1080,41 @@ export function App() {
 
   return (
     <div className="shell">
-      <div className="titlebar" title="ドラッグしてウィンドウを移動" />
+      <header className="appHeader" title="ドラッグしてウィンドウを移動">
+        <nav className="appNav" aria-label="機能切り替え">
+          {(
+            [
+              { view: "todo", icon: "✓", label: "ToDo", count: todoEntries.length, hint: "⌘1" },
+              { view: "projects", icon: "▦", label: "プロジェクト", count: activeProjectTaskCount, hint: "⌘2" },
+              { view: "journal", icon: "◷", label: "ナレッジ", count: entries.length, hint: "⌘3" },
+              { view: "knowledge", icon: "⌕", label: "検索", count: null, hint: "⌘4" }
+            ] as const
+          ).map((item) => (
+            <button
+              key={item.view}
+              className={`appNavItem ${activeView === item.view ? "isActive" : ""}`}
+              type="button"
+              title={item.hint}
+              onClick={() => setActiveView(item.view)}
+            >
+              <span className="appNavIcon">{item.icon}</span>
+              <span className="appNavText">{item.label}</span>
+              {item.count === null ? null : <span className="appNavCount">{item.count}</span>}
+            </button>
+          ))}
+        </nav>
+      </header>
 
       <aside className="sidebar dragScroll" ref={sidebarRef}>
         <TagSidebar
-          activeView={activeView}
           selectedTags={selectedTags}
           untaggedOnly={untaggedOnly}
           totalCount={entries.length}
-          todoCount={todoEntries.length}
           activeProjectCount={activeProjectCount}
           activeProjectTaskCount={activeProjectTaskCount}
           tagStats={tagStats}
           untaggedCount={untaggedCount}
           selectedProjectName={selectedProject?.name ?? ""}
-          onChangeView={(view) => setActiveView(view)}
           onToggleTag={toggleTagFilter}
           onSelectAll={clearTagFilter}
           onToggleUntagged={toggleUntaggedFilter}

@@ -11,17 +11,14 @@ type TagGroup = {
 };
 
 type Props = {
-  activeView: "todo" | "projects" | "journal" | "knowledge";
   selectedTags: string[];
   untaggedOnly: boolean;
   totalCount: number;
-  todoCount: number;
   activeProjectCount: number;
   activeProjectTaskCount: number;
   tagStats: TagStat[];
   untaggedCount: number;
   selectedProjectName: string;
-  onChangeView: (view: "todo" | "projects" | "journal" | "knowledge") => void;
   onToggleTag: (tag: string) => void;
   onSelectAll: () => void;
   onToggleUntagged: () => void;
@@ -34,17 +31,14 @@ function groupKey(tag: string): string {
 }
 
 export function TagSidebar({
-  activeView,
   selectedTags,
   untaggedOnly,
   totalCount,
-  todoCount,
   activeProjectCount,
   activeProjectTaskCount,
   tagStats,
   untaggedCount,
   selectedProjectName,
-  onChangeView,
   onToggleTag,
   onSelectAll,
   onToggleUntagged
@@ -100,48 +94,6 @@ export function TagSidebar({
       <div className="sideBrand" data-no-drag-scroll title="ドラッグしてウィンドウを移動">
         <div className="sideBrandName">Acta</div>
         <div className="sideBrandSub">{selectedProjectName || "今日の作業"}</div>
-      </div>
-
-      <div className="sideNav">
-        <button
-          className={`sideNavItem ${activeView === "todo" ? "isActive" : ""}`}
-          type="button"
-          onClick={() => onChangeView("todo")}
-          title="⌘1"
-        >
-          <span className="sideNavIcon">✓</span>
-          <span className="sideNavText">ToDo</span>
-          <span className="tagCount">{todoCount}</span>
-        </button>
-        <button
-          className={`sideNavItem ${activeView === "projects" ? "isActive" : ""}`}
-          type="button"
-          onClick={() => onChangeView("projects")}
-          title="⌘2"
-        >
-          <span className="sideNavIcon">▦</span>
-          <span className="sideNavText">プロジェクト</span>
-          <span className="tagCount">{activeProjectTaskCount}</span>
-        </button>
-        <button
-          className={`sideNavItem ${activeView === "journal" ? "isActive" : ""}`}
-          type="button"
-          onClick={() => onChangeView("journal")}
-          title="⌘3"
-        >
-          <span className="sideNavIcon">◷</span>
-          <span className="sideNavText">ナレッジ</span>
-          <span className="tagCount">{totalCount}</span>
-        </button>
-        <button
-          className={`sideNavItem ${activeView === "knowledge" ? "isActive" : ""}`}
-          type="button"
-          onClick={() => onChangeView("knowledge")}
-          title="⌘4"
-        >
-          <span className="sideNavIcon">⌕</span>
-          <span className="sideNavText">検索</span>
-        </button>
       </div>
 
       <div className="sideStats">

@@ -31,6 +31,8 @@
 html,
 body {
   height: 100%;
+  /* ページ全体はスクロールさせない。スクロールは各ビュー内の領域だけで起こす。 */
+  overflow: hidden;
 }
 
 body {
@@ -91,22 +93,86 @@ a:focus-visible {
     "titlebar titlebar"
     "sidebar main";
   height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
 }
 
-/* macOS (titleBarStyle: hiddenInset) 用のウィンドウ移動バー。 */
-.titlebar {
+/*
+ * 常時表示のアプリヘッダー。スクロールしても消えない位置（グリッドの独立行）に置く。
+ * macOS (titleBarStyle: hiddenInset) ではウィンドウ移動用のドラッグ領域も兼ねる。
+ */
+.appHeader {
   grid-area: titlebar;
-  display: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--borderSoft);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(40px) saturate(1.35);
+  -webkit-app-region: drag;
 }
 
-:root[data-os="mac"] .titlebar {
-  display: block;
-  height: 28px;
+/* 信号機ボタンと重ならないよう左に余白を取る。 */
+:root[data-os="mac"] .appHeader {
+  padding-left: 86px;
+}
+
+.appNav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
   -webkit-app-region: drag;
+}
+
+.appNavItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg1);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.appNavItem:hover {
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--fg0);
+}
+
+.appNavItem.isActive {
+  border-color: var(--borderSoft);
+  background: var(--bg1);
+  color: var(--fg0);
+}
+
+.appNavIcon {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.appNavCount {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.22);
+  color: var(--fg2);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
 }
 
 .sidebar {
   grid-area: sidebar;
+  min-height: 0;
   border-right: 1px solid var(--borderSoft);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08));
   backdrop-filter: blur(40px) saturate(1.35);
@@ -120,9 +186,12 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .topbar {
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: minmax(300px, 720px) 1fr;
   gap: 18px;
@@ -421,6 +490,7 @@ a:focus-visible {
 
 .scrollArea {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 20px 20px 0;
 }
@@ -4675,4 +4745,74 @@ html .sidebar .tagItem.isSelected .tagCount {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   text-align: center;
+}
+
+/* ---------------------------------------------------------------------------
+   常時表示ヘッダー（テーマ変数にフォールバック）
+   --------------------------------------------------------------------------- */
+
+[data-acta-theme] .appHeader {
+  background:
+    radial-gradient(960px 340px at -14% -26%, var(--theme-shell-accent), transparent 64%),
+    linear-gradient(180deg, var(--theme-surface), var(--theme-surface-alt)) !important;
+  border-color: var(--theme-border-strong) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-acta-theme] .appNavItem {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-acta-theme] .appNavItem:hover {
+  background: linear-gradient(180deg, var(--theme-sidebar-item-hover-top), var(--theme-sidebar-item-hover-bottom)) !important;
+  border-color: var(--theme-sidebar-item-hover-border) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-acta-theme] .appNavItem.isActive {
+  background: linear-gradient(180deg, var(--theme-sidebar-item-active-top), var(--theme-sidebar-item-active-bottom)) !important;
+  border-color: var(--theme-sidebar-item-active-border) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-acta-theme] .appNavCount {
+  background: var(--theme-sidebar-count-bg) !important;
+  border: 1px solid var(--theme-sidebar-count-border) !important;
+  color: var(--theme-sidebar-count-fg) !important;
+}
+
+[data-acta-theme] .appNavItem.isActive .appNavCount {
+  background: var(--theme-sidebar-count-active-bg) !important;
+  border-color: var(--theme-sidebar-count-active-border) !important;
+  color: var(--theme-sidebar-count-active-fg) !important;
+}
+
+/* 各画面のツールバーはスクロールしても上端に残す。 */
+.knowledgeToolbar {
+  position: sticky;
+  top: -18px;
+  z-index: 2;
+  padding: 10px 0;
+  background: linear-gradient(
+    180deg,
+    var(--theme-bg-color, #eef4ff) 0%,
+    var(--theme-bg-color, #eef4ff) 72%,
+    transparent 100%
+  );
+  backdrop-filter: blur(18px) saturate(1.1);
+}
+
+.projectHeader {
+  position: sticky;
+  top: -18px;
+  z-index: 2;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  background: linear-gradient(
+    180deg,
+    var(--theme-bg-color, #eef4ff) 0%,
+    var(--theme-bg-color, #eef4ff) 74%,
+    transparent 100%
+  );
+  backdrop-filter: blur(18px) saturate(1.1);
 }
