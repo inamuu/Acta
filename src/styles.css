@@ -86,10 +86,27 @@ a:focus-visible {
 .shell {
   display: grid;
   grid-template-columns: 270px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "titlebar titlebar"
+    "sidebar main";
   height: 100vh;
 }
 
+/* macOS (titleBarStyle: hiddenInset) 用のウィンドウ移動バー。 */
+.titlebar {
+  grid-area: titlebar;
+  display: none;
+}
+
+:root[data-os="mac"] .titlebar {
+  display: block;
+  height: 28px;
+  -webkit-app-region: drag;
+}
+
 .sidebar {
+  grid-area: sidebar;
   border-right: 1px solid var(--borderSoft);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08));
   backdrop-filter: blur(40px) saturate(1.35);
@@ -99,6 +116,7 @@ a:focus-visible {
 }
 
 .main {
+  grid-area: main;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -3695,7 +3713,11 @@ html .sidebar .tagItem.isSelected .tagCount {
 @media (max-width: 980px) {
   .shell {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "titlebar"
+      "sidebar"
+      "main";
   }
   .sidebar {
     border-right: 0;
@@ -3837,6 +3859,28 @@ html .sidebar .tagItem.isSelected .tagCount {
 
 /* Editorial workspace: a quiet, unified surface for writing and reviewing. */
 .sideBrand {
+  -webkit-app-region: drag;
+}
+
+/*
+ * -webkit-app-region は継承されないため、drag 指定した親の中にある子要素は
+ * 既定で drag 領域に「穴」を空けてしまう。操作対象でないコンテナやラベルには
+ * 明示的に drag を指定して、ウィンドウ移動できる面積を広げる。
+ */
+.sideBrandName,
+.sideBrandSub,
+.topbarLeft,
+.appTitle,
+.appSub,
+.topbarCenter,
+.topbarRight,
+.topbarControls,
+.topbar .search,
+.topbar .limitPicker,
+.topbar .limitLabel,
+.topbar .datePicker,
+.topbar .dateLabel,
+.topbar .topbarSpacer {
   -webkit-app-region: drag;
 }
 

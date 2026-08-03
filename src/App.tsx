@@ -1080,6 +1080,8 @@ export function App() {
 
   return (
     <div className="shell">
+      <div className="titlebar" title="ドラッグしてウィンドウを移動" />
+
       <aside className="sidebar dragScroll" ref={sidebarRef}>
         <TagSidebar
           activeView={activeView}
