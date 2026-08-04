@@ -76,6 +76,25 @@ function startDataDirWatcher() {
   }
 }
 
+// 外部で開くのは Web / メールのみ。file: や独自スキームを OS のハンドラに渡さない。
+const EXTERNAL_URL_SCHEMES = new Set(["http:", "https:", "mailto:"]);
+
+function openExternalIfAllowed(rawUrl) {
+  const value = String(rawUrl ?? "").trim();
+  if (!value) return false;
+
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+
+  if (!EXTERNAL_URL_SCHEMES.has(parsed.protocol)) return false;
+  void shell.openExternal(parsed.toString());
+  return true;
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1180,
@@ -102,14 +121,14 @@ function createWindow() {
 
   // Open links in the default browser (avoid navigating away inside the app).
   win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    openExternalIfAllowed(url);
     return { action: "deny" };
   });
   win.webContents.on("will-navigate", (e, url) => {
     const current = win.webContents.getURL();
     if (url && current && url !== current) {
       e.preventDefault();
-      void shell.openExternal(url);
+      openExternalIfAllowed(url);
     }
   });
 
