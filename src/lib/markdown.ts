@@ -77,15 +77,8 @@ function taskListPlugin(markdownIt: MarkdownIt) {
         `<input class="taskListCheckbox" type="checkbox" data-task-line="${line0}" data-task-state="${taskState}"` +
         `${checked ? " checked" : ""} aria-label="task" />`;
       inline.children.unshift(checkbox);
-      if (taskState === "review") {
-        const badge = new state.Token("html_inline", "", 0);
-        badge.content = `<span class="taskStateBadge taskStateBadgeReview" aria-hidden="true">R</span>`;
-        inline.children.splice(1, 0, badge);
-      }
-
       listItemOpen.attrJoin("class", "taskListItem");
       if (taskState === "partial") listItemOpen.attrJoin("class", "taskStatePartial");
-      if (taskState === "review") listItemOpen.attrJoin("class", "taskStateReview");
     }
   });
 }

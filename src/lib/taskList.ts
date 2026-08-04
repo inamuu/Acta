@@ -1,6 +1,6 @@
-export type TaskState = "unchecked" | "checked" | "partial" | "review";
+export type TaskState = "unchecked" | "checked" | "partial";
 
-const TASK_STATE_ORDER: TaskState[] = ["unchecked", "checked", "partial", "review"];
+const TASK_STATE_ORDER: TaskState[] = ["unchecked", "checked", "partial"];
 
 export function taskStateFromMarker(marker: string): TaskState | null {
   switch (String(marker ?? "").toLowerCase()) {
@@ -10,9 +10,9 @@ export function taskStateFromMarker(marker: string): TaskState | null {
       return "checked";
     case "-":
     case "/":
-      return "partial";
+    // 旧「レビュー中」マーカー。互換のため作業中として扱う。
     case "r":
-      return "review";
+      return "partial";
     default:
       return null;
   }
@@ -24,8 +24,6 @@ export function markerFromTaskState(state: TaskState): string {
       return "x";
     case "partial":
       return "-";
-    case "review":
-      return "R";
     case "unchecked":
     default:
       return " ";
@@ -33,7 +31,6 @@ export function markerFromTaskState(state: TaskState): string {
 }
 
 export function nextTaskState(state: TaskState): TaskState {
-  if (state === "review") return "checked";
   const idx = TASK_STATE_ORDER.indexOf(state);
   if (idx < 0) return "unchecked";
   return TASK_STATE_ORDER[(idx + 1) % TASK_STATE_ORDER.length] ?? "unchecked";
@@ -45,8 +42,6 @@ function taskStateLabel(state: TaskState): string {
       return "完了";
     case "partial":
       return "作業中";
-    case "review":
-      return "レビュー中";
     case "unchecked":
     default:
       return "未着手";
@@ -57,7 +52,6 @@ function normalizeTaskState(raw: string | undefined): TaskState {
   const s = String(raw ?? "").toLowerCase();
   if (s === "checked") return "checked";
   if (s === "partial") return "partial";
-  if (s === "review") return "review";
   return "unchecked";
 }
 
@@ -65,7 +59,6 @@ export function taskStateFromInput(el: HTMLInputElement): TaskState {
   const raw = String(el.dataset.taskState ?? "").toLowerCase();
   if (raw === "checked") return "checked";
   if (raw === "partial") return "partial";
-  if (raw === "review") return "review";
   if (raw === "unchecked") return "unchecked";
   return el.checked ? "checked" : "unchecked";
 }
@@ -125,7 +118,6 @@ export type TaskSummary = {
   total: number;
   done: number;
   doing: number;
-  review: number;
   todo: number;
 };
 
@@ -133,7 +125,7 @@ const TASK_LINE_RE = /^\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s*\[([ xX\-\/rR])\]\s+/;
 
 /** ToDo本文のチェックボックス行を数えて進捗を出す。 */
 export function summarizeTaskStates(markdown: string): TaskSummary {
-  const summary: TaskSummary = { total: 0, done: 0, doing: 0, review: 0, todo: 0 };
+  const summary: TaskSummary = { total: 0, done: 0, doing: 0, todo: 0 };
 
   for (const line of String(markdown ?? "").split(/\r?\n/)) {
     const m = TASK_LINE_RE.exec(line);
@@ -143,7 +135,6 @@ export function summarizeTaskStates(markdown: string): TaskSummary {
     summary.total += 1;
     if (state === "checked") summary.done += 1;
     else if (state === "partial") summary.doing += 1;
-    else if (state === "review") summary.review += 1;
     else summary.todo += 1;
   }
 

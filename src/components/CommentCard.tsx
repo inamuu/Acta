@@ -103,7 +103,7 @@ export function CommentCard({
               {taskSummary && taskSummary.total > 0 ? (
                 <span
                   className="taskProgress"
-                  title={`完了 ${taskSummary.done} / 作業中 ${taskSummary.doing} / レビュー ${taskSummary.review} / 未着手 ${taskSummary.todo}`}
+                  title={`完了 ${taskSummary.done} / 作業中 ${taskSummary.doing} / 未着手 ${taskSummary.todo}`}
                 >
                   <span className="taskProgressBar">
                     <span

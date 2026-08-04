@@ -1106,10 +1106,6 @@ a:focus-visible {
   accent-color: #d97706;
 }
 
-.md li.taskStateReview > input.taskListCheckbox {
-  accent-color: #0284c7;
-}
-
 .md .taskStateBadge {
   display: inline-flex;
   align-items: center;
@@ -1122,12 +1118,6 @@ a:focus-visible {
   font-weight: 700;
   line-height: 1;
   vertical-align: middle;
-}
-
-.md .taskStateBadgeReview {
-  color: #0369a1;
-  background: rgba(14, 116, 144, 0.12);
-  border: 1px solid rgba(14, 116, 144, 0.28);
 }
 
 .md .mermaid {
