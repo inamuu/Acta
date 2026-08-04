@@ -17,6 +17,7 @@ type Props = {
   onEdit?: (entry: ActaEntry) => void;
   onCopy?: (entry: ActaEntry) => void;
   onCopyId?: (entry: ActaEntry) => void;
+  onCopyMarkdown?: (entry: ActaEntry) => void;
   onDelete?: (entry: ActaEntry) => void;
   onOpenLinkedEntry?: (entryId: string) => void;
   onToggleTask?: (entry: ActaEntry, line0: number, nextState: TaskState) => void | Promise<void>;
@@ -69,6 +70,7 @@ export function CommentCard({
   onEdit,
   onCopy,
   onCopyId,
+  onCopyMarkdown,
   onDelete,
   onOpenLinkedEntry,
   onToggleTask,
@@ -133,6 +135,16 @@ export function CommentCard({
                     title="投稿IDをコピー（リンクは [任意の文](#post:ID) 形式）"
                   >
                     IDコピー
+                  </button>
+                ) : null}
+                {onCopyMarkdown ? (
+                  <button
+                    className="ghostBtn"
+                    type="button"
+                    onClick={() => onCopyMarkdown(entry)}
+                    title="本文をMarkdownのままコピー"
+                  >
+                    MDコピー
                   </button>
                 ) : null}
                 {onDelete ? (

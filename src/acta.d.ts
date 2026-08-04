@@ -47,6 +47,7 @@ declare global {
       deleteEntry: (payload: DeleteEntryPayload) => Promise<DeleteEntryResult>;
       updateEntry: (payload: UpdateEntryPayload) => Promise<UpdateEntryResult>;
       listProjects: () => Promise<ActaProject[]>;
+      setProjectOrder: (payload: { projectIds: string[] }) => Promise<string[]>;
       createProject: (payload: CreateProjectPayload) => Promise<ActaProject>;
       saveProject: (payload: SaveProjectPayload) => Promise<ActaProject>;
       addProjectTask: (payload: AddProjectTaskPayload) => Promise<ActaProject>;

@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("acta", {
   deleteEntry: (payload) => ipcRenderer.invoke("acta:deleteEntry", payload),
   updateEntry: (payload) => ipcRenderer.invoke("acta:updateEntry", payload),
   listProjects: () => ipcRenderer.invoke("acta:listProjects"),
+  setProjectOrder: (payload) => ipcRenderer.invoke("acta:setProjectOrder", payload),
   createProject: (payload) => ipcRenderer.invoke("acta:createProject", payload),
   saveProject: (payload) => ipcRenderer.invoke("acta:saveProject", payload),
   addProjectTask: (payload) => ipcRenderer.invoke("acta:addProjectTask", payload),

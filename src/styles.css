@@ -4816,3 +4816,18 @@ html .sidebar .tagItem.isSelected .tagCount {
   );
   backdrop-filter: blur(18px) saturate(1.1);
 }
+
+/* プロジェクト一覧のドラッグ&ドロップ並べ替え */
+.projectNavItem {
+  cursor: grab;
+}
+
+.projectNavItem.isDragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.projectNavItem.isDropTarget {
+  border-color: var(--theme-accent, var(--accent)) !important;
+  box-shadow: inset 0 2px 0 var(--theme-accent, var(--accent));
+}

@@ -1526,8 +1526,48 @@ async function listProjects() {
     const project = await readProjectByDirName(entry.name);
     if (project) projects.push(project);
   }
-  projects.sort((a, b) => a.name.localeCompare(b.name, "ja"));
-  return projects;
+  return sortProjectsByStoredOrder(projects);
+}
+
+/** 設定に保存した並び順（プロジェクトID配列）。未登録のプロジェクトは名前順で後ろに並ぶ。 */
+function getProjectOrder() {
+  const raw = loadSettings().projectOrder;
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const order = [];
+  for (const value of raw) {
+    const id = String(value ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    order.push(id);
+  }
+  return order;
+}
+
+function setProjectOrder(payload) {
+  const ids = Array.isArray(payload?.projectIds) ? payload.projectIds : payload;
+  if (!Array.isArray(ids)) throw new Error("projectIds が不正です");
+  const seen = new Set();
+  const order = [];
+  for (const value of ids) {
+    const id = String(value ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    order.push(id);
+  }
+  saveSettings({ ...loadSettings(), projectOrder: order });
+  return order;
+}
+
+function sortProjectsByStoredOrder(projects) {
+  const order = getProjectOrder();
+  const rank = new Map(order.map((id, index) => [id, index]));
+  return [...projects].sort((a, b) => {
+    const ra = rank.has(a.id) ? rank.get(a.id) : Number.MAX_SAFE_INTEGER;
+    const rb = rank.has(b.id) ? rank.get(b.id) : Number.MAX_SAFE_INTEGER;
+    if (ra !== rb) return ra - rb;
+    return a.name.localeCompare(b.name, "ja");
+  });
 }
 
 async function getProjectById(id) {
@@ -2229,6 +2269,8 @@ module.exports = {
   deleteEntry,
   updateEntry,
   listProjects,
+  getProjectOrder,
+  setProjectOrder,
   createProject,
   saveProject,
   setProjectArchived,

@@ -181,6 +181,8 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeView, setActiveView] = useState<ActiveView>("todo");
   const [projects, setProjects] = useState<ActaProject[]>([]);
+  const [dragProjectId, setDragProjectId] = useState("");
+  const [dropTargetProjectId, setDropTargetProjectId] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectTaskTitle, setNewProjectTaskTitle] = useState("");
@@ -796,6 +798,42 @@ export function App() {
     setAppError("");
   }
 
+  /** サイドの一覧をドラッグ&ドロップで並べ替える。並び順は設定に保存し、ToDo追記の順序にも使われる。 */
+  async function reorderProjects(dragId: string, targetId: string) {
+    if (!dragId || !targetId || dragId === targetId) return;
+
+    const from = projects.findIndex((project) => project.id === dragId);
+    const to = projects.findIndex((project) => project.id === targetId);
+    if (from < 0 || to < 0) return;
+
+    const next = [...projects];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setProjects(next);
+
+    try {
+      await api.setProjectOrder({ projectIds: next.map((project) => project.id) });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "並び順の保存に失敗しました");
+      await reload();
+    }
+  }
+
+  /** 投稿本文をMarkdownのままクリップボードへ。 */
+  async function copyEntryMarkdown(entry: ActaEntry, notify?: (message: string) => void) {
+    const markdown = String(entry.body ?? "").trim();
+    const copied = await copyTextToClipboard(markdown);
+    if (!copied) {
+      const message = "Markdownのコピーに失敗しました";
+      if (notify) notify(message);
+      else setAppError(message);
+      return;
+    }
+    if (notify) notify("Markdownをコピーしました");
+    else setAppError("");
+  }
+
   async function createTodoFromProjects() {
     if (todoBusy) return;
     const today = formatDateYYYYMMDD(new Date());
@@ -1325,6 +1363,9 @@ export function App() {
                     onCopyId={(entry) => {
                       void copyEntryId(entry);
                     }}
+                    onCopyMarkdown={(entry) => {
+                      void copyEntryMarkdown(entry, setTodoStatus);
+                    }}
                     onOpenLinkedEntry={(entryId) => {
                       openLinkedEntry(entryId);
                     }}
@@ -1414,10 +1455,39 @@ export function App() {
                 ) : (
                   visibleProjects.map((project) => (
                     <button
-                      className={`projectNavItem ${selectedProjectId === project.id ? "isActive" : ""}`}
+                      className={`projectNavItem ${selectedProjectId === project.id ? "isActive" : ""} ${
+                        dragProjectId === project.id ? "isDragging" : ""
+                      } ${dropTargetProjectId === project.id ? "isDropTarget" : ""}`}
                       key={project.id}
                       type="button"
+                      draggable
+                      title="ドラッグで並べ替え"
                       onClick={() => setSelectedProjectId(project.id)}
+                      onDragStart={(e) => {
+                        setDragProjectId(project.id);
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", project.id);
+                      }}
+                      onDragOver={(e) => {
+                        if (!dragProjectId || dragProjectId === project.id) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        setDropTargetProjectId(project.id);
+                      }}
+                      onDragLeave={() => {
+                        setDropTargetProjectId((current) => (current === project.id ? "" : current));
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const dragId = dragProjectId || e.dataTransfer.getData("text/plain");
+                        setDragProjectId("");
+                        setDropTargetProjectId("");
+                        void reorderProjects(dragId, project.id);
+                      }}
+                      onDragEnd={() => {
+                        setDragProjectId("");
+                        setDropTargetProjectId("");
+                      }}
                     >
                       <span>{project.name}</span>
                       <small>
@@ -1767,6 +1837,9 @@ export function App() {
                       }}
                       onCopyId={(entry) => {
                         void copyEntryId(entry);
+                      }}
+                      onCopyMarkdown={(entry) => {
+                        void copyEntryMarkdown(entry);
                       }}
                       onOpenLinkedEntry={(entryId) => {
                         openLinkedEntry(entryId);

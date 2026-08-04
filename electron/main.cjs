@@ -168,6 +168,7 @@ app.whenReady().then(() => {
   ipcMain.handle("acta:deleteEntry", async (_event, payload) => storage.deleteEntry(payload));
   ipcMain.handle("acta:updateEntry", async (_event, payload) => storage.updateEntry(payload));
   ipcMain.handle("acta:listProjects", async () => storage.listProjects());
+  ipcMain.handle("acta:setProjectOrder", async (_event, payload) => storage.setProjectOrder(payload));
   ipcMain.handle("acta:createProject", async (_event, payload) => storage.createProject(payload));
   ipcMain.handle("acta:saveProject", async (_event, payload) => storage.saveProject(payload));
   ipcMain.handle("acta:addProjectTask", async (_event, payload) => storage.addProjectTask(payload));
