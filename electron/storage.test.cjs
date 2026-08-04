@@ -5,7 +5,7 @@ const { _test } = require("./storage.cjs");
 test("project statuses map to ToDo task markers", () => {
   assert.equal(_test.markerFromProjectTaskStatus("Backlog"), " ");
   assert.equal(_test.markerFromProjectTaskStatus("InProgress"), "-");
-  assert.equal(_test.markerFromProjectTaskStatus("GitHub"), "R");
+  assert.equal(_test.markerFromProjectTaskStatus("GitHub"), "-");
   assert.equal(_test.markerFromProjectTaskStatus("Done"), "x");
 });
 
@@ -25,7 +25,7 @@ test("moving a task not yet in ToDo appends it with its current status", () => {
     { title: "新しいタスク", status: "GitHub" }
   ]);
 
-  assert.match(nextBody, /  - \[R\] 新しいタスク/);
+  assert.match(nextBody, /  - \[-\] 新しいタスク/);
 });
 
 test("GitHub search results become Issue or PR tasks with stable metadata", () => {
@@ -78,7 +78,7 @@ test("appending a GitHub task to an existing project does not add a GitHub hiera
     { title: "OIDC対応", status: "GitHub", source: "github" }
   ]);
 
-  assert.equal(nextBody, ["# ToDo", "- 認証基盤", "  - [-] 既存タスク", "  - [R] OIDC対応"].join("\n"));
+  assert.equal(nextBody, ["# ToDo", "- 認証基盤", "  - [-] 既存タスク", "  - [-] OIDC対応"].join("\n"));
 });
 
 test("GitHub sync only updates when source metadata or state changed", () => {
@@ -110,7 +110,7 @@ test("GitHub tasks use the same two-space indentation as local tasks in ToDo", (
       "# ToDo",
       "- コンテナOSの最新化",
       "  - [-] 新Op",
-      "  - [R] イメージ更新 #6048"
+      "  - [-] イメージ更新 #6048"
     ].join("\n")
   );
   assert.doesNotMatch(body, /\t/);

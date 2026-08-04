@@ -2048,9 +2048,8 @@ function todoLinesForProjectGroup(group) {
 function markerFromProjectTaskStatus(status) {
   switch (normalizeProjectTaskStatus(status)) {
     case "InProgress":
-      return "-";
     case "GitHub":
-      return "R";
+      return "-";
     case "Done":
       return "x";
     case "Backlog":
