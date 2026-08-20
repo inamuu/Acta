@@ -20,7 +20,9 @@ import { setTaskStateOnLine, summarizeTaskStates, type TaskState } from "./lib/t
 
 type TagStat = { tag: string; count: number };
 type DateFilterMode = "week" | "day" | "all";
-type ActiveView = "todo" | "projects" | "journal" | "knowledge";
+type ActiveView = "workspace" | "journal" | "knowledge";
+
+const TODO_RAIL_STORAGE_KEY = "acta.todoRailOpen";
 type DraftPost = {
   key: string;
   body: string;
@@ -179,7 +181,7 @@ export function App() {
   const [editing, setEditing] = useState<ActaEntry | null>(null);
   const [draft, setDraft] = useState<DraftPost | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [activeView, setActiveView] = useState<ActiveView>("todo");
+  const [activeView, setActiveView] = useState<ActiveView>("workspace");
   const [projects, setProjects] = useState<ActaProject[]>([]);
   const [dragProjectId, setDragProjectId] = useState("");
   const [dropTargetProjectId, setDropTargetProjectId] = useState("");
@@ -193,10 +195,15 @@ export function App() {
   const [projectNameDraft, setProjectNameDraft] = useState("");
   const [projectIssueUrlDraft, setProjectIssueUrlDraft] = useState("");
   const [projectStatus, setProjectStatus] = useState("");
+  const [projectMetaOpen, setProjectMetaOpen] = useState(false);
   const [projectTodoBusy, setProjectTodoBusy] = useState(false);
   const [todoStatus, setTodoStatus] = useState("");
   const [todoBusy, setTodoBusy] = useState(false);
   const [todoWeekOffset, setTodoWeekOffset] = useState(0);
+  // ToDoレールの開閉。狭いウィンドウでカンバンを広く使えるように閉じられる。
+  const [todoRailOpen, setTodoRailOpen] = useState<boolean>(
+    () => window.localStorage.getItem(TODO_RAIL_STORAGE_KEY) !== "closed"
+  );
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
   const [knowledgeExcludeTags, setKnowledgeExcludeTags] = useState("");
   const [knowledgeResults, setKnowledgeResults] = useState<KnowledgeSearchResultItem[]>([]);
@@ -227,6 +234,7 @@ export function App() {
   const searchRef = useRef<HTMLInputElement>(null);
   const knowledgeSearchRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
+  const todoRailRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const syncQueueRef = useRef<Promise<void>>(Promise.resolve());
   const backupSyncTimerRef = useRef<number | null>(null);
@@ -439,6 +447,10 @@ export function App() {
   }, [limit]);
 
   useEffect(() => {
+    window.localStorage.setItem(TODO_RAIL_STORAGE_KEY, todoRailOpen ? "open" : "closed");
+  }, [todoRailOpen]);
+
+  useEffect(() => {
     const nextTheme = normalizeTheme(settings.theme);
     document.documentElement.setAttribute("data-acta-theme", nextTheme);
   }, [settings.theme]);
@@ -470,7 +482,7 @@ export function App() {
   }, [projectStatus]);
 
   useEffect(() => {
-    const VIEW_ORDER: ActiveView[] = ["todo", "projects", "journal", "knowledge"];
+    const VIEW_ORDER: ActiveView[] = ["workspace", "journal", "knowledge"];
 
     function onKeyDown(e: KeyboardEvent) {
       const key = e.key.toLowerCase();
@@ -501,10 +513,12 @@ export function App() {
     const cleanups: Array<() => void> = [];
     if (sidebarRef.current) cleanups.push(installDragScroll(sidebarRef.current, { axis: "y" }));
     if (scrollAreaRef.current) cleanups.push(installDragScroll(scrollAreaRef.current, { axis: "y" }));
+    if (todoRailRef.current) cleanups.push(installDragScroll(todoRailRef.current, { axis: "y" }));
     return () => {
       for (const fn of cleanups) fn();
     };
-  }, []);
+    // ビュー切り替えで対象要素が入れ替わるため再インストールする。
+  }, [activeView, todoRailOpen]);
 
   useEffect(() => {
     return () => {
@@ -1041,7 +1055,7 @@ export function App() {
     setProjectStatus("");
     try {
       const project = await api.renameProject({ projectId: selectedProject.id, name: trimmed });
-      setActiveView("projects");
+      setActiveView("workspace");
       setEditing(null);
       setDraft(null);
       setProjectNameDraft(project.name);
@@ -1098,13 +1112,12 @@ export function App() {
       mergeEntry(entry);
       await reload();
       queueBackupSync();
-      // 追記結果をすぐ確認できるようにToDo画面へ切り替える。
+      // 同一画面のToDoレールへ即反映されるので画面遷移は不要。
+      setTodoRailOpen(true);
       setTodoStatus(`${entry.date} のToDoにActiveプロジェクトのInProgressを追記しました`);
-      setActiveView("todo");
-      setProjectStatus(`${entry.date} のToDoにActiveプロジェクトのInProgressを追記しました`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setProjectStatus(msg || "ToDoへの追記に失敗しました");
+      setTodoStatus(msg || "ToDoへの追記に失敗しました");
     } finally {
       setProjectTodoBusy(false);
     }
@@ -1124,15 +1137,14 @@ export function App() {
   }
 
   return (
-    <div className="shell">
+    <div className={`shell${activeView === "workspace" ? " isWide" : ""}`}>
       <header className="appHeader" title="ドラッグしてウィンドウを移動">
         <nav className="appNav" aria-label="機能切り替え">
           {(
             [
-              { view: "todo", icon: "✓", label: "ToDo", count: todoEntries.length, hint: "⌘1" },
-              { view: "projects", icon: "▦", label: "プロジェクト", count: activeProjectTaskCount, hint: "⌘2" },
-              { view: "journal", icon: "◷", label: "ナレッジ", count: entries.length, hint: "⌘3" },
-              { view: "knowledge", icon: "⌕", label: "検索", count: null, hint: "⌘4" }
+              { view: "workspace", icon: "▦", label: "プロジェクト", count: activeProjectTaskCount, hint: "⌘1" },
+              { view: "journal", icon: "◷", label: "ナレッジ", count: entries.length, hint: "⌘2" },
+              { view: "knowledge", icon: "⌕", label: "検索", count: null, hint: "⌘3" }
             ] as const
           ).map((item) => (
             <button
@@ -1150,6 +1162,7 @@ export function App() {
         </nav>
       </header>
 
+      {activeView === "workspace" ? null : (
       <aside className="sidebar dragScroll" ref={sidebarRef}>
         <TagSidebar
           selectedTags={selectedTags}
@@ -1165,6 +1178,7 @@ export function App() {
           onToggleUntagged={toggleUntaggedFilter}
         />
       </aside>
+      )}
 
       <main className="main">
         {activeView === "journal" ? (
@@ -1292,483 +1306,526 @@ export function App() {
           </header>
         ) : null}
 
-        {activeView === "todo" ? (
-          <section className="todoArea">
-            <div className="todoToolbar">
-              <button
-                className="primaryActionBtn"
-                type="button"
-                disabled={todoBusy}
-                title="全プロジェクトのInProgressから今日のToDoを作成"
-                onClick={() => void createTodoFromProjects()}
-              >
-                {todoBusy ? "作成中..." : "新規ToDo"}
-              </button>
-              <button
-                className="ghostBtn"
-                type="button"
-                disabled={todoBusy}
-                title="直近のToDoをそのまま今日へコピー"
-                onClick={() => void copyPreviousTodo()}
-              >
-                前回のToDoをコピー
-              </button>
-
-              <div className="todoToolbarSpacer" />
-
-              <div className="segmented todoWeekNav" role="group" aria-label="表示する週">
-                <button
-                  className="segmentedBtn"
-                  type="button"
-                  aria-label="前週"
-                  onClick={() => setTodoWeekOffset((value) => value - 1)}
-                >
-                  ‹
-                </button>
-                <span className="todoWeekLabel">
-                  {todoWeekRange.start} 〜 {todoWeekRange.end}
-                </span>
-                <button
-                  className="segmentedBtn"
-                  type="button"
-                  aria-label="次週"
-                  disabled={todoWeekOffset >= 0}
-                  onClick={() => setTodoWeekOffset((value) => Math.min(0, value + 1))}
-                >
-                  ›
-                </button>
-                <button
-                  className="segmentedBtn isText"
-                  type="button"
-                  disabled={todoWeekOffset === 0}
-                  onClick={() => setTodoWeekOffset(0)}
-                >
-                  今週
-                </button>
-              </div>
-            </div>
-            {todoStatus ? <div className="inlineToast">{todoStatus}</div> : null}
-            <div className="commentList">
-              {loading ? (
-                <div className="empty">読み込み中...</div>
-              ) : todoEntries.length === 0 ? (
-                <div className="empty">ToDoはまだありません</div>
-              ) : (
-                todoEntries.map((e) => (
-                  <CommentCard
-                    key={e.id}
-                    entry={e}
-                    assetBaseUrl={assetBaseUrl}
-                    domId={buildEntryDomId(e.id)}
-                    isLinkedTarget={linkedTargetEntryId === e.id}
-                    taskSummary={summarizeTaskStates(e.body)}
-                    onEdit={(entry) => {
-                      setActiveView("journal");
-                      setEditing(entry);
-                      setDraft(null);
+        {activeView === "workspace" ? (
+          <section className={`workspaceArea${todoRailOpen ? "" : " isRailCollapsed"}`}>
+            <section className="projectsArea">
+              <aside className="projectList">
+                <div className="projectCreate">
+                  <input
+                    className="projectInput"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (isImeComposingEvent(e)) return;
+                      if (e.key === "Enter") void createProject();
                     }}
-                    onCopyId={(entry) => {
-                      void copyEntryId(entry);
-                    }}
-                    onCopyMarkdown={(entry) => {
-                      void copyEntryMarkdown(entry, setTodoStatus);
-                    }}
-                    onOpenLinkedEntry={(entryId) => {
-                      openLinkedEntry(entryId);
-                    }}
-                    onToggleTask={async (entry, line0, nextState: TaskState) => {
-                      const nextBody = setTaskStateOnLine(entry.body, line0, nextState);
-                      if (!nextBody) return;
-                      const res = await api.updateEntry({ id: entry.id, body: nextBody, tags: entry.tags });
-                      if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
-                      await reload();
-                      queueBackupSync();
-                    }}
-                    onDelete={async (entry) => {
-                      const ok = window.confirm("このToDoを削除しますか？");
-                      if (!ok) return;
-
-                      let deleted = false;
-                      try {
-                        const res = await api.deleteEntry({ id: entry.id });
-                        if (!res?.deleted) {
-                          setTodoStatus("削除対象が見つかりませんでした");
-                        } else {
-                          deleted = true;
-                          setTodoStatus("ToDoを削除しました");
-                        }
-                        await reload();
-                      } catch (err) {
-                        const msg = err instanceof Error ? err.message : String(err);
-                        setTodoStatus(msg || "削除に失敗しました");
-                      }
-                      if (deleted) queueBackupSync();
-                    }}
+                    placeholder="新規プロジェクト名"
                   />
-                ))
-              )}
-            </div>
-          </section>
-        ) : null}
-
-        {activeView === "projects" ? (
-          <section className="projectsArea">
-            <aside className="projectList">
-              <div className="projectCreate">
-                <input
-                  className="projectInput"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (isImeComposingEvent(e)) return;
-                    if (e.key === "Enter") void createProject();
-                  }}
-                  placeholder="新規プロジェクト名"
-                />
-                <button className="primaryActionBtn" type="button" onClick={() => void createProject()}>
-                  作成
-                </button>
-                <button
-                  className="ghostBtn"
-                  type="button"
-                  disabled={githubSyncBusy}
-                  onClick={() => void syncGitHubItems()}
-                  title="自分が作成したGitHub Issue・PRを同期"
-                >
-                  {githubSyncBusy ? "同期中..." : "GitHub同期"}
-                </button>
-              </div>
-              <div className="projectArchiveToggle">
-                <button
-                  className={`viewTab ${!showArchivedProjects ? "isActive" : ""}`}
-                  type="button"
-                  onClick={() => setShowArchivedProjects(false)}
-                >
-                  Active
-                </button>
-                <button
-                  className={`viewTab ${showArchivedProjects ? "isActive" : ""}`}
-                  type="button"
-                  onClick={() => setShowArchivedProjects(true)}
-                >
-                  Archive
-                </button>
-              </div>
-              <div className="projectNav">
-                {visibleProjects.length === 0 ? (
-                  <div className="empty">
-                    {showArchivedProjects ? "アーカイブ済みプロジェクトはありません" : "プロジェクトはまだありません"}
-                  </div>
-                ) : (
-                  visibleProjects.map((project) => (
-                    <button
-                      className={`projectNavItem ${selectedProjectId === project.id ? "isActive" : ""} ${
-                        dragProjectId === project.id ? "isDragging" : ""
-                      } ${dropTargetProjectId === project.id ? "isDropTarget" : ""}`}
-                      key={project.id}
-                      type="button"
-                      draggable
-                      title="ドラッグで並べ替え"
-                      onClick={() => setSelectedProjectId(project.id)}
-                      onDragStart={(e) => {
-                        setDragProjectId(project.id);
-                        e.dataTransfer.effectAllowed = "move";
-                        e.dataTransfer.setData("text/plain", project.id);
-                      }}
-                      onDragOver={(e) => {
-                        if (!dragProjectId || dragProjectId === project.id) return;
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                        setDropTargetProjectId(project.id);
-                      }}
-                      onDragLeave={() => {
-                        setDropTargetProjectId((current) => (current === project.id ? "" : current));
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        const dragId = dragProjectId || e.dataTransfer.getData("text/plain");
-                        setDragProjectId("");
-                        setDropTargetProjectId("");
-                        void reorderProjects(dragId, project.id);
-                      }}
-                      onDragEnd={() => {
-                        setDragProjectId("");
-                        setDropTargetProjectId("");
-                      }}
-                    >
-                      <span>{project.name}</span>
-                      <small>
-                        {project.archivedAtMs
-                          ? "archived"
-                          : `${
-                              project.tasks.filter((task) => task.status === "InProgress").length
-                            } active`}
-                      </small>
-                    </button>
-                  ))
-                )}
-              </div>
-            </aside>
-            <div className="projectDetail">
-              {selectedProject ? (
-                <>
-                  <div className="projectHeader">
-                    <div>
-                      <h2>
-                        {selectedProject.name}
-                        {selectedProject.archivedAtMs ? <span className="projectArchivedBadge">Archived</span> : null}
-                      </h2>
-                      <div className="projectPath" title={selectedProject.sourceDir}>
-                        {selectedProject.sourceDir}
+                  <button className="primaryActionBtn" type="button" onClick={() => void createProject()}>
+                    作成
+                  </button>
+                  <button
+                    className="ghostBtn"
+                    type="button"
+                    disabled={githubSyncBusy}
+                    onClick={() => void syncGitHubItems()}
+                    title="自分が作成したGitHub Issue・PRを同期"
+                  >
+                    {githubSyncBusy ? "同期中..." : "GitHub同期"}
+                  </button>
+                </div>
+                <div className="projectArchiveToggle">
+                  <button
+                    className={`viewTab ${!showArchivedProjects ? "isActive" : ""}`}
+                    type="button"
+                    onClick={() => setShowArchivedProjects(false)}
+                  >
+                    Active
+                  </button>
+                  <button
+                    className={`viewTab ${showArchivedProjects ? "isActive" : ""}`}
+                    type="button"
+                    onClick={() => setShowArchivedProjects(true)}
+                  >
+                    Archive
+                  </button>
+                </div>
+                <div className="projectNav">
+                  {visibleProjects.length === 0 ? (
+                    <div className="empty">
+                      {showArchivedProjects ? "アーカイブ済みプロジェクトはありません" : "プロジェクトはまだありません"}
+                    </div>
+                  ) : (
+                    visibleProjects.map((project) => (
+                      <button
+                        className={`projectNavItem ${selectedProjectId === project.id ? "isActive" : ""} ${
+                          dragProjectId === project.id ? "isDragging" : ""
+                        } ${dropTargetProjectId === project.id ? "isDropTarget" : ""}`}
+                        key={project.id}
+                        type="button"
+                        draggable
+                        title="ドラッグで並べ替え"
+                        onClick={() => setSelectedProjectId(project.id)}
+                        onDragStart={(e) => {
+                          setDragProjectId(project.id);
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", project.id);
+                        }}
+                        onDragOver={(e) => {
+                          if (!dragProjectId || dragProjectId === project.id) return;
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          setDropTargetProjectId(project.id);
+                        }}
+                        onDragLeave={() => {
+                          setDropTargetProjectId((current) => (current === project.id ? "" : current));
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const dragId = dragProjectId || e.dataTransfer.getData("text/plain");
+                          setDragProjectId("");
+                          setDropTargetProjectId("");
+                          void reorderProjects(dragId, project.id);
+                        }}
+                        onDragEnd={() => {
+                          setDragProjectId("");
+                          setDropTargetProjectId("");
+                        }}
+                      >
+                        <span>{project.name}</span>
+                        <small>
+                          {project.archivedAtMs
+                            ? "archived"
+                            : `${
+                                project.tasks.filter((task) => task.status === "InProgress").length
+                              } active`}
+                        </small>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </aside>
+              <div className="projectDetail">
+                {selectedProject ? (
+                  <>
+                    <div className="projectHeader">
+                      <div>
+                        <h2>
+                          {selectedProject.name}
+                          {selectedProject.archivedAtMs ? <span className="projectArchivedBadge">Archived</span> : null}
+                        </h2>
+                        <div className="projectPath" title={selectedProject.sourceDir}>
+                          {selectedProject.sourceDir}
+                        </div>
+                        {projectMetaOpen ? (
+                        <div className="projectInlineEditors">
+                          <label className="projectInlineField">
+                            <span>プロジェクト名</span>
+                            <input
+                              className="projectInlineInput"
+                              value={projectNameDraft}
+                              onChange={(e) => setProjectNameDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (isImeComposingEvent(e)) return;
+                                if (e.key === "Enter") void renameSelectedProject();
+                              }}
+                            />
+                          </label>
+                          <button
+                            className="ghostBtn"
+                            type="button"
+                            disabled={!projectNameDraft.trim() || projectNameDraft.trim() === selectedProject.name}
+                            onClick={() => void renameSelectedProject()}
+                          >
+                            名前を保存
+                          </button>
+                          <label className="projectInlineField isWide">
+                            <span>issueリンク</span>
+                            <input
+                              className="projectInlineInput"
+                              value={projectIssueUrlDraft}
+                              onChange={(e) => setProjectIssueUrlDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (isImeComposingEvent(e)) return;
+                                if (e.key === "Enter") void editProjectIssueUrl();
+                              }}
+                              placeholder="https://..."
+                            />
+                          </label>
+                          <button
+                            className="ghostBtn"
+                            type="button"
+                            disabled={projectIssueUrlDraft.trim() === (selectedProject.issueUrl || "")}
+                            onClick={() => void editProjectIssueUrl()}
+                          >
+                            リンクを保存
+                          </button>
+                        </div>
+                        ) : null}
                       </div>
-                      <div className="projectInlineEditors">
-                        <label className="projectInlineField">
-                          <span>プロジェクト名</span>
-                          <input
-                            className="projectInlineInput"
-                            value={projectNameDraft}
-                            onChange={(e) => setProjectNameDraft(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (isImeComposingEvent(e)) return;
-                              if (e.key === "Enter") void renameSelectedProject();
-                            }}
-                          />
-                        </label>
+                      <div className="projectHeaderActions">
                         <button
-                          className="ghostBtn"
+                          className={`ghostBtn${projectMetaOpen ? " isActive" : ""}`}
                           type="button"
-                          disabled={!projectNameDraft.trim() || projectNameDraft.trim() === selectedProject.name}
-                          onClick={() => void renameSelectedProject()}
+                          title="プロジェクト名・issueリンクを編集"
+                          onClick={() => setProjectMetaOpen((value) => !value)}
                         >
-                          名前を保存
+                          {projectMetaOpen ? "設定を閉じる" : "設定"}
                         </button>
-                        <label className="projectInlineField isWide">
-                          <span>issueリンク</span>
-                          <input
-                            className="projectInlineInput"
-                            value={projectIssueUrlDraft}
-                            onChange={(e) => setProjectIssueUrlDraft(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (isImeComposingEvent(e)) return;
-                              if (e.key === "Enter") void editProjectIssueUrl();
-                            }}
-                            placeholder="https://..."
-                          />
-                        </label>
+                        {selectedProject.issueUrl ? (
+                          <a
+                            className="ghostLinkBtn"
+                            href={selectedProject.issueUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={selectedProject.issueUrl}
+                          >
+                            Issueを開く
+                          </a>
+                        ) : null}
                         <button
-                          className="ghostBtn"
+                          className={selectedProject.archivedAtMs ? "ghostBtn" : "dangerGhostBtn"}
                           type="button"
-                          disabled={projectIssueUrlDraft.trim() === (selectedProject.issueUrl || "")}
-                          onClick={() => void editProjectIssueUrl()}
+                          onClick={() => void setProjectArchived(!selectedProject.archivedAtMs)}
                         >
-                          リンクを保存
+                          {selectedProject.archivedAtMs ? "アーカイブ解除" : "アーカイブ"}
+                        </button>
+                        <button className="dangerGhostBtn" type="button" onClick={() => void deleteSelectedProject()}>
+                          削除
                         </button>
                       </div>
                     </div>
-                    <div className="projectHeaderActions">
-                      {selectedProject.issueUrl ? (
-                        <a
-                          className="ghostLinkBtn"
-                          href={selectedProject.issueUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          title={selectedProject.issueUrl}
-                        >
-                          Issueを開く
-                        </a>
-                      ) : null}
+                    <div className="projectTaskCreate">
+                      <input
+                        className="projectInput"
+                        value={newProjectTaskTitle}
+                        onChange={(e) => setNewProjectTaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (isImeComposingEvent(e)) return;
+                          if (e.key === "Enter") void addProjectTask();
+                        }}
+                        placeholder="Backlogへタスク追加"
+                      />
                       <button
-                        className="ghostBtn"
+                        className="primaryActionBtn"
                         type="button"
-                        disabled={projectTodoBusy}
-                        title="Activeプロジェクト全体のInProgressを最新のToDoへ追記"
-                        onClick={() => void appendActiveProjectTasksToTodo()}
+                        disabled={!newProjectTaskTitle.trim()}
+                        onClick={() => void addProjectTask()}
                       >
-                        {projectTodoBusy ? "追記中..." : "ToDoへ追記"}
-                      </button>
-                      <button
-                        className={selectedProject.archivedAtMs ? "ghostBtn" : "dangerGhostBtn"}
-                        type="button"
-                        onClick={() => void setProjectArchived(!selectedProject.archivedAtMs)}
-                      >
-                        {selectedProject.archivedAtMs ? "アーカイブ解除" : "アーカイブ"}
-                      </button>
-                      <button className="dangerGhostBtn" type="button" onClick={() => void deleteSelectedProject()}>
-                        削除
+                        追加
                       </button>
                     </div>
-                  </div>
-                  <div className="projectTaskCreate">
-                    <input
-                      className="projectInput"
-                      value={newProjectTaskTitle}
-                      onChange={(e) => setNewProjectTaskTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (isImeComposingEvent(e)) return;
-                        if (e.key === "Enter") void addProjectTask();
-                      }}
-                      placeholder="Backlogへタスク追加"
-                    />
-                    <button
-                      className="primaryActionBtn"
-                      type="button"
-                      disabled={!newProjectTaskTitle.trim()}
-                      onClick={() => void addProjectTask()}
-                    >
-                      追加
-                    </button>
-                  </div>
-                  {projectStatus ? <div className="inlineToast">{projectStatus}</div> : null}
-                  <div className="kanbanBoard">
-                    {(["Backlog", "InProgress", "Done"] as const).map((status) => {
-                      const visibleTasks = selectedProject.tasks.filter(
-                        (task) => task.status === status && (status !== "Done" || isRecentProjectTask(task))
-                      );
-                      return (
-                        <section
-                          className={`kanbanColumn ${draggingTaskId ? "isDropReady" : ""}`}
-                          key={status}
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            e.dataTransfer.dropEffect = "move";
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            dropProjectTask(status);
-                          }}
-                        >
-                          <h3>
-                            <span>{status}</span>
-                            <span className="kanbanCount">{visibleTasks.length}</span>
-                          </h3>
-                          {visibleTasks.length === 0 ? (
-                            <div className="kanbanEmpty">タスクなし</div>
-                          ) : (
-                            visibleTasks.map((task) => (
-                              <div
-                                className={`kanbanCard ${draggingTaskId === task.id ? "isDragging" : ""}`}
-                                key={task.id}
-                                draggable={editingProjectTaskId !== task.id}
-                                onDragStart={(e) => {
-                                  setDraggingTaskId(task.id);
-                                  e.dataTransfer.effectAllowed = "move";
-                                  e.dataTransfer.setData("text/plain", task.id);
-                                }}
-                                onDragEnd={() => setDraggingTaskId("")}
-                              >
-                                {editingProjectTaskId === task.id ? (
-                                  <div className="kanbanEdit">
-                                    <input
-                                      className="kanbanEditInput"
-                                      value={projectTaskTitleDraft}
-                                      autoFocus
-                                      onChange={(e) => setProjectTaskTitleDraft(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (isImeComposingEvent(e)) return;
-                                        if (e.key === "Enter") void renameProjectTask(task.id);
-                                        if (e.key === "Escape") {
-                                          setEditingProjectTaskId("");
-                                          setProjectTaskTitleDraft("");
-                                        }
-                                      }}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onDragStart={(e) => e.preventDefault()}
-                                    />
-                                    <div className="kanbanEditActions">
-                                      <button
-                                        className="ghostBtn"
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          void renameProjectTask(task.id);
+                    {projectStatus ? <div className="inlineToast">{projectStatus}</div> : null}
+                    <div className="kanbanBoard">
+                      {(["Backlog", "InProgress", "Done"] as const).map((status) => {
+                        const visibleTasks = selectedProject.tasks.filter(
+                          (task) => task.status === status && (status !== "Done" || isRecentProjectTask(task))
+                        );
+                        return (
+                          <section
+                            className={`kanbanColumn ${draggingTaskId ? "isDropReady" : ""}`}
+                            key={status}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              dropProjectTask(status);
+                            }}
+                          >
+                            <h3>
+                              <span>{status}</span>
+                              <span className="kanbanCount">{visibleTasks.length}</span>
+                            </h3>
+                            {visibleTasks.length === 0 ? (
+                              <div className="kanbanEmpty">タスクなし</div>
+                            ) : (
+                              visibleTasks.map((task) => (
+                                <div
+                                  className={`kanbanCard ${draggingTaskId === task.id ? "isDragging" : ""}`}
+                                  key={task.id}
+                                  draggable={editingProjectTaskId !== task.id}
+                                  onDragStart={(e) => {
+                                    setDraggingTaskId(task.id);
+                                    e.dataTransfer.effectAllowed = "move";
+                                    e.dataTransfer.setData("text/plain", task.id);
+                                  }}
+                                  onDragEnd={() => setDraggingTaskId("")}
+                                >
+                                  {editingProjectTaskId === task.id ? (
+                                    <div className="kanbanEdit">
+                                      <input
+                                        className="kanbanEditInput"
+                                        value={projectTaskTitleDraft}
+                                        autoFocus
+                                        onChange={(e) => setProjectTaskTitleDraft(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (isImeComposingEvent(e)) return;
+                                          if (e.key === "Enter") void renameProjectTask(task.id);
+                                          if (e.key === "Escape") {
+                                            setEditingProjectTaskId("");
+                                            setProjectTaskTitleDraft("");
+                                          }
                                         }}
-                                      >
-                                        保存
-                                      </button>
-                                      <button
-                                        className="ghostBtn"
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditingProjectTaskId("");
-                                          setProjectTaskTitleDraft("");
-                                        }}
-                                      >
-                                        キャンセル
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div>{task.title}</div>
-                                    {task.source === "github" ? (
-                                      <div className="kanbanSourceMeta">
-                                        <span>{task.sourceType === "PullRequest" ? "PR" : task.sourceType === "Issue" ? "Issue" : "Task"}</span>
-                                        {task.sourceUrl ? (
-                                          <a href={task.sourceUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                                            GitHubで開く
-                                          </a>
-                                        ) : null}
-                                        <select
-                                          className="kanbanProjectSelect"
-                                          value={selectedProject.id}
-                                          aria-label="Actaプロジェクト"
-                                          onClick={(e) => e.stopPropagation()}
-                                          onChange={(e) => {
+                                        onClick={(e) => e.stopPropagation()}
+                                        onDragStart={(e) => e.preventDefault()}
+                                      />
+                                      <div className="kanbanEditActions">
+                                        <button
+                                          className="ghostBtn"
+                                          type="button"
+                                          onClick={(e) => {
                                             e.stopPropagation();
-                                            void reassignProjectTask(task.id, e.target.value);
+                                            void renameProjectTask(task.id);
                                           }}
                                         >
-                                          {projects
-                                            .filter((project) => !project.archivedAtMs)
-                                            .map((project) => (
-                                              <option key={project.id} value={project.id}>
-                                                {project.name}
-                                              </option>
-                                            ))}
-                                        </select>
+                                          保存
+                                        </button>
+                                        <button
+                                          className="ghostBtn"
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingProjectTaskId("");
+                                            setProjectTaskTitleDraft("");
+                                          }}
+                                        >
+                                          キャンセル
+                                        </button>
                                       </div>
-                                    ) : null}
-                                    <div className="kanbanCardActions">
-                                      {task.source !== "github" ? (
-                                        <>
-                                          <button
-                                            className="ghostBtn"
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              startProjectTaskEdit(task.id, task.title);
-                                            }}
-                                          >
-                                            編集
-                                          </button>
-                                          <button
-                                            className="dangerGhostBtn"
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              void deleteProjectTask(task.id, task.title);
-                                            }}
-                                          >
-                                            削除
-                                          </button>
-                                        </>
-                                      ) : null}
                                     </div>
-                                  </>
-                                )}
-                              </div>
-                            ))
-                          )}
-                        </section>
-                      );
-                    })}
+                                  ) : (
+                                    <>
+                                      <div>{task.title}</div>
+                                      {task.source === "github" ? (
+                                        <div className="kanbanSourceMeta">
+                                          <span>{task.sourceType === "PullRequest" ? "PR" : task.sourceType === "Issue" ? "Issue" : "Task"}</span>
+                                          {task.sourceUrl ? (
+                                            <a href={task.sourceUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+                                              GitHubで開く
+                                            </a>
+                                          ) : null}
+                                          <select
+                                            className="kanbanProjectSelect"
+                                            value={selectedProject.id}
+                                            aria-label="Actaプロジェクト"
+                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={(e) => {
+                                              e.stopPropagation();
+                                              void reassignProjectTask(task.id, e.target.value);
+                                            }}
+                                          >
+                                            {projects
+                                              .filter((project) => !project.archivedAtMs)
+                                              .map((project) => (
+                                                <option key={project.id} value={project.id}>
+                                                  {project.name}
+                                                </option>
+                                              ))}
+                                          </select>
+                                        </div>
+                                      ) : null}
+                                      <div className="kanbanCardActions">
+                                        {task.source !== "github" ? (
+                                          <>
+                                            <button
+                                              className="ghostBtn"
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                startProjectTaskEdit(task.id, task.title);
+                                              }}
+                                            >
+                                              編集
+                                            </button>
+                                            <button
+                                              className="dangerGhostBtn"
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                void deleteProjectTask(task.id, task.title);
+                                              }}
+                                            >
+                                              削除
+                                            </button>
+                                          </>
+                                        ) : null}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <div className="empty">左側でプロジェクトを作成してください</div>
+                )}
+              </div>
+            </section>
+
+            {todoRailOpen ? (
+              <aside className="todoRail">
+                <div className="todoRailHead">
+                  <div className="todoRailTitle">
+                    <span className="todoRailMark" aria-hidden="true">
+                      ✓
+                    </span>
+                    <span className="todoRailName">ToDo</span>
+                    <span className="todoRailBadge">{todoEntries.length}</span>
                   </div>
-                </>
-              ) : (
-                <div className="empty">左側でプロジェクトを作成してください</div>
-              )}
-            </div>
+                  <button
+                    className="railToggleBtn"
+                    type="button"
+                    title="ToDoを閉じる"
+                    aria-label="ToDoを閉じる"
+                    onClick={() => setTodoRailOpen(false)}
+                  >
+                    ›
+                  </button>
+                </div>
+                <div className="todoRailTools">
+                  <button
+                    className="primaryActionBtn"
+                    type="button"
+                    disabled={todoBusy}
+                    title="全プロジェクトのInProgressから今日のToDoを作成"
+                    onClick={() => void createTodoFromProjects()}
+                  >
+                    {todoBusy ? "作成中..." : "新規ToDo"}
+                  </button>
+                  <button
+                    className="ghostBtn"
+                    type="button"
+                    disabled={todoBusy}
+                    title="直近のToDoをそのまま今日へコピー"
+                    onClick={() => void copyPreviousTodo()}
+                  >
+                    前回をコピー
+                  </button>
+                  <button
+                    className="ghostBtn"
+                    type="button"
+                    disabled={projectTodoBusy}
+                    title="Activeプロジェクト全体のInProgressを最新のToDoへ追記"
+                    onClick={() => void appendActiveProjectTasksToTodo()}
+                  >
+                    {projectTodoBusy ? "追記中..." : "追記"}
+                  </button>
+
+                  <div className="segmented todoWeekNav" role="group" aria-label="表示する週">
+                    <button
+                      className="segmentedBtn"
+                      type="button"
+                      aria-label="前週"
+                      onClick={() => setTodoWeekOffset((value) => value - 1)}
+                    >
+                      ‹
+                    </button>
+                    <span className="todoWeekLabel">
+                      {todoWeekRange.start} 〜 {todoWeekRange.end}
+                    </span>
+                    <button
+                      className="segmentedBtn"
+                      type="button"
+                      aria-label="次週"
+                      disabled={todoWeekOffset >= 0}
+                      onClick={() => setTodoWeekOffset((value) => Math.min(0, value + 1))}
+                    >
+                      ›
+                    </button>
+                    <button
+                      className="segmentedBtn isText"
+                      type="button"
+                      disabled={todoWeekOffset === 0}
+                      onClick={() => setTodoWeekOffset(0)}
+                    >
+                      今週
+                    </button>
+                  </div>
+                </div>
+                {todoStatus ? <div className="inlineToast">{todoStatus}</div> : null}
+                <div className="todoRailBody dragScroll" ref={todoRailRef}>
+                  <div className="commentList">
+                  {loading ? (
+                    <div className="empty">読み込み中...</div>
+                  ) : todoEntries.length === 0 ? (
+                    <div className="empty">ToDoはまだありません</div>
+                  ) : (
+                    todoEntries.map((e) => (
+                      <CommentCard
+                        key={e.id}
+                        entry={e}
+                        assetBaseUrl={assetBaseUrl}
+                        domId={buildEntryDomId(e.id)}
+                        isLinkedTarget={linkedTargetEntryId === e.id}
+                        taskSummary={summarizeTaskStates(e.body)}
+                        onEdit={(entry) => {
+                          setActiveView("journal");
+                          setEditing(entry);
+                          setDraft(null);
+                        }}
+                        onCopyId={(entry) => {
+                          void copyEntryId(entry);
+                        }}
+                        onCopyMarkdown={(entry) => {
+                          void copyEntryMarkdown(entry, setTodoStatus);
+                        }}
+                        onOpenLinkedEntry={(entryId) => {
+                          openLinkedEntry(entryId);
+                        }}
+                        onToggleTask={async (entry, line0, nextState: TaskState) => {
+                          const nextBody = setTaskStateOnLine(entry.body, line0, nextState);
+                          if (!nextBody) return;
+                          const res = await api.updateEntry({ id: entry.id, body: nextBody, tags: entry.tags });
+                          if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
+                          await reload();
+                          queueBackupSync();
+                        }}
+                        onDelete={async (entry) => {
+                          const ok = window.confirm("このToDoを削除しますか？");
+                          if (!ok) return;
+
+                          let deleted = false;
+                          try {
+                            const res = await api.deleteEntry({ id: entry.id });
+                            if (!res?.deleted) {
+                              setTodoStatus("削除対象が見つかりませんでした");
+                            } else {
+                              deleted = true;
+                              setTodoStatus("ToDoを削除しました");
+                            }
+                            await reload();
+                          } catch (err) {
+                            const msg = err instanceof Error ? err.message : String(err);
+                            setTodoStatus(msg || "削除に失敗しました");
+                          }
+                          if (deleted) queueBackupSync();
+                        }}
+                      />
+                    ))
+                  )}
+                </div>
+                </div>
+              </aside>
+            ) : (
+              <button
+                className="todoRailHandle"
+                type="button"
+                title="ToDoを開く"
+                onClick={() => setTodoRailOpen(true)}
+              >
+                <span className="todoRailMark" aria-hidden="true">
+                  ✓
+                </span>
+                <span className="todoRailHandleText">ToDo</span>
+                <span className="todoRailBadge">{todoEntries.length}</span>
+              </button>
+            )}
           </section>
         ) : null}
 

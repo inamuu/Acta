@@ -4821,3 +4821,370 @@ html .sidebar .tagItem.isSelected .tagCount {
   border-color: var(--theme-accent, var(--accent)) !important;
   box-shadow: inset 0 2px 0 var(--theme-accent, var(--accent));
 }
+
+/* ---------------------------------------------------------------------------
+   ワークスペース: プロジェクト（カンバン）と今日のToDoを1画面に統合
+   --------------------------------------------------------------------------- */
+
+/* タグサイドバーはナレッジ/検索専用。ワークスペースでは横幅をすべて使う。 */
+.shell.isWide {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "titlebar"
+    "main";
+}
+
+.workspaceArea {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--todoRailWidth, 380px);
+  overflow: hidden;
+}
+
+.workspaceArea.isRailCollapsed {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.workspaceArea > .projectsArea {
+  min-width: 0;
+  grid-template-columns: 232px minmax(0, 1fr);
+}
+
+/* ToDoレール本体 */
+.todoRail {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--theme-border-soft, var(--borderSoft));
+  background:
+    radial-gradient(520px 220px at 118% -12%, rgba(var(--theme-accent2-rgb, 6, 182, 212), 0.18), transparent 68%),
+    radial-gradient(460px 220px at -18% 4%, rgba(var(--theme-accent-rgb, 37, 99, 235), 0.14), transparent 70%),
+    linear-gradient(
+      180deg,
+      var(--theme-surface-alt, rgba(255, 255, 255, 0.62)),
+      var(--theme-surface, rgba(255, 255, 255, 0.4))
+    );
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.4), -20px 0 44px rgba(var(--theme-shadow-rgb, 15, 23, 42), 0.07);
+  animation: railIn 220ms ease-out both;
+}
+
+@keyframes railIn {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.todoRailHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 14px 10px;
+}
+
+.todoRailTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.todoRailMark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--theme-accent, var(--accent)), var(--theme-accent2, var(--accent2)));
+  box-shadow: 0 6px 14px rgba(var(--theme-accent-rgb, 37, 99, 235), 0.34);
+}
+
+.todoRailName {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--theme-text, var(--fg0));
+}
+
+.todoRailBadge {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.14);
+  color: var(--theme-text-muted, var(--muted));
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.railToggleBtn {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--theme-border-soft, var(--borderSoft));
+  background: var(--theme-surface, rgba(255, 255, 255, 0.7));
+  color: var(--theme-text-muted, var(--muted));
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.railToggleBtn:hover {
+  color: var(--theme-text, var(--fg0));
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.12);
+  transform: translateX(1px);
+}
+
+.todoRailTools {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 10px;
+}
+
+.todoRailTools .primaryActionBtn,
+.todoRailTools .ghostBtn {
+  font-size: 12px;
+}
+
+.todoRailTools .todoWeekNav {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.todoRail .inlineToast {
+  margin: 0 14px 10px;
+}
+
+.todoRailBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 14px 18px;
+}
+
+/* レール幅に合わせてToDoカードを少しコンパクトにする */
+.todoRail .commentList {
+  max-width: none;
+  gap: 10px;
+}
+
+.todoRail .commentHeader {
+  padding: 10px 12px;
+}
+
+.todoRail .commentBody {
+  padding: 10px 12px;
+}
+
+.todoRail .md {
+  font-size: 13px;
+  line-height: 1.62;
+}
+
+/* 折りたたみ時の縦タブ */
+.todoRailHandle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0;
+  border: 0;
+  border-left: 1px solid var(--theme-border-soft, var(--borderSoft));
+  background: linear-gradient(
+    180deg,
+    rgba(var(--theme-accent-rgb, 37, 99, 235), 0.1),
+    rgba(var(--theme-accent2-rgb, 6, 182, 212), 0.08)
+  );
+  color: var(--theme-text-muted, var(--muted));
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.todoRailHandle:hover {
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.18);
+  color: var(--theme-text, var(--fg0));
+}
+
+.todoRailHandleText {
+  writing-mode: vertical-rl;
+  text-orientation: sideways;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+/* カンバンはステータス3列。レールと並ぶので余白を詰める */
+.workspaceArea .projectDetail {
+  padding: 16px 16px 22px;
+}
+
+.workspaceArea .kanbanBoard {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.workspaceArea .projectList {
+  padding: 14px 12px;
+}
+
+/* 幅が足りないときは順に詰める → 最後はレールをオーバーレイにする */
+@media (max-width: 1280px) {
+  .workspaceArea {
+    --todoRailWidth: 340px;
+  }
+
+  .workspaceArea > .projectsArea {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1080px) {
+  .workspaceArea {
+    grid-template-columns: minmax(0, 1fr) 0;
+  }
+
+  .workspaceArea.isRailCollapsed {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .workspaceArea .todoRail {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 340px;
+    border-radius: 16px 0 0 16px;
+    box-shadow: -26px 0 60px rgba(var(--theme-shadow-rgb, 15, 23, 42), 0.22);
+  }
+
+  .workspaceArea .kanbanBoard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ワークスペース内の窮屈さ対策: ヘッダー・カード・ToDoカードをコンパクトに */
+.workspaceArea .projectHeader {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.workspaceArea .projectHeader > div:first-child {
+  flex: 1 1 340px;
+  min-width: 0;
+}
+
+.workspaceArea .projectHeader h2 {
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.workspaceArea .projectPath {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.workspaceArea .projectHeaderActions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.workspaceArea .projectHeaderActions > * {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.workspaceArea .projectInlineEditors {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* カンバンカード: 狭い列でもメタ情報が縦積みにならないようにする */
+.kanbanSourceMeta {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  row-gap: 6px;
+}
+
+.kanbanSourceMeta > span,
+.kanbanSourceMeta > a {
+  white-space: nowrap;
+}
+
+.kanbanProjectSelect {
+  flex: 1 1 100%;
+  max-width: 100%;
+}
+
+/* ToDoレールのカードヘッダー: 進捗バーと操作ボタンを折り返す */
+.todoRail .commentHeader {
+  gap: 8px;
+}
+
+.todoRail .commentHeaderLine1 {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.todoRail .commentHeaderRight {
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.todoRail .commentMeta {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.todoRail .taskProgressBar {
+  width: 52px;
+}
+
+.todoRail .commentActions .ghostBtn,
+.todoRail .commentActions .dangerGhostBtn {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+/* レール内は全件ToDoタグなのでタグ表示を省き、縦を稼ぐ */
+.todoRail .commentTags {
+  display: none;
+}
+
+/* カンバンは列幅を確保し、足りなければ横スクロール */
+.workspaceArea .kanbanBoard {
+  grid-template-columns: repeat(3, minmax(196px, 1fr));
+}
+
+.ghostBtn.isActive {
+  border-color: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.5);
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.12);
+  color: var(--theme-text, var(--fg0));
+}
