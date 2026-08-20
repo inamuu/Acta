@@ -1875,6 +1875,13 @@ async function syncGitHubItems() {
   let automaticallyClassifiedItems = 0;
   let otherItems = 0;
   const seenIds = new Set();
+  // 同期でToDoへ反映するタスク（プロジェクトIDごと）
+  const todoTasksByProjectId = new Map();
+  const rememberTodoTask = (projectId, task) => {
+    const list = todoTasksByProjectId.get(projectId) || [];
+    list.push(task);
+    todoTasksByProjectId.set(projectId, list);
+  };
 
   for (const item of [...items].reverse()) {
     const content = githubSearchItemContent(item);
@@ -1941,25 +1948,33 @@ async function syncGitHubItems() {
         targetProject.tasks[previousTaskIndex] = nextTask;
         updatedTasks += 1;
         touchedProjectIds.add(targetProject.id);
+        rememberTodoTask(targetProject.id, nextTask);
       }
     } else {
       targetProject.tasks.unshift(nextTask);
       importedTasks += 1;
       touchedProjectIds.add(targetProject.id);
+      rememberTodoTask(targetProject.id, nextTask);
     }
   }
 
   if (items.length < GITHUB_SEARCH_LIMIT) {
     for (const project of projects) {
       const before = project.tasks.length;
+      const removed = project.tasks.filter((task) => task.source === "github" && !seenIds.has(task.id));
       project.tasks = project.tasks.filter((task) => task.source !== "github" || seenIds.has(task.id));
-      if (project.tasks.length !== before) touchedProjectIds.add(project.id);
+      if (project.tasks.length === before) continue;
+      touchedProjectIds.add(project.id);
+      // クローズ・マージ済みでプロジェクトから消えた項目は、ToDo上では完了扱いにする
+      for (const task of removed) rememberTodoTask(project.id, { ...task, status: "Done" });
     }
   }
 
   for (const project of projects) {
     if (touchedProjectIds.has(project.id)) await writeProject(project);
   }
+
+  await reflectSyncedTasksToTodayTodo(projects, todoTasksByProjectId);
 
   const syncedAtMs = Date.now();
   return {
@@ -2157,7 +2172,8 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks, orderedProjectNa
       title: normalizeTodoTaskTitle(task?.title),
       status: normalizeProjectTaskStatus(task?.status),
       marker: markerFromProjectTaskStatus(task?.status),
-      source: task?.source === "github" ? "github" : "local"
+      source: task?.source === "github" ? "github" : "local",
+      existingOnly: Boolean(task?.existingOnly)
     }))
     .filter((task) => task.title);
   if (normalizedTasks.length === 0) return String(body ?? "").trimEnd();
@@ -2165,8 +2181,10 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks, orderedProjectNa
   const lines = normalizeNewlines(String(body ?? "")).trimEnd().split("\n");
   const group = findProjectTodoGroup(lines, projectName);
   if (!group) {
+    const newTasks = normalizedTasks.filter((task) => !task.existingOnly);
+    if (newTasks.length === 0) return lines.join("\n").trimEnd();
     const base = lines.filter((line, index) => !(lines.length === 1 && index === 0 && line === ""));
-    base.push(...todoLinesForProjectGroup({ name: projectName, tasks: normalizedTasks }));
+    base.push(...todoLinesForProjectGroup({ name: projectName, tasks: newTasks }));
     return reorderTodoGroupBlocks(base, orderedProjectNames).join("\n").trimEnd();
   }
 
@@ -2189,6 +2207,7 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks, orderedProjectNa
       );
       continue;
     }
+    if (task.existingOnly) continue;
     appendTasks.push(task);
   }
 
@@ -2283,6 +2302,35 @@ async function upsertProjectTasksToTodayTodo(project, tasks) {
     targetTasks,
     await listProjectNamesInDisplayOrder()
   );
+  if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
+
+  const tags = Array.from(new Set([...(current.tags || []), TODO_TAG]));
+  const res = await updateEntry({ id: current.id, body: nextBody, tags });
+  if (!res.updated) throw new Error("今日のToDo更新に失敗しました");
+  return { ...current, body: nextBody, tags };
+}
+
+/**
+ * GitHub同期の結果を今日のToDoへ反映する。
+ * InProgress は追記、Done（クローズ・マージ済み）は既存行の完了マークのみ更新する。
+ * 今日のToDoが無い場合は何もしない（「新規ToDo」で最新のInProgressから作成できる）。
+ */
+async function reflectSyncedTasksToTodayTodo(projects, tasksByProjectId) {
+  if (!tasksByProjectId || tasksByProjectId.size === 0) return null;
+
+  const current = await findTodayTodoEntry();
+  if (!current) return null;
+
+  const orderedNames = projects.map((project) => project.name);
+  let nextBody = current.body;
+  for (const project of projects) {
+    if (project.archivedAtMs) continue;
+    const tasks = (tasksByProjectId.get(project.id) || [])
+      .filter((task) => task?.title && (task.status === "InProgress" || task.status === "Done"))
+      .map((task) => ({ ...task, existingOnly: task.status === "Done" }));
+    if (tasks.length === 0) continue;
+    nextBody = upsertProjectTasksInTodoBody(nextBody, project.name, tasks, orderedNames);
+  }
   if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
 
   const tags = Array.from(new Set([...(current.tags || []), TODO_TAG]));

@@ -22,7 +22,7 @@ GitHub issue 風の「コメント」UIで、Markdown を日次ファイルへ�
 
 新しい項目は、ラベルと既存のActaタスク名との類似度からActaプロジェクトへ自動分類されます。十分な関連がないものだけ「その他」へ入り、Actaプロジェクトが自動作成されることはありません。カード内のプロジェクト選択欄から所属を修正すると、次回以降の同期でもその所属が維持されます。
 
-Projectsの状態は`Backlog`、`InProgress`、`Done`です。同期したOpenなIssue・PRは`InProgress`に入ります（Acta側で状態を変えた項目はその状態を維持します）。GitHub由来の項目も、ToDoでは各Actaプロジェクトの通常タスクと同じ階層へ追加されます。GitHub由来のURLはプロジェクト画面でのみ表示し、ToDo本文には出力しません。
+Projectsの状態は`Backlog`、`InProgress`、`Done`です。同期したOpenなIssue・PRは`InProgress`に入ります（Acta側で状態を変えた項目はその状態を維持します）。同期の結果は今日のToDoにも反映され、新しい`InProgress`は追記、クローズ・マージ済みで消えた項目は既存行を完了マークへ更新します（今日のToDoが無い場合は何もしません）。GitHub由来の項目も、ToDoでは各Actaプロジェクトの通常タスクと同じ階層へ追加されます。GitHub由来のURLはプロジェクト画面でのみ表示し、ToDo本文には出力しません。
 
 ## 保存先
 既定: `~/Documents/Acta/YYYY-MM-DD.md`

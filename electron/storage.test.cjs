@@ -202,6 +202,48 @@ test("deleting a task not written in ToDo keeps the body as is", () => {
   assert.equal(_test.removeProjectTasksFromTodoBody(body, "別プロジェクト", ["残すタスク"]), body);
 });
 
+test("synced InProgress tasks are appended to today's ToDo", () => {
+  const body = ["# ToDo", "- Acta", "  - [-] 既存タスク"].join("\n");
+  const nextBody = _test.upsertProjectTasksInTodoBody(
+    body,
+    "Acta",
+    [{ title: "OIDC対応 #12", status: "InProgress", source: "github" }],
+    ["Acta"]
+  );
+
+  assert.equal(
+    nextBody,
+    ["# ToDo", "- Acta", "  - [-] 既存タスク", "  - [-] OIDC対応 #12"].join("\n")
+  );
+});
+
+test("existingOnly tasks only flip the marker of lines already in ToDo", () => {
+  const body = ["# ToDo", "- Acta", "  - [-] OIDC対応 #12"].join("\n");
+  const closed = _test.upsertProjectTasksInTodoBody(
+    body,
+    "Acta",
+    [{ title: "OIDC対応 #12", status: "Done", existingOnly: true }],
+    ["Acta"]
+  );
+  assert.equal(closed, ["# ToDo", "- Acta", "  - [x] OIDC対応 #12"].join("\n"));
+
+  const untouched = _test.upsertProjectTasksInTodoBody(
+    body,
+    "Acta",
+    [{ title: "ToDoに無いタスク", status: "Done", existingOnly: true }],
+    ["Acta"]
+  );
+  assert.equal(untouched, body);
+
+  const newGroup = _test.upsertProjectTasksInTodoBody(
+    body,
+    "その他",
+    [{ title: "ToDoに無いタスク", status: "Done", existingOnly: true }],
+    ["Acta", "その他"]
+  );
+  assert.equal(newGroup, body);
+});
+
 test("GitHub items are classified from existing Acta project task titles", () => {
   const projects = [
     { id: "aws-local", name: "AWSアカウント分割（local）", tasks: [
