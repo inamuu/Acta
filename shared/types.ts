@@ -47,7 +47,7 @@ export type UpdateEntryResult = {
   updated: boolean;
 };
 
-export type ProjectTaskStatus = "Backlog" | "InProgress" | "GitHub" | "Done";
+export type ProjectTaskStatus = "Backlog" | "InProgress" | "Done";
 
 export type ProjectTask = {
   id: string;

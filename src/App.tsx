@@ -631,7 +631,7 @@ export function App() {
         (count, project) =>
           project.archivedAtMs
             ? count
-            : count + project.tasks.filter((task) => task.status === "InProgress" || task.status === "GitHub").length,
+            : count + project.tasks.filter((task) => task.status === "InProgress").length,
         0
       ),
     [projects]
@@ -1010,6 +1010,8 @@ export function App() {
         setProjectTaskTitleDraft("");
       }
       await reloadProjects(selectedProject.id);
+      // 削除はToDo本文にも反映されるので再読み込みする。
+      await reload();
       queueBackupSync();
       setProjectStatus("タスクを削除しました");
     } catch (err) {
@@ -1092,9 +1094,14 @@ export function App() {
     setProjectTodoBusy(true);
     try {
       const entry = await api.appendActiveProjectsInProgressToTodayTodo();
+      setTodoWeekOffset(0);
+      mergeEntry(entry);
       await reload();
       queueBackupSync();
-      setProjectStatus(`${entry.date} のToDoにActiveプロジェクトのInProgress / GitHubを追記しました`);
+      // 追記結果をすぐ確認できるようにToDo画面へ切り替える。
+      setTodoStatus(`${entry.date} のToDoにActiveプロジェクトのInProgressを追記しました`);
+      setActiveView("todo");
+      setProjectStatus(`${entry.date} のToDoにActiveプロジェクトのInProgressを追記しました`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setProjectStatus(msg || "ToDoへの追記に失敗しました");
@@ -1292,7 +1299,7 @@ export function App() {
                 className="primaryActionBtn"
                 type="button"
                 disabled={todoBusy}
-                title="全プロジェクトのInProgress / GitHubから今日のToDoを作成"
+                title="全プロジェクトのInProgressから今日のToDoを作成"
                 onClick={() => void createTodoFromProjects()}
               >
                 {todoBusy ? "作成中..." : "新規ToDo"}
@@ -1494,8 +1501,7 @@ export function App() {
                         {project.archivedAtMs
                           ? "archived"
                           : `${
-                              project.tasks.filter((task) => task.status === "InProgress" || task.status === "GitHub")
-                                .length
+                              project.tasks.filter((task) => task.status === "InProgress").length
                             } active`}
                       </small>
                     </button>
@@ -1575,7 +1581,7 @@ export function App() {
                         className="ghostBtn"
                         type="button"
                         disabled={projectTodoBusy}
-                        title="Activeプロジェクト全体のInProgress / GitHubを最新のToDoへ追記"
+                        title="Activeプロジェクト全体のInProgressを最新のToDoへ追記"
                         onClick={() => void appendActiveProjectTasksToTodo()}
                       >
                         {projectTodoBusy ? "追記中..." : "ToDoへ追記"}
@@ -1614,7 +1620,7 @@ export function App() {
                   </div>
                   {projectStatus ? <div className="inlineToast">{projectStatus}</div> : null}
                   <div className="kanbanBoard">
-                    {(["Backlog", "InProgress", "GitHub", "Done"] as const).map((status) => {
+                    {(["Backlog", "InProgress", "Done"] as const).map((status) => {
                       const visibleTasks = selectedProject.tasks.filter(
                         (task) => task.status === status && (status !== "Done" || isRecentProjectTask(task))
                       );

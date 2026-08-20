@@ -11,7 +11,7 @@ const IMAGES_DIR = "images";
 const PROJECTS_DIR = "projects";
 const PROJECT_FILE = "project.json";
 const PROJECT_KNOWLEDGE_FILE = "knowledge.md";
-const PROJECT_TASK_STATUSES = new Set(["Backlog", "InProgress", "GitHub", "Done"]);
+const PROJECT_TASK_STATUSES = new Set(["Backlog", "InProgress", "Done"]);
 const TODO_TAG = "ToDo";
 const TODO_NESTED_INDENT = "  ";
 const SETTINGS_FILE = "acta-settings.json";
@@ -229,7 +229,8 @@ function slugifyProjectName(name) {
 function normalizeProjectTaskStatus(raw) {
   const value = String(raw ?? "").trim();
   if (value === "Inbox") return "Backlog";
-  if (value === "Waiting") return "GitHub";
+  if (value === "Waiting") return "InProgress";
+  if (value === "GitHub") return "InProgress";
   return PROJECT_TASK_STATUSES.has(value) ? value : "Backlog";
 }
 
@@ -1738,10 +1739,13 @@ async function deleteProjectTask(payload) {
   const project = await getProjectById(payload?.projectId);
   const taskId = String(payload?.taskId ?? "").trim();
   if (!taskId) throw new Error("taskId が不正です");
+  const deletedTask = project.tasks.find((task) => task.id === taskId) || null;
   const before = project.tasks.length;
   project.tasks = project.tasks.filter((task) => task.id !== taskId);
   if (project.tasks.length === before) throw new Error("タスクが見つかりません");
-  return writeProject(project);
+  const written = await writeProject(project);
+  if (deletedTask) await removeProjectTasksFromTodayTodo(written, [deletedTask]);
+  return written;
 }
 
 function githubSearchItemContent(item) {
@@ -1819,8 +1823,7 @@ function classifyGitHubItem(item, projects) {
 function projectTaskStatusFromGitHubItem(item, previousTask) {
   const sourceState = githubSourceState(item);
   if (sourceState === "closed") return "Done";
-  if (item?.isPullRequest) return "GitHub";
-  if (!previousTask || previousTask.sourceState === "closed") return "Backlog";
+  if (!previousTask || previousTask.sourceState === "closed") return "InProgress";
   return normalizeProjectTaskStatus(previousTask.status);
 }
 
@@ -2048,7 +2051,6 @@ function todoLinesForProjectGroup(group) {
 function markerFromProjectTaskStatus(status) {
   switch (normalizeProjectTaskStatus(status)) {
     case "InProgress":
-    case "GitHub":
       return "-";
     case "Done":
       return "x";
@@ -2068,6 +2070,70 @@ function normalizeTodoTaskTitle(value) {
     .trim();
 }
 
+function compareProjectNames(left, right) {
+  return String(left ?? "").localeCompare(String(right ?? ""), "ja");
+}
+
+/** 大カテゴリ見出し行（インデントなしの `- プロジェクト名`。チェックボックス行は除く）。 */
+function todoGroupHeadingName(line) {
+  const match = /^-\s+(?!\[)(.+?)\s*$/.exec(String(line ?? ""));
+  return match ? match[1] : null;
+}
+
+/** ToDo本文を「大カテゴリのブロック」と「それ以外のブロック」に分解する。 */
+function splitTodoBlocks(lines) {
+  const blocks = [];
+  let current = null;
+  for (const line of lines) {
+    const name = todoGroupHeadingName(line);
+    const topLevel = name !== null || /^\S/.test(line);
+    if (name !== null) {
+      current = { kind: "group", name, lines: [line] };
+      blocks.push(current);
+      continue;
+    }
+    if (!current || (topLevel && current.kind === "group")) {
+      current = { kind: "other", name: null, lines: [] };
+      blocks.push(current);
+    }
+    current.lines.push(line);
+  }
+  return blocks;
+}
+
+/**
+ * 大カテゴリをプロジェクト画面の表示順（projectOrder）に並べ替える。
+ * 表示順に無いカテゴリは後ろへ回し、その中ではプロジェクト名順にする。
+ */
+function reorderTodoGroupBlocks(lines, orderedProjectNames) {
+  const rank = new Map();
+  (orderedProjectNames || []).forEach((name, index) => {
+    const key = String(name ?? "").trim();
+    if (key && !rank.has(key)) rank.set(key, index);
+  });
+
+  const blocks = splitTodoBlocks(lines);
+  const groupPositions = [];
+  const groupBlocks = [];
+  blocks.forEach((block, index) => {
+    if (block.kind !== "group") return;
+    groupPositions.push(index);
+    groupBlocks.push(block);
+  });
+  if (groupBlocks.length < 2) return lines;
+
+  const sorted = [...groupBlocks].sort((a, b) => {
+    const ra = rank.has(a.name) ? rank.get(a.name) : Number.MAX_SAFE_INTEGER;
+    const rb = rank.has(b.name) ? rank.get(b.name) : Number.MAX_SAFE_INTEGER;
+    if (ra !== rb) return ra - rb;
+    return compareProjectNames(a.name, b.name);
+  });
+  groupPositions.forEach((position, index) => {
+    blocks[position] = sorted[index];
+  });
+  return blocks.flatMap((block) => block.lines);
+}
+
 function findProjectTodoGroup(lines, projectName) {
   const name = String(projectName ?? "").trim();
   if (!name) return null;
@@ -2085,7 +2151,7 @@ function findProjectTodoGroup(lines, projectName) {
   return null;
 }
 
-function upsertProjectTasksInTodoBody(body, projectName, tasks) {
+function upsertProjectTasksInTodoBody(body, projectName, tasks, orderedProjectNames) {
   const normalizedTasks = (tasks || [])
     .map((task) => ({
       title: normalizeTodoTaskTitle(task?.title),
@@ -2099,10 +2165,9 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks) {
   const lines = normalizeNewlines(String(body ?? "")).trimEnd().split("\n");
   const group = findProjectTodoGroup(lines, projectName);
   if (!group) {
-    return [
-      ...lines.filter((line, index) => !(lines.length === 1 && index === 0 && line === "")),
-      ...todoLinesForProjectGroup({ name: projectName, tasks: normalizedTasks })
-    ].join("\n");
+    const base = lines.filter((line, index) => !(lines.length === 1 && index === 0 && line === ""));
+    base.push(...todoLinesForProjectGroup({ name: projectName, tasks: normalizedTasks }));
+    return reorderTodoGroupBlocks(base, orderedProjectNames).join("\n").trimEnd();
   }
 
   const titleToLine = new Map();
@@ -2137,7 +2202,40 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks) {
     );
   }
 
-  return lines.join("\n").trimEnd();
+  return reorderTodoGroupBlocks(lines, orderedProjectNames).join("\n").trimEnd();
+}
+
+/** 削除されたタスク行をToDoから消す。空になった大カテゴリの見出しも消す。 */
+function removeProjectTasksFromTodoBody(body, projectName, titles) {
+  const targets = new Set(
+    (titles || []).map((title) => normalizeTodoTaskTitle(title)).filter(Boolean)
+  );
+  if (targets.size === 0) return String(body ?? "").trimEnd();
+
+  const lines = normalizeNewlines(String(body ?? "")).trimEnd().split("\n");
+  const group = findProjectTodoGroup(lines, projectName);
+  if (!group) return lines.join("\n").trimEnd();
+
+  const kept = [];
+  let removed = 0;
+  for (let i = group.start + 1; i < group.end; i += 1) {
+    const line = lines[i] ?? "";
+    const match = /^(\s*[-+*]\s*)\[([ xX\-\/rR])\](\s+)(.*?)\s*$/.exec(line);
+    if (match && targets.has(normalizeTodoTaskTitle(match[4]))) {
+      removed += 1;
+      continue;
+    }
+    kept.push(line);
+  }
+  if (removed === 0) return lines.join("\n").trimEnd();
+
+  const hasRemainingTask = kept.some((line) => /^\s*[-+*]\s*\[[ xX\-\/rR]\]/.test(line));
+  const next = [
+    ...lines.slice(0, group.start),
+    ...(hasRemainingTask ? [lines[group.start], ...kept] : []),
+    ...lines.slice(group.end)
+  ];
+  return next.join("\n").trimEnd();
 }
 
 async function addTodoEntry(body) {
@@ -2164,6 +2262,12 @@ async function findTodayTodoEntry() {
   return entries.find((entry) => entry.date === today && isTodoEntry(entry)) || null;
 }
 
+/** プロジェクト画面と同じ表示順のプロジェクト名一覧。 */
+async function listProjectNamesInDisplayOrder() {
+  const projects = await listProjects();
+  return projects.map((project) => project.name);
+}
+
 async function upsertProjectTasksToTodayTodo(project, tasks) {
   const targetTasks = (tasks || []).filter((task) => task?.title);
   if (!targetTasks.length) return null;
@@ -2173,13 +2277,34 @@ async function upsertProjectTasksToTodayTodo(project, tasks) {
     return addTodoEntry(buildTodoBodyFromProjectGroups([{ name: project.name, tasks: targetTasks }], todoHeading()));
   }
 
-  const nextBody = upsertProjectTasksInTodoBody(current.body, project.name, targetTasks);
+  const nextBody = upsertProjectTasksInTodoBody(
+    current.body,
+    project.name,
+    targetTasks,
+    await listProjectNamesInDisplayOrder()
+  );
   if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
 
   const tags = Array.from(new Set([...(current.tags || []), TODO_TAG]));
   const res = await updateEntry({ id: current.id, body: nextBody, tags });
   if (!res.updated) throw new Error("今日のToDo更新に失敗しました");
   return { ...current, body: nextBody, tags };
+}
+
+/** 削除・移動で不要になったタスクを今日のToDoから消す。ToDoが無ければ何もしない。 */
+async function removeProjectTasksFromTodayTodo(project, tasks) {
+  const titles = (tasks || []).map((task) => task?.title).filter(Boolean);
+  if (!titles.length) return null;
+
+  const current = await findTodayTodoEntry();
+  if (!current) return null;
+
+  const nextBody = removeProjectTasksFromTodoBody(current.body, project.name, titles);
+  if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
+
+  const res = await updateEntry({ id: current.id, body: nextBody, tags: current.tags });
+  if (!res.updated) throw new Error("今日のToDo更新に失敗しました");
+  return { ...current, body: nextBody };
 }
 
 function isTodoEntry(entry) {
@@ -2190,8 +2315,8 @@ function isTodoEntry(entry) {
 async function appendProjectInProgressToTodayTodo(payload) {
   const project = await getProjectById(payload?.projectId);
   if (project.archivedAtMs) throw new Error("アーカイブ済みプロジェクトはToDoに追記できません");
-  const tasks = project.tasks.filter((task) => task.status === "InProgress" || task.status === "GitHub");
-  if (tasks.length === 0) throw new Error("InProgress / GitHub のタスクがありません");
+  const tasks = project.tasks.filter((task) => task.status === "InProgress");
+  if (tasks.length === 0) throw new Error("InProgress のタスクがありません");
   return upsertProjectTasksToTodayTodo(project, tasks);
 }
 
@@ -2201,10 +2326,10 @@ async function appendActiveProjectsInProgressToTodayTodo() {
     .filter((project) => !project.archivedAtMs)
     .map((project) => ({
       project,
-      tasks: project.tasks.filter((task) => task.status === "InProgress" || task.status === "GitHub")
+      tasks: project.tasks.filter((task) => task.status === "InProgress")
     }))
     .filter((group) => group.tasks.length > 0);
-  if (groups.length === 0) throw new Error("InProgress / GitHub のプロジェクトタスクがありません");
+  if (groups.length === 0) throw new Error("InProgress のプロジェクトタスクがありません");
 
   const current = await findTodayTodoEntry();
   if (!current) {
@@ -2216,8 +2341,9 @@ async function appendActiveProjectsInProgressToTodayTodo() {
     );
   }
 
+  const orderedNames = projects.map((project) => project.name);
   const nextBody = groups.reduce(
-    (body, { project, tasks }) => upsertProjectTasksInTodoBody(body, project.name, tasks),
+    (body, { project, tasks }) => upsertProjectTasksInTodoBody(body, project.name, tasks, orderedNames),
     current.body
   );
   if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
@@ -2234,10 +2360,10 @@ async function createTodoFromProjects() {
     .filter((project) => !project.archivedAtMs)
     .map((project) => ({
       name: project.name,
-      tasks: project.tasks.filter((task) => task.status === "InProgress" || task.status === "GitHub")
+      tasks: project.tasks.filter((task) => task.status === "InProgress")
     }))
     .filter((group) => group.tasks.length > 0);
-  if (groups.length === 0) throw new Error("InProgress / GitHub のプロジェクトタスクがありません");
+  if (groups.length === 0) throw new Error("InProgress のプロジェクトタスクがありません");
   return addTodoEntry(buildTodoBodyFromProjectGroups(groups, todoHeading()));
 }
 
@@ -2299,6 +2425,8 @@ module.exports = {
     markerFromProjectTaskStatus,
     buildTodoBodyFromProjectGroups,
     upsertProjectTasksInTodoBody,
+    reorderTodoGroupBlocks,
+    removeProjectTasksFromTodoBody,
     githubSearchItemContent,
     githubSourceState,
     githubTitleSimilarity,

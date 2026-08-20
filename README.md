@@ -10,6 +10,8 @@ GitHub issue 風の「コメント」UIで、Markdown を日次ファイルへ�
 - 既存投稿の編集/削除
 - 自分が作成したGitHub Issue・PRをActaのTaskへ同期
 - 保存先フォルダの変更を監視して自動再読み込み（CLIやAIが直接書いたToDo・ナレッジもリロード不要で反映）
+- ToDoの大カテゴリ（プロジェクト名）はプロジェクト画面の並び順に追従（追記時も並べ替え。並び順未登録のプロジェクトは名前順で末尾）
+- プロジェクトのタスクを削除するとToDoの該当行も削除（空になった大カテゴリの見出しも削除）
 - ToDoカードにチェックボックスの進捗（完了数/全体）を表示
 - キーボードショートカット: `Cmd+1`〜`Cmd+4` で ToDo / プロジェクト / ナレッジ / 検索 を切り替え
 
@@ -19,7 +21,7 @@ GitHub issue 風の「コメント」UIで、Markdown を日次ファイルへ�
 
 新しい項目は、ラベルと既存のActaタスク名との類似度からActaプロジェクトへ自動分類されます。十分な関連がないものだけ「その他」へ入り、Actaプロジェクトが自動作成されることはありません。カード内のプロジェクト選択欄から所属を修正すると、次回以降の同期でもその所属が維持されます。
 
-Projectsの状態は`Backlog`、`InProgress`、`GitHub`、`Done`です。同期したOpenなPRは`GitHub`、Issueは`Backlog`に入ります。GitHub由来の項目も、ToDoでは各Actaプロジェクトの通常タスクと同じ階層へ追加されます。GitHub由来のURLはプロジェクト画面でのみ表示し、ToDo本文には出力しません。
+Projectsの状態は`Backlog`、`InProgress`、`Done`です。同期したOpenなIssue・PRは`InProgress`に入ります（Acta側で状態を変えた項目はその状態を維持します）。GitHub由来の項目も、ToDoでは各Actaプロジェクトの通常タスクと同じ階層へ追加されます。GitHub由来のURLはプロジェクト画面でのみ表示し、ToDo本文には出力しません。
 
 ## 保存先
 既定: `~/Documents/Acta/YYYY-MM-DD.md`
