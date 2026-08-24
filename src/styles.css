@@ -5612,3 +5612,615 @@ html .sidebar .tagItem.isSelected .tagCount {
   text-orientation: mixed;
   letter-spacing: 0.04em;
 }
+
+/* ---------------------------------------------------------------------------
+   Slack-inspired blue left navigation
+   --------------------------------------------------------------------------- */
+
+.shell:not(.isWide) > .sidebar,
+.shell.isJournal .journalListSidebar,
+.workspaceArea .projectList {
+  color: #eff6ff !important;
+  background:
+    radial-gradient(520px 280px at -10% -8%, rgba(56, 189, 248, 0.26), transparent 62%),
+    linear-gradient(165deg, #123f7a 0%, #0d3266 52%, #092954 100%) !important;
+  border-color: rgba(191, 219, 254, 0.16) !important;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+.shell:not(.isWide) > .sidebar :is(.tagSearchInput, .tagPickerInput) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: rgba(5, 25, 55, 0.34) !important;
+  border-color: rgba(191, 219, 254, 0.2) !important;
+}
+
+.shell:not(.isWide) > .sidebar :is(.tagSearchInput, .tagPickerInput)::placeholder {
+  color: #9dbde3 !important;
+  -webkit-text-fill-color: #9dbde3 !important;
+}
+
+.shell:not(.isWide) > .sidebar :is(.tagGroupHeader, .tagItem) {
+  color: #d7e8fb !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.shell:not(.isWide) > .sidebar :is(.tagGroupHeader, .tagItem):hover {
+  color: #ffffff !important;
+  background: rgba(147, 197, 253, 0.12) !important;
+}
+
+.shell:not(.isWide) > .sidebar :is(.tagGroupHeader, .tagItem).isSelected,
+.shell:not(.isWide) > .sidebar .tagGroupHeader.isActive {
+  color: #ffffff !important;
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.34), rgba(56, 189, 248, 0.15)) !important;
+  box-shadow: inset 3px 0 0 #7dd3fc !important;
+}
+
+.shell:not(.isWide) > .sidebar :is(.tagCount, .tagSearchClear) {
+  color: #dff2ff !important;
+  background: rgba(125, 211, 252, 0.16) !important;
+  border-color: rgba(191, 219, 254, 0.14) !important;
+}
+
+.journalListHeader h2,
+.workspaceArea .projectList :is(.projectCreate, .projectArchiveToggle, .projectNav) {
+  color: #f8fbff;
+}
+
+.journalListEyebrow,
+.journalListCount {
+  color: #a9c9ef;
+}
+
+.journalListSearchInput,
+.workspaceArea .projectList .projectInput {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: rgba(5, 25, 55, 0.34) !important;
+  border-color: rgba(191, 219, 254, 0.2) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+.journalListSearchInput::placeholder,
+.workspaceArea .projectList .projectInput::placeholder {
+  color: #9dbde3 !important;
+  -webkit-text-fill-color: #9dbde3 !important;
+}
+
+.journalListSearchInput:focus,
+.workspaceArea .projectList .projectInput:focus {
+  border-color: #7dd3fc !important;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.18) !important;
+}
+
+.journalListSearch > button {
+  color: #bfd8f5;
+}
+
+.journalListSearch > button:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.journalNewButton,
+.workspaceArea .projectList .primaryActionBtn {
+  color: #08315f !important;
+  background: #dff3ff !important;
+  border-color: rgba(255, 255, 255, 0.62) !important;
+  box-shadow: 0 4px 12px rgba(3, 17, 39, 0.18) !important;
+}
+
+.journalNewButton:hover,
+.workspaceArea .projectList .primaryActionBtn:hover:not(:disabled) {
+  background: #ffffff !important;
+}
+
+.journalListFilters {
+  background: rgba(3, 20, 46, 0.3);
+  border-color: rgba(191, 219, 254, 0.14);
+}
+
+.journalListFilters button {
+  color: #b9d2ee;
+}
+
+.journalListFilters button:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.journalListFilters button.isActive {
+  color: #ffffff;
+  background: rgba(147, 197, 253, 0.23);
+  box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.12);
+}
+
+.journalEntryList {
+  border-color: rgba(191, 219, 254, 0.12);
+}
+
+.journalEntryItem {
+  color: #f6faff;
+  border-color: rgba(191, 219, 254, 0.1);
+}
+
+.journalEntryItem:hover {
+  background: rgba(147, 197, 253, 0.12);
+}
+
+.journalEntryItem.isActive {
+  color: #ffffff;
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.34), rgba(56, 189, 248, 0.15));
+  box-shadow: inset 3px 0 0 #7dd3fc;
+}
+
+.journalEntryItemHead time,
+.journalEntryExcerpt {
+  color: #aec9e8;
+}
+
+.journalEntryItem.isActive :is(.journalEntryItemHead time, .journalEntryExcerpt) {
+  color: #d8eaff;
+}
+
+.journalEntryTags {
+  color: #8bdcff;
+}
+
+.journalListEmpty {
+  color: #aec9e8;
+}
+
+.workspaceArea .projectArchiveToggle {
+  padding: 3px;
+  border: 1px solid rgba(191, 219, 254, 0.14);
+  border-radius: 8px;
+  background: rgba(3, 20, 46, 0.28);
+}
+
+.workspaceArea .projectArchiveToggle .viewTab {
+  flex: 1;
+  color: #b9d2ee !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.workspaceArea .projectArchiveToggle .viewTab:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+.workspaceArea .projectArchiveToggle .viewTab.isActive {
+  color: #ffffff !important;
+  background: rgba(147, 197, 253, 0.22) !important;
+  box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.1);
+}
+
+.workspaceArea .projectNavItem {
+  color: #d7e8fb !important;
+  border: 0 !important;
+  border-radius: 7px;
+  background: transparent !important;
+}
+
+.workspaceArea .projectNavItem small {
+  color: #9fbee1 !important;
+}
+
+.workspaceArea .projectNavItem:hover {
+  color: #ffffff !important;
+  background: rgba(147, 197, 253, 0.12) !important;
+}
+
+.workspaceArea .projectNavItem.isActive {
+  color: #ffffff !important;
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.34), rgba(56, 189, 248, 0.16)) !important;
+  box-shadow: inset 3px 0 0 #7dd3fc;
+}
+
+.workspaceArea .projectList .ghostBtn {
+  color: #d7e8fb !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(191, 219, 254, 0.16) !important;
+}
+
+.workspaceArea .projectList .ghostBtn:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.13) !important;
+}
+
+.workspaceArea .todoRail {
+  color: #edf6ff;
+  background:
+    radial-gradient(440px 180px at 110% -12%, rgba(56, 189, 248, 0.18), transparent 68%),
+    linear-gradient(180deg, #0b2e5c, #08264e) !important;
+  border-color: rgba(191, 219, 254, 0.16) !important;
+  box-shadow: 0 -14px 30px rgba(2, 13, 31, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.workspaceArea .todoRail :is(.todoRailName, .todoWeekLabel) {
+  color: #f5f9ff;
+}
+
+.workspaceArea .todoRailBadge {
+  color: #dff2ff;
+  background: rgba(125, 211, 252, 0.18);
+}
+
+.workspaceArea .todoRail .railToggleBtn,
+.workspaceArea .todoRailTools :is(.ghostBtn, .segmentedBtn) {
+  color: #d7e8fb !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(191, 219, 254, 0.16) !important;
+}
+
+.workspaceArea .todoRail .railToggleBtn:hover,
+.workspaceArea .todoRailTools :is(.ghostBtn, .segmentedBtn):hover:not(:disabled) {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+
+.workspaceArea .todoRailTools .primaryActionBtn {
+  color: #08315f !important;
+  background: #dff3ff !important;
+  border-color: rgba(255, 255, 255, 0.62) !important;
+}
+
+.workspaceArea > .todoRailHandle {
+  color: #e7f3ff;
+  background: linear-gradient(90deg, #0b2e5c, #0c376e);
+  border-color: rgba(191, 219, 254, 0.16);
+}
+
+.workspaceArea > .todoRailHandle:hover {
+  color: #ffffff;
+  background: #10427f;
+}
+
+.projectTodoResizeHandle::before {
+  background: rgba(191, 219, 254, 0.2);
+}
+
+.projectTodoResizeHandle span {
+  background: #c7e5ff;
+  opacity: 0.62;
+}
+
+/* ---------------------------------------------------------------------------
+   Blue application chrome and unified control colors
+   --------------------------------------------------------------------------- */
+
+:root {
+  --control-blue: #2563eb;
+  --control-blue-hover: #1d4ed8;
+  --control-blue-soft: #eaf2ff;
+  --control-blue-soft-hover: #dbeafe;
+  --control-blue-border: #bfd3f5;
+  --control-blue-text: #173b72;
+  --control-neutral-text: #334155;
+}
+
+[data-acta-theme] .appHeader {
+  color: #f8fbff !important;
+  background:
+    radial-gradient(680px 120px at 12% -70%, rgba(56, 189, 248, 0.34), transparent 70%),
+    linear-gradient(90deg, #0b3266 0%, #104681 55%, #0d3a70 100%) !important;
+  border-color: rgba(191, 219, 254, 0.18) !important;
+  box-shadow: 0 6px 18px rgba(3, 20, 46, 0.18) !important;
+}
+
+[data-acta-theme] .appNavItem {
+  color: #c6dcf5 !important;
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+[data-acta-theme] .appNavItem:hover {
+  color: #ffffff !important;
+  border-color: rgba(191, 219, 254, 0.12) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-acta-theme] .appNavItem.isActive {
+  color: #ffffff !important;
+  border-color: rgba(191, 219, 254, 0.22) !important;
+  background: rgba(147, 197, 253, 0.2) !important;
+  box-shadow: inset 0 -2px 0 #7dd3fc;
+}
+
+[data-acta-theme] .appNavCount,
+[data-acta-theme] .appNavItem.isActive .appNavCount {
+  color: #ecf7ff !important;
+  background: rgba(255, 255, 255, 0.13) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+:is(.primaryActionBtn, .primaryBtn),
+.composerWorkspace .primaryBtn,
+.settingActions .primaryBtn {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: linear-gradient(180deg, #3478f6, var(--control-blue)) !important;
+  border-color: #1f56c7 !important;
+  box-shadow: 0 3px 9px rgba(37, 99, 235, 0.24) !important;
+}
+
+:is(.primaryActionBtn, .primaryBtn):hover:not(:disabled),
+.composerWorkspace .primaryBtn:hover:not(:disabled),
+.settingActions .primaryBtn:hover:not(:disabled) {
+  color: #ffffff !important;
+  background: linear-gradient(180deg, #2869e8, var(--control-blue-hover)) !important;
+  border-color: #1948b3 !important;
+  box-shadow: 0 5px 12px rgba(29, 78, 216, 0.28) !important;
+  filter: none;
+}
+
+:is(.ghostBtn, .ghostLinkBtn, .composerLinkButton, .segmentedBtn, .dateNavBtn, .dateQuickBtn, .dateClearBtn),
+.composerWorkspace .ghostBtn {
+  color: var(--control-blue-text) !important;
+  -webkit-text-fill-color: var(--control-blue-text) !important;
+  background: var(--control-blue-soft) !important;
+  border-color: var(--control-blue-border) !important;
+  box-shadow: none !important;
+}
+
+:is(.ghostBtn, .ghostLinkBtn, .composerLinkButton, .segmentedBtn, .dateNavBtn, .dateQuickBtn, .dateClearBtn):hover:not(:disabled),
+.composerWorkspace .ghostBtn:hover:not(:disabled) {
+  color: #10346c !important;
+  background: var(--control-blue-soft-hover) !important;
+  border-color: #9bbbec !important;
+}
+
+.ghostBtn.isActive,
+.dateQuickBtn.isActive,
+.segmentedBtn.isActive {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: var(--control-blue) !important;
+  border-color: var(--control-blue-hover) !important;
+}
+
+.dangerGhostBtn {
+  color: #b4232e !important;
+  -webkit-text-fill-color: #b4232e !important;
+  background: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+  box-shadow: none !important;
+}
+
+.dangerGhostBtn:hover:not(:disabled) {
+  color: #8f1722 !important;
+  background: #ffe4e6 !important;
+  border-color: #fda4af !important;
+}
+
+:is(.primaryActionBtn, .primaryBtn, .ghostBtn, .dangerGhostBtn, .segmentedBtn):disabled {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  background: #eef2f7 !important;
+  border-color: #d8e0ea !important;
+  box-shadow: none !important;
+  opacity: 0.72;
+}
+
+.viewTab,
+.composerLayoutButton {
+  color: var(--control-neutral-text) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+:is(.viewTab, .composerLayoutButton):hover {
+  color: var(--control-blue-text) !important;
+  background: var(--control-blue-soft) !important;
+}
+
+:is(.viewTab, .composerLayoutButton).isActive {
+  color: #ffffff !important;
+  background: var(--control-blue) !important;
+  border-color: var(--control-blue-hover) !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2) !important;
+}
+
+:is(.tagPill, .tagSuggestionPill, .tagPickerMore) {
+  color: #1555a3 !important;
+  background: #e8f3ff !important;
+  border-color: #bfdbfe !important;
+}
+
+:is(.tagPill, .tagSuggestionPill, .tagPickerMore):hover {
+  color: #0f3f7d !important;
+  background: #dbeafe !important;
+  border-color: #93c5fd !important;
+}
+
+.modalClose,
+.searchClear,
+.settingsFab {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: linear-gradient(180deg, #3478f6, var(--control-blue)) !important;
+  border-color: #1f56c7 !important;
+  box-shadow: 0 5px 14px rgba(37, 99, 235, 0.27) !important;
+}
+
+:is(.modalClose, .searchClear, .settingsFab):hover {
+  color: #ffffff !important;
+  background: linear-gradient(180deg, #2869e8, var(--control-blue-hover)) !important;
+  border-color: #1948b3 !important;
+}
+
+.knowledgeResultTitle {
+  color: #174b91;
+}
+
+.knowledgeResultTitle:hover {
+  color: #123b76;
+}
+
+/* Sidebar-specific controls stay legible on the dark blue surface. */
+.workspaceArea .projectList .primaryActionBtn,
+.workspaceArea .todoRailTools .primaryActionBtn,
+.journalNewButton {
+  color: #08315f !important;
+  -webkit-text-fill-color: #08315f !important;
+  background: #dff3ff !important;
+  border-color: rgba(255, 255, 255, 0.62) !important;
+}
+
+.workspaceArea .projectList .ghostBtn,
+.workspaceArea .todoRail :is(.ghostBtn, .segmentedBtn, .railToggleBtn) {
+  color: #d7e8fb !important;
+  -webkit-text-fill-color: #d7e8fb !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(191, 219, 254, 0.16) !important;
+}
+
+.workspaceArea .projectList .ghostBtn:hover:not(:disabled),
+.workspaceArea .todoRail :is(.ghostBtn, .segmentedBtn, .railToggleBtn):hover:not(:disabled) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+
+/* Contrast corrections for every text element placed directly on blue surfaces. */
+.shell:not(.isWide) > .sidebar .sideBrandName {
+  color: #ffffff !important;
+}
+
+.shell:not(.isWide) > .sidebar :is(.sideBrandSub, .tagSidebarTitle, .tagEmpty) {
+  color: #abc8e8 !important;
+}
+
+.shell:not(.isWide) > .sidebar .sideStat {
+  background: rgba(3, 20, 46, 0.26) !important;
+  border-color: rgba(191, 219, 254, 0.14) !important;
+}
+
+.shell:not(.isWide) > .sidebar .sideStat span {
+  color: #abc8e8 !important;
+}
+
+.shell:not(.isWide) > .sidebar .sideStat strong {
+  color: #ffffff !important;
+}
+
+.shell:not(.isWide) > .sidebar :is(.tagGroupName, .tagName) {
+  color: inherit !important;
+}
+
+.shell:not(.isWide) > .sidebar .tagGroupHeader::before {
+  border-right-color: #9fc9ef !important;
+  border-bottom-color: #9fc9ef !important;
+}
+
+.shell:not(.isWide) > .sidebar .tagDivider {
+  background: rgba(191, 219, 254, 0.14) !important;
+}
+
+.workspaceArea .projectList .empty {
+  color: #abc8e8 !important;
+}
+
+.workspaceArea .todoRail > :not(.todoRailBody),
+.workspaceArea .todoRail > :not(.todoRailBody) :is(span, strong, small, label) {
+  color: #edf6ff;
+}
+
+.workspaceArea .todoRail .segmented {
+  background: rgba(3, 20, 46, 0.3) !important;
+  border-color: rgba(191, 219, 254, 0.16) !important;
+}
+
+.workspaceArea .todoRail :is(.inlineToast, .empty) {
+  color: #e7f3ff !important;
+}
+
+.workspaceArea .todoRail .inlineToast {
+  background: rgba(125, 211, 252, 0.12) !important;
+  border-color: rgba(125, 211, 252, 0.24) !important;
+}
+
+.workspaceArea > .todoRailHandle :is(.todoRailHandleText, .todoRailBadge) {
+  color: #edf6ff !important;
+}
+
+/* Final dark-surface contrast audit: never rely on native button text colors. */
+.journalListHeader h2,
+.journalEntryItem .journalEntryItemHead strong {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.journalEntryItem .journalEntryItemHead time,
+.journalEntryItem .journalEntryExcerpt {
+  color: #b9d3ef !important;
+  -webkit-text-fill-color: #b9d3ef !important;
+}
+
+.journalEntryItem.isActive .journalEntryItemHead time,
+.journalEntryItem.isActive .journalEntryExcerpt {
+  color: #e0efff !important;
+  -webkit-text-fill-color: #e0efff !important;
+}
+
+.journalEntryItem .journalEntryTags,
+.journalEntryItem .journalEntryTags span {
+  color: #8bdcff !important;
+  -webkit-text-fill-color: #8bdcff !important;
+}
+
+.journalListFilters button,
+.journalListSearch > button {
+  color: #c5dcf4 !important;
+  -webkit-text-fill-color: #c5dcf4 !important;
+}
+
+.journalListFilters button.isActive {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.workspaceArea .projectNavItem > span {
+  color: #eef6ff !important;
+  -webkit-text-fill-color: #eef6ff !important;
+}
+
+.workspaceArea .projectNavItem > small {
+  color: #a9c7e8 !important;
+  -webkit-text-fill-color: #a9c7e8 !important;
+}
+
+.workspaceArea .projectNavItem.isActive > :is(span, small) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.shell:not(.isWide) > .sidebar .tagSidebar :is(.tagName, .tagGroupName) {
+  color: #dbeafe !important;
+  -webkit-text-fill-color: #dbeafe !important;
+}
+
+.shell:not(.isWide) > .sidebar .tagSidebar :is(.tagItem.isSelected, .tagGroupHeader.isActive) :is(.tagName, .tagGroupName) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.shell:not(.isWide) > .sidebar .tagSidebar .tagCount {
+  color: #dff2ff !important;
+  -webkit-text-fill-color: #dff2ff !important;
+}
+
+[data-acta-theme] .appHeader :is(.appNavText, .appNavIcon) {
+  color: inherit !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.workspaceArea .todoRail :is(.todoRailName, .todoWeekLabel, .inlineToast, .empty),
+.workspaceArea > .todoRailHandle :is(.todoRailHandleText, .todoRailBadge) {
+  color: #edf6ff !important;
+  -webkit-text-fill-color: #edf6ff !important;
+}
