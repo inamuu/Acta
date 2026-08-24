@@ -64,6 +64,14 @@ function makeExcerpt(text: string, query: string, maxLen = 220): string {
   return `${start > 0 ? "..." : ""}${excerpt}${start + maxLen < normalized.length ? "..." : ""}`;
 }
 
+function makeEntryTitle(text: string): string {
+  const firstLine = String(text ?? "")
+    .split(/\r?\n/g)
+    .map((line) => line.replace(/^\s{0,3}#{1,6}\s+/, "").trim())
+    .find(Boolean);
+  return firstLine || "無題のナレッジ";
+}
+
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -725,13 +733,13 @@ export function App() {
     }
 
     setActiveView("journal");
-    setEditing(null);
+    setEditing(target);
     setDraft(null);
     setQuery("");
-    setDateFilter(target.date);
+    setDateFilter("");
+    setDateFilterMode("all");
     clearTagFilter();
     setAppError("");
-    scrollToEntryCard(target.id);
   }
 
   async function rebuildKnowledgeIndex() {
@@ -1137,7 +1145,11 @@ export function App() {
   }
 
   return (
-    <div className={`shell${activeView === "workspace" ? " isWide" : ""}`}>
+    <div
+      className={`shell${activeView === "workspace" ? " isWide" : ""}${
+        activeView === "journal" ? " isJournal" : ""
+      }`}
+    >
       <header className="appHeader" title="ドラッグしてウィンドウを移動">
         <nav className="appNav" aria-label="機能切り替え">
           {(
@@ -1163,149 +1175,129 @@ export function App() {
       </header>
 
       {activeView === "workspace" ? null : (
-      <aside className="sidebar dragScroll" ref={sidebarRef}>
-        <TagSidebar
-          selectedTags={selectedTags}
-          untaggedOnly={untaggedOnly}
-          totalCount={entries.length}
-          activeProjectCount={activeProjectCount}
-          activeProjectTaskCount={activeProjectTaskCount}
-          tagStats={tagStats}
-          untaggedCount={untaggedCount}
-          selectedProjectName={selectedProject?.name ?? ""}
-          onToggleTag={toggleTagFilter}
-          onSelectAll={clearTagFilter}
-          onToggleUntagged={toggleUntaggedFilter}
-        />
+      <aside className={`sidebar dragScroll${activeView === "journal" ? " journalListSidebar" : ""}`} ref={sidebarRef}>
+        {activeView === "journal" ? (
+          <div className="journalListPanel">
+            <div className="journalListHeader">
+              <div>
+                <div className="journalListEyebrow">KNOWLEDGE</div>
+                <h2>ナレッジ一覧</h2>
+              </div>
+              <button
+                className="journalNewButton"
+                type="button"
+                onClick={() => {
+                  setEditing(null);
+                  setDraft({ key: `new:${Date.now()}`, body: "", tags: [] });
+                  setAppError("");
+                }}
+              >
+                ＋ 新規
+              </button>
+            </div>
+
+            <div className="journalListSearch">
+              <input
+                ref={searchRef}
+                className="journalListSearchInput"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ナレッジを検索 (⌘F)"
+              />
+              {query ? (
+                <button type="button" aria-label="検索をクリア" onClick={() => setQuery("")}>
+                  ×
+                </button>
+              ) : null}
+            </div>
+
+            <div className="journalListFilters" role="group" aria-label="表示期間">
+              <button
+                className={dateFilterMode === "day" ? "isActive" : ""}
+                type="button"
+                onClick={() => {
+                  setDateFilter(formatDateYYYYMMDD(new Date()));
+                  setDateFilterMode("day");
+                }}
+              >
+                今日
+              </button>
+              <button
+                className={dateFilterMode === "week" ? "isActive" : ""}
+                type="button"
+                onClick={() => {
+                  setDateFilter(formatDateYYYYMMDD(new Date()));
+                  setDateFilterMode("week");
+                }}
+              >
+                1週間
+              </button>
+              <button
+                className={dateFilterMode === "all" ? "isActive" : ""}
+                type="button"
+                onClick={() => {
+                  setDateFilter("");
+                  setDateFilterMode("all");
+                }}
+              >
+                すべて
+              </button>
+            </div>
+
+            <div className="journalListCount">{filteredEntries.length}件</div>
+            <div className="journalEntryList">
+              {loading ? (
+                <div className="journalListEmpty">読み込み中...</div>
+              ) : filteredEntries.length === 0 ? (
+                <div className="journalListEmpty">該当するナレッジがありません</div>
+              ) : (
+                filteredEntries.map((entry) => (
+                  <button
+                    className={`journalEntryItem${editing?.id === entry.id ? " isActive" : ""}`}
+                    key={entry.id}
+                    type="button"
+                    onClick={() => {
+                      setEditing(entry);
+                      setDraft(null);
+                      setAppError("");
+                    }}
+                  >
+                    <span className="journalEntryItemHead">
+                      <strong>{makeEntryTitle(entry.body)}</strong>
+                      <time>{entry.date}</time>
+                    </span>
+                    <span className="journalEntryExcerpt">{makeExcerpt(entry.body, query, 96)}</span>
+                    {entry.tags.length > 0 ? (
+                      <span className="journalEntryTags">
+                        {entry.tags.slice(0, 3).map((tag) => (
+                          <span key={tag}>#{tag}</span>
+                        ))}
+                      </span>
+                    ) : null}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          <TagSidebar
+            selectedTags={selectedTags}
+            untaggedOnly={untaggedOnly}
+            totalCount={entries.length}
+            activeProjectCount={activeProjectCount}
+            activeProjectTaskCount={activeProjectTaskCount}
+            tagStats={tagStats}
+            untaggedCount={untaggedCount}
+            selectedProjectName={selectedProject?.name ?? ""}
+            onToggleTag={toggleTagFilter}
+            onSelectAll={clearTagFilter}
+            onToggleUntagged={toggleUntaggedFilter}
+          />
+        )}
       </aside>
       )}
 
-      <main className="main">
-        {activeView === "journal" ? (
-          <header className="topbar topbarJournal">
-            <div className="topbarCenter">
-              <div className="topbarControls">
-                <div className="search">
-                  <input
-                    ref={searchRef}
-                    className="searchInput"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="検索 (Ctrl+F)"
-                  />
-                  {query ? (
-                    <button
-                      className="searchClear"
-                      type="button"
-                      onClick={() => setQuery("")}
-                      title="クリア"
-                    >
-                      ×
-                    </button>
-                  ) : null}
-                </div>
-
-                <div className="limitPicker" title="表示件数">
-                  <div className="limitLabel">表示</div>
-                  <select
-                    className="limitSelect"
-                    value={String(limit)}
-                    onChange={(e) => setLimit(Number(e.target.value))}
-                  >
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                    <option value="0">すべて</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="topbarRight">
-              <div className="datePicker" title="日付で絞り込み">
-                <div className="dateLabel">日付</div>
-
-                <button
-                  className="dateNavBtn"
-                  type="button"
-                  disabled={!prevAvailableDate}
-                  title={prevAvailableDate ? `${prevAvailableDate} へ` : "前の日付がありません"}
-                  onClick={() => {
-                    if (!prevAvailableDate) return;
-                    setDateFilter(prevAvailableDate);
-                    setDateFilterMode("day");
-                  }}
-                >
-                  ←
-                </button>
-
-                <input
-                  className="dateInput"
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => {
-                    setDateFilter(e.target.value);
-                    setDateFilterMode(e.target.value ? "day" : "all");
-                  }}
-                />
-
-                <button
-                  className="dateNavBtn"
-                  type="button"
-                  disabled={!nextAvailableDate}
-                  title={nextAvailableDate ? `${nextAvailableDate} へ` : "次の日付がありません"}
-                  onClick={() => {
-                    if (!nextAvailableDate) return;
-                    setDateFilter(nextAvailableDate);
-                    setDateFilterMode("day");
-                  }}
-                >
-                  →
-                </button>
-
-                <button
-                  className={`dateQuickBtn${dateFilterMode === "day" ? " isActive" : ""}`}
-                  type="button"
-                  title="今日"
-                  onClick={() => {
-                    setDateFilter(formatDateYYYYMMDD(new Date()));
-                    setDateFilterMode("day");
-                  }}
-                >
-                  今日
-                </button>
-
-                <button
-                  className={`dateQuickBtn${dateFilterMode === "week" ? " isActive" : ""}`}
-                  type="button"
-                  title="直近1週間"
-                  onClick={() => {
-                    setDateFilter(formatDateYYYYMMDD(new Date()));
-                    setDateFilterMode("week");
-                  }}
-                >
-                  今週
-                </button>
-
-                {dateFilterMode !== "all" ? (
-                  <button
-                    className="dateClearBtn"
-                    type="button"
-                    title="クリア"
-                    onClick={() => {
-                      setDateFilter("");
-                      setDateFilterMode("all");
-                    }}
-                  >
-                    ×
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </header>
-        ) : null}
-
+      <main className={`main${activeView === "journal" ? " journalMain" : ""}`}>
         {activeView === "workspace" ? (
           <section className={`workspaceArea${todoRailOpen ? "" : " isRailCollapsed"}`}>
             <section className="projectsArea">
@@ -1830,8 +1822,7 @@ export function App() {
         ) : null}
 
         {activeView === "journal" ? (
-          <>
-            <section className="composerArea">
+            <section className="composerArea journalComposerArea">
               {appError ? <div className="appError">{appError}</div> : null}
               <Composer
                 assetBaseUrl={assetBaseUrl}
@@ -1867,98 +1858,6 @@ export function App() {
                 }}
               />
             </section>
-
-            <div className="scrollArea dragScroll" ref={scrollAreaRef}>
-              <div className="commentList">
-                {loading ? (
-                  <div className="empty">読み込み中...</div>
-                ) : filteredEntries.length === 0 ? (
-                  <div className="empty">該当するコメントがありません</div>
-                ) : (
-                  visibleEntries.map((e) => (
-                    <CommentCard
-                      key={e.id}
-                      entry={e}
-                      assetBaseUrl={assetBaseUrl}
-                      domId={buildEntryDomId(e.id)}
-                      isLinkedTarget={linkedTargetEntryId === e.id}
-                      onClickTag={(t) => toggleTagFilter(t)}
-                      onEdit={(entry) => {
-                        setEditing(entry);
-                        setDraft(null);
-                        setAppError("");
-                      }}
-                      onCopy={(entry) => {
-                        setEditing(null);
-                        setDraft({
-                          key: `copy:${entry.id}:${Date.now()}`,
-                          body: entry.body,
-                          tags: entry.tags,
-                          source: { id: entry.id, date: entry.date }
-                        });
-                        setAppError("");
-                      }}
-                      onCopyId={(entry) => {
-                        void copyEntryId(entry);
-                      }}
-                      onCopyMarkdown={(entry) => {
-                        void copyEntryMarkdown(entry);
-                      }}
-                      onOpenLinkedEntry={(entryId) => {
-                        openLinkedEntry(entryId);
-                      }}
-                      onToggleTask={async (entry, line0, nextState: TaskState) => {
-                        const nextBody = setTaskStateOnLine(entry.body, line0, nextState);
-                        if (!nextBody) return;
-                        let updated = false;
-                        try {
-                          const res = await api.updateEntry({ id: entry.id, body: nextBody, tags: entry.tags });
-                          if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
-                          updated = true;
-                          setAppError("");
-                        } catch (err) {
-                          const msg = err instanceof Error ? err.message : String(err);
-                          if (msg.includes("No handler registered")) {
-                            setAppError("アプリを再起動してください（更新が反映されていない可能性があります）");
-                          } else {
-                            setAppError(msg || "更新に失敗しました");
-                          }
-                        } finally {
-                          await reload({ keepError: true });
-                          if (updated) queueBackupSync();
-                        }
-                      }}
-                      onDelete={async (entry) => {
-                        const ok = window.confirm("この投稿を削除しますか？");
-                        if (!ok) return;
-
-                        let deleted = false;
-                        try {
-                          if (editing?.id === entry.id) setEditing(null);
-                          const res = await api.deleteEntry({ id: entry.id });
-                          if (!res?.deleted) {
-                            setAppError("削除対象が見つかりませんでした");
-                          } else {
-                            deleted = true;
-                            setAppError("");
-                          }
-                          await reload();
-                        } catch (err) {
-                          const msg = err instanceof Error ? err.message : String(err);
-                          if (msg.includes("No handler registered")) {
-                            setAppError("アプリを再起動してください（更新が反映されていない可能性があります）");
-                          } else {
-                            setAppError(msg || "削除に失敗しました");
-                          }
-                        }
-                        if (deleted) queueBackupSync();
-                      }}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-          </>
         ) : null}
 
         {activeView === "knowledge" ? (
