@@ -6224,3 +6224,432 @@ html .sidebar .tagItem.isSelected .tagCount {
   color: #edf6ff !important;
   -webkit-text-fill-color: #edf6ff !important;
 }
+
+/* ---------------------------------------------------------------------------
+   Theme-aware Slack UI palettes
+   Each preset owns its complete application chrome instead of inheriting blue.
+   --------------------------------------------------------------------------- */
+
+:root,
+[data-acta-theme="default"] {
+  --slack-header-start: #0b3266;
+  --slack-header-end: #104681;
+  --slack-sidebar-start: #123f7a;
+  --slack-sidebar-end: #092954;
+  --slack-sidebar-text: #f8fbff;
+  --slack-sidebar-muted: #b9d3ef;
+  --slack-sidebar-accent: #7dd3fc;
+  --slack-sidebar-active: rgba(96, 165, 250, 0.3);
+  --slack-primary: #2563eb;
+  --slack-primary-hover: #1d4ed8;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #eaf2ff;
+  --slack-soft-hover: #dbeafe;
+  --slack-soft-border: #bfd3f5;
+  --slack-soft-text: #173b72;
+  --slack-tag-bg: #e8f3ff;
+  --slack-tag-text: #1555a3;
+}
+
+[data-acta-theme="dracula"] {
+  --slack-header-start: #2d1e42;
+  --slack-header-end: #4a2f69;
+  --slack-sidebar-start: #3a2852;
+  --slack-sidebar-end: #21182f;
+  --slack-sidebar-text: #f8f8f2;
+  --slack-sidebar-muted: #cfc2df;
+  --slack-sidebar-accent: #8be9fd;
+  --slack-sidebar-active: rgba(189, 147, 249, 0.3);
+  --slack-primary: #8f6bd1;
+  --slack-primary-hover: #7b55c0;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #3b3558;
+  --slack-soft-hover: #484168;
+  --slack-soft-border: #655a82;
+  --slack-soft-text: #f0e9ff;
+  --slack-tag-bg: #44365f;
+  --slack-tag-text: #f0cbff;
+}
+
+[data-acta-theme="solarized-dark"] {
+  --slack-header-start: #003846;
+  --slack-header-end: #075364;
+  --slack-sidebar-start: #073f4c;
+  --slack-sidebar-end: #00252e;
+  --slack-sidebar-text: #eee8d5;
+  --slack-sidebar-muted: #a9bebd;
+  --slack-sidebar-accent: #2aa198;
+  --slack-sidebar-active: rgba(38, 139, 210, 0.3);
+  --slack-primary: #268bd2;
+  --slack-primary-hover: #1d76b6;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #114a58;
+  --slack-soft-hover: #175b69;
+  --slack-soft-border: #3f7180;
+  --slack-soft-text: #d8e7e5;
+  --slack-tag-bg: #12444f;
+  --slack-tag-text: #9fe3d8;
+}
+
+[data-acta-theme="solarized-light"] {
+  --slack-header-start: #0b4c59;
+  --slack-header-end: #176a78;
+  --slack-sidebar-start: #135b68;
+  --slack-sidebar-end: #073642;
+  --slack-sidebar-text: #fffdf5;
+  --slack-sidebar-muted: #c7dad6;
+  --slack-sidebar-accent: #b8d56a;
+  --slack-sidebar-active: rgba(42, 161, 152, 0.34);
+  --slack-primary: #268bd2;
+  --slack-primary-hover: #1d76b6;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #e7f0e9;
+  --slack-soft-hover: #d9e9e3;
+  --slack-soft-border: #b9d1ca;
+  --slack-soft-text: #285761;
+  --slack-tag-bg: #e4f2ef;
+  --slack-tag-text: #0e6f67;
+}
+
+[data-acta-theme="morokai"] {
+  --slack-header-start: #303426;
+  --slack-header-end: #465033;
+  --slack-sidebar-start: #3a402d;
+  --slack-sidebar-end: #20231b;
+  --slack-sidebar-text: #f8f8f2;
+  --slack-sidebar-muted: #c8cbb8;
+  --slack-sidebar-accent: #a6e22e;
+  --slack-sidebar-active: rgba(166, 226, 46, 0.22);
+  --slack-primary: #2f9faf;
+  --slack-primary-hover: #278894;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #3b3c33;
+  --slack-soft-hover: #484a3e;
+  --slack-soft-border: #626652;
+  --slack-soft-text: #eef0df;
+  --slack-tag-bg: #39412d;
+  --slack-tag-text: #d9f9a4;
+}
+
+[data-acta-theme="morokai-light"] {
+  --slack-header-start: #40512d;
+  --slack-header-end: #58713a;
+  --slack-sidebar-start: #4a6132;
+  --slack-sidebar-end: #29371f;
+  --slack-sidebar-text: #fffef7;
+  --slack-sidebar-muted: #d3dec2;
+  --slack-sidebar-accent: #b8df68;
+  --slack-sidebar-active: rgba(166, 226, 46, 0.24);
+  --slack-primary: #2c8fa3;
+  --slack-primary-hover: #23798a;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #e9eddd;
+  --slack-soft-hover: #dde5ce;
+  --slack-soft-border: #c3cdb0;
+  --slack-soft-text: #42552d;
+  --slack-tag-bg: #e3edd2;
+  --slack-tag-text: #4d6120;
+}
+
+[data-acta-theme="tokyo-night"] {
+  --slack-header-start: #1f2543;
+  --slack-header-end: #303d6a;
+  --slack-sidebar-start: #283252;
+  --slack-sidebar-end: #171b2f;
+  --slack-sidebar-text: #e4e9ff;
+  --slack-sidebar-muted: #aeb9e1;
+  --slack-sidebar-accent: #2ac3de;
+  --slack-sidebar-active: rgba(122, 162, 247, 0.3);
+  --slack-primary: #668ee5;
+  --slack-primary-hover: #547bd1;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #2a2f45;
+  --slack-soft-hover: #353b55;
+  --slack-soft-border: #525d86;
+  --slack-soft-text: #d6ddff;
+  --slack-tag-bg: #293456;
+  --slack-tag-text: #b6caff;
+}
+
+[data-acta-theme="nord"] {
+  --slack-header-start: #3b465a;
+  --slack-header-end: #52647f;
+  --slack-sidebar-start: #46556d;
+  --slack-sidebar-end: #2e3440;
+  --slack-sidebar-text: #eceff4;
+  --slack-sidebar-muted: #c3ccda;
+  --slack-sidebar-accent: #88c0d0;
+  --slack-sidebar-active: rgba(136, 192, 208, 0.25);
+  --slack-primary: #5e81ac;
+  --slack-primary-hover: #4c6f98;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #4c566a;
+  --slack-soft-hover: #58647a;
+  --slack-soft-border: #71809a;
+  --slack-soft-text: #eef3f8;
+  --slack-tag-bg: #4b5973;
+  --slack-tag-text: #dceaf7;
+}
+
+[data-acta-theme="gruvbox-dark"] {
+  --slack-header-start: #43382e;
+  --slack-header-end: #5a4a36;
+  --slack-sidebar-start: #4a4034;
+  --slack-sidebar-end: #282421;
+  --slack-sidebar-text: #fbf1c7;
+  --slack-sidebar-muted: #d5c4a1;
+  --slack-sidebar-accent: #b8bb26;
+  --slack-sidebar-active: rgba(215, 153, 33, 0.26);
+  --slack-primary: #458588;
+  --slack-primary-hover: #367174;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #45403d;
+  --slack-soft-hover: #504945;
+  --slack-soft-border: #756b62;
+  --slack-soft-text: #f2e5bc;
+  --slack-tag-bg: #4f4a41;
+  --slack-tag-text: #f2e5bc;
+}
+
+[data-acta-theme] .appHeader {
+  color: var(--slack-sidebar-text) !important;
+  background:
+    radial-gradient(680px 120px at 12% -70%, rgba(var(--theme-accent2-rgb), 0.34), transparent 70%),
+    linear-gradient(90deg, var(--slack-header-start), var(--slack-header-end)) !important;
+  border-color: rgba(var(--theme-accent2-rgb), 0.22) !important;
+  box-shadow: 0 6px 18px rgba(var(--theme-shadow-rgb), 0.34) !important;
+}
+
+.shell:not(.isWide) > .sidebar,
+.workspaceArea .projectList {
+  color: var(--slack-sidebar-text) !important;
+  background:
+    radial-gradient(520px 280px at -10% -8%, rgba(var(--theme-accent2-rgb), 0.24), transparent 62%),
+    linear-gradient(165deg, var(--slack-sidebar-start), var(--slack-sidebar-end)) !important;
+  border-color: rgba(var(--theme-accent2-rgb), 0.2) !important;
+}
+
+.workspaceArea .todoRail {
+  color: var(--slack-sidebar-text) !important;
+  background:
+    radial-gradient(440px 180px at 110% -12%, rgba(var(--theme-accent2-rgb), 0.2), transparent 68%),
+    linear-gradient(180deg, var(--slack-sidebar-start), var(--slack-sidebar-end)) !important;
+  border-color: rgba(var(--theme-accent2-rgb), 0.2) !important;
+}
+
+[data-acta-theme] .appNavItem,
+.journalListEyebrow,
+.journalListCount,
+.journalEntryItem .journalEntryItemHead time,
+.journalEntryItem .journalEntryExcerpt,
+.shell:not(.isWide) > .sidebar :is(.sideBrandSub, .tagSidebarTitle, .tagEmpty),
+.shell:not(.isWide) > .sidebar .sideStat span,
+.workspaceArea .projectNavItem > small,
+.workspaceArea .projectList .empty {
+  color: var(--slack-sidebar-muted) !important;
+  -webkit-text-fill-color: var(--slack-sidebar-muted) !important;
+}
+
+[data-acta-theme] .appNavItem:hover,
+[data-acta-theme] .appNavItem.isActive,
+.journalListHeader h2,
+.journalEntryItem .journalEntryItemHead strong,
+.journalEntryItem.isActive :is(.journalEntryItemHead time, .journalEntryExcerpt),
+.workspaceArea .projectNavItem > span,
+.workspaceArea .projectNavItem.isActive > :is(span, small),
+.shell:not(.isWide) > .sidebar :is(.sideBrandName, .sideStat strong),
+.workspaceArea .todoRail :is(.todoRailName, .todoWeekLabel, .inlineToast, .empty) {
+  color: var(--slack-sidebar-text) !important;
+  -webkit-text-fill-color: var(--slack-sidebar-text) !important;
+}
+
+[data-acta-theme] .appNavItem.isActive,
+.journalEntryItem.isActive,
+.workspaceArea .projectNavItem.isActive,
+.shell:not(.isWide) > .sidebar :is(.tagItem.isSelected, .tagGroupHeader.isActive) {
+  background: var(--slack-sidebar-active) !important;
+  box-shadow: inset 3px 0 0 var(--slack-sidebar-accent) !important;
+}
+
+[data-acta-theme] .appNavItem.isActive {
+  box-shadow: inset 0 -2px 0 var(--slack-sidebar-accent) !important;
+}
+
+.journalEntryItem .journalEntryTags,
+.journalEntryItem .journalEntryTags span {
+  color: var(--slack-sidebar-accent) !important;
+  -webkit-text-fill-color: var(--slack-sidebar-accent) !important;
+}
+
+.journalListSearchInput,
+.workspaceArea .projectList .projectInput,
+.shell:not(.isWide) > .sidebar :is(.tagSearchInput, .tagPickerInput) {
+  color: var(--slack-sidebar-text) !important;
+  -webkit-text-fill-color: var(--slack-sidebar-text) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.3) !important;
+  border-color: rgba(var(--theme-accent2-rgb), 0.24) !important;
+}
+
+.journalListSearchInput::placeholder,
+.workspaceArea .projectList .projectInput::placeholder,
+.shell:not(.isWide) > .sidebar :is(.tagSearchInput, .tagPickerInput)::placeholder {
+  color: var(--slack-sidebar-muted) !important;
+  -webkit-text-fill-color: var(--slack-sidebar-muted) !important;
+}
+
+:is(.primaryActionBtn, .primaryBtn),
+.composerWorkspace .primaryBtn,
+.settingActions .primaryBtn,
+.modalClose,
+.searchClear,
+.settingsFab {
+  color: var(--slack-primary-text) !important;
+  -webkit-text-fill-color: var(--slack-primary-text) !important;
+  background: var(--slack-primary) !important;
+  border-color: var(--slack-primary-hover) !important;
+  box-shadow: 0 4px 12px rgba(var(--theme-shadow-rgb), 0.24) !important;
+}
+
+:is(.primaryActionBtn, .primaryBtn, .modalClose, .searchClear, .settingsFab):hover:not(:disabled),
+.composerWorkspace .primaryBtn:hover:not(:disabled),
+.settingActions .primaryBtn:hover:not(:disabled) {
+  color: var(--slack-primary-text) !important;
+  background: var(--slack-primary-hover) !important;
+  border-color: var(--slack-primary-hover) !important;
+}
+
+:is(.ghostBtn, .ghostLinkBtn, .composerLinkButton, .segmentedBtn, .dateNavBtn, .dateQuickBtn, .dateClearBtn),
+.composerWorkspace .ghostBtn {
+  color: var(--slack-soft-text) !important;
+  -webkit-text-fill-color: var(--slack-soft-text) !important;
+  background: var(--slack-soft) !important;
+  border-color: var(--slack-soft-border) !important;
+}
+
+:is(.ghostBtn, .ghostLinkBtn, .composerLinkButton, .segmentedBtn, .dateNavBtn, .dateQuickBtn, .dateClearBtn):hover:not(:disabled),
+.composerWorkspace .ghostBtn:hover:not(:disabled) {
+  color: var(--slack-soft-text) !important;
+  background: var(--slack-soft-hover) !important;
+  border-color: var(--theme-accent) !important;
+}
+
+:is(.ghostBtn.isActive, .dateQuickBtn.isActive, .segmentedBtn.isActive, .viewTab.isActive, .composerLayoutButton.isActive) {
+  color: var(--slack-primary-text) !important;
+  -webkit-text-fill-color: var(--slack-primary-text) !important;
+  background: var(--slack-primary) !important;
+  border-color: var(--slack-primary-hover) !important;
+}
+
+:is(.viewTab, .composerLayoutButton) {
+  color: var(--theme-text-subtle) !important;
+}
+
+:is(.viewTab, .composerLayoutButton):hover {
+  color: var(--slack-soft-text) !important;
+  background: var(--slack-soft) !important;
+}
+
+:is(.tagPill, .tagSuggestionPill, .tagPickerMore) {
+  color: var(--slack-tag-text) !important;
+  -webkit-text-fill-color: var(--slack-tag-text) !important;
+  background: var(--slack-tag-bg) !important;
+  border-color: rgba(var(--theme-accent2-rgb), 0.36) !important;
+}
+
+.dangerGhostBtn {
+  color: var(--theme-danger) !important;
+  -webkit-text-fill-color: var(--theme-danger) !important;
+  background: rgba(var(--theme-danger-rgb), 0.1) !important;
+  border-color: rgba(var(--theme-danger-rgb), 0.38) !important;
+}
+
+.dangerGhostBtn:hover:not(:disabled) {
+  color: var(--theme-danger) !important;
+  background: rgba(var(--theme-danger-rgb), 0.18) !important;
+  border-color: rgba(var(--theme-danger-rgb), 0.56) !important;
+}
+
+/* Controls placed on Slack sidebars use translucent theme colors. */
+.workspaceArea .projectList .primaryActionBtn,
+.workspaceArea .todoRailTools .primaryActionBtn,
+.journalNewButton {
+  color: var(--slack-primary-text) !important;
+  -webkit-text-fill-color: var(--slack-primary-text) !important;
+  background: var(--slack-primary) !important;
+  border-color: rgba(var(--theme-accent2-rgb), 0.5) !important;
+}
+
+.workspaceArea .projectList .ghostBtn,
+.workspaceArea .todoRail :is(.ghostBtn, .segmentedBtn, .railToggleBtn) {
+  color: var(--slack-sidebar-text) !important;
+  -webkit-text-fill-color: var(--slack-sidebar-text) !important;
+  background: rgba(var(--theme-accent-rgb), 0.13) !important;
+  border-color: rgba(var(--theme-accent2-rgb), 0.22) !important;
+}
+
+.workspaceArea .projectList .ghostBtn:hover:not(:disabled),
+.workspaceArea .todoRail :is(.ghostBtn, .segmentedBtn, .railToggleBtn):hover:not(:disabled) {
+  color: var(--slack-sidebar-text) !important;
+  background: rgba(var(--theme-accent-rgb), 0.24) !important;
+}
+
+.knowledgeResultTitle {
+  color: var(--theme-accent) !important;
+}
+
+.journalListFilters,
+.workspaceArea .projectArchiveToggle,
+.workspaceArea .todoRail .segmented {
+  background: rgba(var(--theme-shadow-rgb), 0.28) !important;
+  border-color: rgba(var(--theme-accent2-rgb), 0.2) !important;
+}
+
+.journalListFilters button,
+.workspaceArea .projectArchiveToggle .viewTab {
+  color: var(--slack-sidebar-muted) !important;
+  -webkit-text-fill-color: var(--slack-sidebar-muted) !important;
+  background: transparent !important;
+}
+
+.journalListFilters button:hover,
+.workspaceArea .projectArchiveToggle .viewTab:hover {
+  color: var(--slack-sidebar-text) !important;
+  -webkit-text-fill-color: var(--slack-sidebar-text) !important;
+  background: rgba(var(--theme-accent-rgb), 0.14) !important;
+}
+
+.journalListFilters button.isActive,
+.workspaceArea .projectArchiveToggle .viewTab.isActive {
+  color: var(--slack-sidebar-text) !important;
+  -webkit-text-fill-color: var(--slack-sidebar-text) !important;
+  background: var(--slack-sidebar-active) !important;
+  border-color: transparent !important;
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-accent2-rgb), 0.2) !important;
+}
+
+.workspaceArea > .todoRailHandle {
+  color: var(--slack-sidebar-text) !important;
+  background: linear-gradient(90deg, var(--slack-sidebar-end), var(--slack-sidebar-start)) !important;
+  border-color: rgba(var(--theme-accent2-rgb), 0.2) !important;
+}
+
+.workspaceArea > .todoRailHandle:hover {
+  background: var(--slack-sidebar-start) !important;
+}
+
+.projectTodoResizeHandle::before {
+  background: rgba(var(--theme-accent2-rgb), 0.24) !important;
+}
+
+.projectTodoResizeHandle span {
+  background: var(--slack-sidebar-accent) !important;
+}
+
+:is(.primaryActionBtn, .primaryBtn, .ghostBtn, .dangerGhostBtn, .segmentedBtn):disabled {
+  color: var(--theme-text-muted) !important;
+  -webkit-text-fill-color: var(--theme-text-muted) !important;
+  background: var(--theme-surface-soft) !important;
+  border-color: var(--theme-border-soft) !important;
+  box-shadow: none !important;
+  opacity: 0.62;
+}
