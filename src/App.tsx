@@ -23,6 +23,7 @@ type DateFilterMode = "week" | "day" | "all";
 type ActiveView = "workspace" | "journal" | "knowledge";
 
 const TODO_RAIL_STORAGE_KEY = "acta.todoRailOpen";
+const PROJECT_TODO_HEIGHT_STORAGE_KEY = "acta.projectTodoHeight";
 type DraftPost = {
   key: string;
   body: string;
@@ -212,6 +213,10 @@ export function App() {
   const [todoRailOpen, setTodoRailOpen] = useState<boolean>(
     () => window.localStorage.getItem(TODO_RAIL_STORAGE_KEY) !== "closed"
   );
+  const [projectTodoHeight, setProjectTodoHeight] = useState<number>(() => {
+    const stored = Number(window.localStorage.getItem(PROJECT_TODO_HEIGHT_STORAGE_KEY));
+    return Number.isFinite(stored) && stored >= 260 && stored <= 600 ? stored : 340;
+  });
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
   const [knowledgeExcludeTags, setKnowledgeExcludeTags] = useState("");
   const [knowledgeResults, setKnowledgeResults] = useState<KnowledgeSearchResultItem[]>([]);
@@ -243,6 +248,7 @@ export function App() {
   const knowledgeSearchRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const todoRailRef = useRef<HTMLDivElement>(null);
+  const workspaceAreaRef = useRef<HTMLElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const syncQueueRef = useRef<Promise<void>>(Promise.resolve());
   const backupSyncTimerRef = useRef<number | null>(null);
@@ -457,6 +463,10 @@ export function App() {
   useEffect(() => {
     window.localStorage.setItem(TODO_RAIL_STORAGE_KEY, todoRailOpen ? "open" : "closed");
   }, [todoRailOpen]);
+
+  useEffect(() => {
+    window.localStorage.setItem(PROJECT_TODO_HEIGHT_STORAGE_KEY, String(projectTodoHeight));
+  }, [projectTodoHeight]);
 
   useEffect(() => {
     const nextTheme = normalizeTheme(settings.theme);
@@ -1131,6 +1141,33 @@ export function App() {
     }
   }
 
+  function clampProjectTodoHeight(nextHeight: number): number {
+    const containerHeight = workspaceAreaRef.current?.getBoundingClientRect().height ?? 720;
+    const maxHeight = Math.max(260, containerHeight - 220);
+    return Math.round(Math.min(maxHeight, Math.max(260, nextHeight)));
+  }
+
+  function beginProjectTodoResize(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const container = workspaceAreaRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const resize = (clientY: number) => setProjectTodoHeight(clampProjectTodoHeight(rect.bottom - clientY));
+    const onPointerMove = (event: PointerEvent) => resize(event.clientY);
+    const onPointerUp = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      document.body.classList.remove("isResizingProjectTodo");
+    };
+
+    document.body.classList.add("isResizingProjectTodo");
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp, { once: true });
+    resize(e.clientY);
+  }
+
   if (!api) {
     return (
       <div className="noApi">
@@ -1299,7 +1336,11 @@ export function App() {
 
       <main className={`main${activeView === "journal" ? " journalMain" : ""}`}>
         {activeView === "workspace" ? (
-          <section className={`workspaceArea${todoRailOpen ? "" : " isRailCollapsed"}`}>
+          <section
+            className={`workspaceArea${todoRailOpen ? "" : " isRailCollapsed"}`}
+            ref={workspaceAreaRef}
+            style={{ "--projectTodoHeight": `${projectTodoHeight}px` } as React.CSSProperties}
+          >
             <section className="projectsArea">
               <aside className="projectList">
                 <div className="projectCreate">
@@ -1659,6 +1700,26 @@ export function App() {
                 )}
               </div>
             </section>
+
+            {todoRailOpen ? (
+              <div
+                className="projectTodoResizeHandle"
+                role="separator"
+                aria-label="プロジェクト一覧とToDoの高さを変更"
+                aria-orientation="horizontal"
+                aria-valuenow={projectTodoHeight}
+                tabIndex={0}
+                onPointerDown={beginProjectTodoResize}
+                onKeyDown={(e) => {
+                  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+                  e.preventDefault();
+                  const direction = e.key === "ArrowUp" ? 1 : -1;
+                  setProjectTodoHeight((height) => clampProjectTodoHeight(height + direction * 20));
+                }}
+              >
+                <span aria-hidden="true" />
+              </div>
+            ) : null}
 
             {todoRailOpen ? (
               <aside className="todoRail">

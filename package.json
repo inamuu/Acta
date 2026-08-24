@@ -1,6 +1,6 @@
 {
   "name": "acta",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "private": true,
   "description": "Acta - GitHub issue style markdown log",
   "main": "electron/main.cjs",
