@@ -2759,83 +2759,83 @@ a:focus-visible {
 
 [data-acta-theme="morokai"] {
   --theme-bg-color: #272822;
-  --theme-bg-gradient: linear-gradient(180deg, #272822 0%, #232420 52%, #1f201c 100%);
-  --theme-surface: #2d2e27;
-  --theme-surface-alt: #33342c;
-  --theme-surface-soft: #3b3c33;
-  --theme-surface-soft-2: #44463c;
-  --theme-surface-selected: #4a4d3f;
+  --theme-bg-gradient: linear-gradient(180deg, #272822 0%, #242320 52%, #201d1e 100%);
+  --theme-surface: #2e2c28;
+  --theme-surface-alt: #35322e;
+  --theme-surface-soft: #3d3833;
+  --theme-surface-soft-2: #46403b;
+  --theme-surface-selected: #4d4340;
   --theme-text: #f8f8f2;
-  --theme-text-subtle: #d8d8c9;
-  --theme-text-muted: #b9bba9;
-  --theme-border: #4a4d3f;
-  --theme-border-soft: #575b4a;
-  --theme-border-strong: #646955;
-  --theme-border-selected: #a6e22e;
-  --theme-accent: #66d9ef;
-  --theme-accent2: #a6e22e;
-  --theme-danger: #f92672;
-  --theme-overlay: #12130f;
-  --theme-tag-bg: #39412d;
-  --theme-tag-fg: #d9f9a4;
-  --theme-sidebar-shell-a: rgba(102, 217, 239, 0.34);
-  --theme-sidebar-shell-b: rgba(166, 226, 46, 0.34);
-  --theme-sidebar-item-active-top: rgba(102, 217, 239, 0.54);
-  --theme-sidebar-item-active-bottom: rgba(166, 226, 46, 0.42);
-  --theme-accent-rgb: 102, 217, 239;
-  --theme-accent2-rgb: 166, 226, 46;
-  --theme-danger-rgb: 249, 38, 114;
-  --theme-shadow-rgb: 7, 8, 6;
-  --theme-shell-accent: rgba(102, 217, 239, 0.14);
-  --theme-shell-accent2: rgba(166, 226, 46, 0.13);
-  --theme-scroll-accent: rgba(102, 217, 239, 0.1);
-  --theme-scroll-accent2: rgba(166, 226, 46, 0.07);
+  --theme-text-subtle: #dcd6ce;
+  --theme-text-muted: #bdb3ad;
+  --theme-border: #4d4540;
+  --theme-border-soft: #5a504b;
+  --theme-border-strong: #6a5d58;
+  --theme-border-selected: #f92672;
+  --theme-accent: #f92672;
+  --theme-accent2: #fd971f;
+  --theme-danger: #ff6188;
+  --theme-overlay: #14100f;
+  --theme-tag-bg: #4a3038;
+  --theme-tag-fg: #ffb3cd;
+  --theme-sidebar-shell-a: rgba(249, 38, 114, 0.34);
+  --theme-sidebar-shell-b: rgba(253, 151, 31, 0.3);
+  --theme-sidebar-item-active-top: rgba(249, 38, 114, 0.5);
+  --theme-sidebar-item-active-bottom: rgba(253, 151, 31, 0.38);
+  --theme-accent-rgb: 249, 38, 114;
+  --theme-accent2-rgb: 253, 151, 31;
+  --theme-danger-rgb: 255, 97, 136;
+  --theme-shadow-rgb: 9, 7, 6;
+  --theme-shell-accent: rgba(249, 38, 114, 0.14);
+  --theme-shell-accent2: rgba(253, 151, 31, 0.12);
+  --theme-scroll-accent: rgba(249, 38, 114, 0.1);
+  --theme-scroll-accent2: rgba(253, 151, 31, 0.07);
   --theme-card-border-gradient: linear-gradient(
     135deg,
-    rgba(102, 217, 239, 0.38),
-    rgba(166, 226, 46, 0.28),
+    rgba(249, 38, 114, 0.38),
+    rgba(253, 151, 31, 0.28),
     rgba(248, 248, 242, 0.14)
   );
 }
 
 [data-acta-theme="morokai-light"] {
-  --theme-bg-color: #f8f7f1;
-  --theme-bg-gradient: linear-gradient(180deg, #f8f7f1 0%, #f2f0e6 52%, #efecdf 100%);
-  --theme-surface: #fffef7;
-  --theme-surface-alt: #f5f3e8;
-  --theme-surface-soft: #efebda;
-  --theme-surface-soft-2: #ebe6d2;
-  --theme-surface-selected: #e3ddc4;
-  --theme-text: #2f3228;
-  --theme-text-subtle: #4b5142;
-  --theme-text-muted: #68705e;
-  --theme-border: #d5d2c4;
-  --theme-border-soft: #e1ded0;
-  --theme-border-strong: #c7c3b2;
-  --theme-border-selected: #8bb23f;
-  --theme-accent: #2c8fa3;
-  --theme-accent2: #7aa12f;
-  --theme-danger: #d14b6c;
-  --theme-overlay: #2b2e24;
-  --theme-tag-bg: #e3edd2;
-  --theme-tag-fg: #4d6120;
-  --theme-sidebar-shell-a: rgba(44, 143, 163, 0.24);
-  --theme-sidebar-shell-b: rgba(122, 161, 47, 0.22);
-  --theme-sidebar-item-active-top: rgba(44, 143, 163, 0.36);
-  --theme-sidebar-item-active-bottom: rgba(122, 161, 47, 0.3);
-  --theme-accent-rgb: 44, 143, 163;
-  --theme-accent2-rgb: 122, 161, 47;
-  --theme-danger-rgb: 209, 75, 108;
-  --theme-shadow-rgb: 37, 39, 32;
-  --theme-shell-accent: rgba(44, 143, 163, 0.14);
-  --theme-shell-accent2: rgba(122, 161, 47, 0.1);
-  --theme-scroll-accent: rgba(44, 143, 163, 0.08);
-  --theme-scroll-accent2: rgba(122, 161, 47, 0.06);
+  --theme-bg-color: #faf6f3;
+  --theme-bg-gradient: linear-gradient(180deg, #faf6f3 0%, #f5eeeb 52%, #f2e9e7 100%);
+  --theme-surface: #fffbf9;
+  --theme-surface-alt: #f7f0ed;
+  --theme-surface-soft: #f2e8e6;
+  --theme-surface-soft-2: #ecdfde;
+  --theme-surface-selected: #e6d3d7;
+  --theme-text: #322830;
+  --theme-text-subtle: #4f4149;
+  --theme-text-muted: #6d5c65;
+  --theme-border: #d8cbcd;
+  --theme-border-soft: #e3d7d8;
+  --theme-border-strong: #c9babd;
+  --theme-border-selected: #c62368;
+  --theme-accent: #c62368;
+  --theme-accent2: #d1751a;
+  --theme-danger: #d1355c;
+  --theme-overlay: #2e2229;
+  --theme-tag-bg: #fbe2ee;
+  --theme-tag-fg: #8f1f4f;
+  --theme-sidebar-shell-a: rgba(198, 35, 104, 0.24);
+  --theme-sidebar-shell-b: rgba(209, 117, 26, 0.2);
+  --theme-sidebar-item-active-top: rgba(198, 35, 104, 0.34);
+  --theme-sidebar-item-active-bottom: rgba(209, 117, 26, 0.26);
+  --theme-accent-rgb: 198, 35, 104;
+  --theme-accent2-rgb: 209, 117, 26;
+  --theme-danger-rgb: 209, 53, 92;
+  --theme-shadow-rgb: 44, 32, 38;
+  --theme-shell-accent: rgba(198, 35, 104, 0.14);
+  --theme-shell-accent2: rgba(209, 117, 26, 0.1);
+  --theme-scroll-accent: rgba(198, 35, 104, 0.08);
+  --theme-scroll-accent2: rgba(209, 117, 26, 0.06);
   --theme-card-border-gradient: linear-gradient(
     135deg,
-    rgba(44, 143, 163, 0.32),
-    rgba(122, 161, 47, 0.26),
-    rgba(47, 50, 40, 0.12)
+    rgba(198, 35, 104, 0.32),
+    rgba(209, 117, 26, 0.26),
+    rgba(50, 40, 48, 0.12)
   );
 }
 
@@ -4453,7 +4453,7 @@ html .sidebar .tagItem.isSelected .tagCount {
 }
 
 [data-acta-theme="morokai-light"] {
-  --theme-on-accent: #151a12;
+  --theme-on-accent: #fff5f9;
 }
 
 :is(
@@ -6072,7 +6072,7 @@ html .sidebar .tagItem.isSelected .tagCount {
 }
 
 .workspaceArea .projectList .ghostBtn,
-.workspaceArea .todoRail :is(.ghostBtn, .segmentedBtn, .railToggleBtn) {
+.workspaceArea .todoRail :is(.todoRailHead, .todoRailTools) :is(.ghostBtn, .segmentedBtn, .railToggleBtn) {
   color: #d7e8fb !important;
   -webkit-text-fill-color: #d7e8fb !important;
   background: rgba(255, 255, 255, 0.07) !important;
@@ -6080,7 +6080,7 @@ html .sidebar .tagItem.isSelected .tagCount {
 }
 
 .workspaceArea .projectList .ghostBtn:hover:not(:disabled),
-.workspaceArea .todoRail :is(.ghostBtn, .segmentedBtn, .railToggleBtn):hover:not(:disabled) {
+.workspaceArea .todoRail :is(.todoRailHead, .todoRailTools) :is(.ghostBtn, .segmentedBtn, .railToggleBtn):hover:not(:disabled) {
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
   background: rgba(255, 255, 255, 0.14) !important;
@@ -6312,43 +6312,43 @@ html .sidebar .tagItem.isSelected .tagCount {
 }
 
 [data-acta-theme="morokai"] {
-  --slack-header-start: #303426;
-  --slack-header-end: #465033;
-  --slack-sidebar-start: #3a402d;
-  --slack-sidebar-end: #20231b;
+  --slack-header-start: #3a2b30;
+  --slack-header-end: #5a3440;
+  --slack-sidebar-start: #45303a;
+  --slack-sidebar-end: #241f21;
   --slack-sidebar-text: #f8f8f2;
-  --slack-sidebar-muted: #c8cbb8;
-  --slack-sidebar-accent: #a6e22e;
-  --slack-sidebar-active: rgba(166, 226, 46, 0.22);
-  --slack-primary: #2f9faf;
-  --slack-primary-hover: #278894;
+  --slack-sidebar-muted: #d3c4c9;
+  --slack-sidebar-accent: #fd971f;
+  --slack-sidebar-active: rgba(249, 38, 114, 0.26);
+  --slack-primary: #c9285f;
+  --slack-primary-hover: #a91f4e;
   --slack-primary-text: #ffffff;
-  --slack-soft: #3b3c33;
-  --slack-soft-hover: #484a3e;
-  --slack-soft-border: #626652;
-  --slack-soft-text: #eef0df;
-  --slack-tag-bg: #39412d;
-  --slack-tag-text: #d9f9a4;
+  --slack-soft: #3f3339;
+  --slack-soft-hover: #4d3e46;
+  --slack-soft-border: #6e5560;
+  --slack-soft-text: #f6e3ea;
+  --slack-tag-bg: #4a3038;
+  --slack-tag-text: #ffb3cd;
 }
 
 [data-acta-theme="morokai-light"] {
-  --slack-header-start: #40512d;
-  --slack-header-end: #58713a;
-  --slack-sidebar-start: #4a6132;
-  --slack-sidebar-end: #29371f;
-  --slack-sidebar-text: #fffef7;
-  --slack-sidebar-muted: #d3dec2;
-  --slack-sidebar-accent: #b8df68;
-  --slack-sidebar-active: rgba(166, 226, 46, 0.24);
-  --slack-primary: #2c8fa3;
-  --slack-primary-hover: #23798a;
+  --slack-header-start: #5c2444;
+  --slack-header-end: #7d3459;
+  --slack-sidebar-start: #6a2c4d;
+  --slack-sidebar-end: #35202b;
+  --slack-sidebar-text: #fffaf9;
+  --slack-sidebar-muted: #e0c9d5;
+  --slack-sidebar-accent: #ff9ec4;
+  --slack-sidebar-active: rgba(198, 35, 104, 0.3);
+  --slack-primary: #b02659;
+  --slack-primary-hover: #93204a;
   --slack-primary-text: #ffffff;
-  --slack-soft: #e9eddd;
-  --slack-soft-hover: #dde5ce;
-  --slack-soft-border: #c3cdb0;
-  --slack-soft-text: #42552d;
-  --slack-tag-bg: #e3edd2;
-  --slack-tag-text: #4d6120;
+  --slack-soft: #f8e6ee;
+  --slack-soft-hover: #f0d6e2;
+  --slack-soft-border: #ddbfcd;
+  --slack-soft-text: #7d2450;
+  --slack-tag-bg: #fbe2ee;
+  --slack-tag-text: #8f1f4f;
 }
 
 [data-acta-theme="tokyo-night"] {
@@ -6580,7 +6580,7 @@ html .sidebar .tagItem.isSelected .tagCount {
 }
 
 .workspaceArea .projectList .ghostBtn,
-.workspaceArea .todoRail :is(.ghostBtn, .segmentedBtn, .railToggleBtn) {
+.workspaceArea .todoRail :is(.todoRailHead, .todoRailTools) :is(.ghostBtn, .segmentedBtn, .railToggleBtn) {
   color: var(--slack-sidebar-text) !important;
   -webkit-text-fill-color: var(--slack-sidebar-text) !important;
   background: rgba(var(--theme-accent-rgb), 0.13) !important;
@@ -6588,9 +6588,31 @@ html .sidebar .tagItem.isSelected .tagCount {
 }
 
 .workspaceArea .projectList .ghostBtn:hover:not(:disabled),
-.workspaceArea .todoRail :is(.ghostBtn, .segmentedBtn, .railToggleBtn):hover:not(:disabled) {
+.workspaceArea .todoRail :is(.todoRailHead, .todoRailTools) :is(.ghostBtn, .segmentedBtn, .railToggleBtn):hover:not(:disabled) {
   color: var(--slack-sidebar-text) !important;
   background: rgba(var(--theme-accent-rgb), 0.24) !important;
+}
+
+/* ToDoカード内のボタンはサイドバーではなくカード面に載るのでソフト配色を使う。 */
+.workspaceArea .todoRail .commentCard :is(.ghostBtn, .segmentedBtn) {
+  color: var(--slack-soft-text) !important;
+  -webkit-text-fill-color: var(--slack-soft-text) !important;
+  background: var(--slack-soft) !important;
+  border-color: var(--slack-soft-border) !important;
+}
+
+.workspaceArea .todoRail .commentCard :is(.ghostBtn, .segmentedBtn):hover:not(:disabled) {
+  color: var(--slack-soft-text) !important;
+  -webkit-text-fill-color: var(--slack-soft-text) !important;
+  background: var(--slack-soft-hover) !important;
+  border-color: var(--theme-accent) !important;
+}
+
+.workspaceArea .todoRail .commentCard .dangerGhostBtn {
+  color: var(--theme-danger) !important;
+  -webkit-text-fill-color: var(--theme-danger) !important;
+  background: rgba(var(--theme-danger-rgb), 0.12) !important;
+  border-color: rgba(var(--theme-danger-rgb), 0.4) !important;
 }
 
 .knowledgeResultTitle {
