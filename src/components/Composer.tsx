@@ -84,6 +84,7 @@ type Props = {
     date: string;
   };
   onCancel?: () => void;
+  onDelete?: () => void | Promise<void>;
   autoFocusEditor?: boolean;
 };
 
@@ -100,6 +101,7 @@ export function Composer({
   initialTags,
   source,
   onCancel,
+  onDelete,
   autoFocusEditor
 }: Props) {
   const initialBodyValue = typeof initialBody === "string" ? initialBody : "";
@@ -522,6 +524,20 @@ export function Composer({
           </div>
 
           <div className="previewActions">
+              {mode === "edit" && onDelete ? (
+                <button
+                  className="dangerGhostBtn"
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => {
+                    setError("");
+                    void onDelete();
+                  }}
+                >
+                  削除
+                </button>
+              ) : null}
+
               {mode === "edit" || mode === "copy" ? (
                 <button
                   className="ghostBtn"

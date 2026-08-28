@@ -752,6 +752,23 @@ export function App() {
     setAppError("");
   }
 
+  async function deleteEditingEntry(entry: ActaEntry) {
+    const ok = window.confirm(`「${makeEntryTitle(entry.body)}」を削除しますか？`);
+    if (!ok) return;
+    try {
+      const res = await api.deleteEntry({ id: entry.id });
+      if (!res?.deleted) throw new Error("削除対象が見つかりませんでした");
+      setEditing(null);
+      setDraft(null);
+      setAppError("");
+      await reload();
+      queueBackupSync();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setAppError(msg || "削除に失敗しました");
+    }
+  }
+
   async function rebuildKnowledgeIndex() {
     setKnowledgeBusy(true);
     setKnowledgeStatus("インデックスを更新しています...");
@@ -1899,6 +1916,7 @@ export function App() {
                   setEditing(null);
                   setDraft(null);
                 }}
+                onDelete={editing ? () => deleteEditingEntry(editing) : undefined}
                 onSubmit={async (body, tags) => {
                   if (editing) {
                     const res = await api.updateEntry({ id: editing.id, body, tags });
