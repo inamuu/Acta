@@ -3,6 +3,7 @@ import { markdownToHtml } from "../lib/markdown";
 import { renderMermaid } from "../lib/mermaid";
 import { hydrateTaskCheckboxStates, nextTaskState, setTaskStateOnLine, taskStateFromInput } from "../lib/taskList";
 import { TagInput } from "./TagInput";
+import { continueListOnEnter, indentLines, shouldIndentOnTab } from "../lib/editorAssist";
 
 const PREVIEW_DEBOUNCE_MS = 320;
 const PREVIEW_DEBOUNCE_LARGE_DOC_MS = 520;
@@ -12,6 +13,9 @@ const MERMAID_RENDER_DEBOUNCE_MS = 1200;
 const EMPTY_PREVIEW_SOURCE = " ";
 const ENTRY_LINK_LABEL_PLACEHOLDER = "リンク先";
 const ENTRY_HASH_PREFIX = "#post:";
+const LAYOUT_STORAGE_KEY = "acta.composerLayout";
+const NEW_POST_DRAFT_STORAGE_KEY = "acta.newPostDraft";
+const DRAFT_SAVE_DEBOUNCE_MS = 400;
 
 type IdleDeadline = {
   didTimeout: boolean;
@@ -65,6 +69,58 @@ function getClipboardImageItem(items: DataTransferItemList): DataTransferItem | 
   return null;
 }
 
+function getDroppedImageFiles(files: FileList | null | undefined): File[] {
+  if (!files) return [];
+  return Array.from(files).filter((file) => file.type.startsWith("image/"));
+}
+
+type StoredDraft = { body: string; tags: string[] };
+
+function loadStoredLayout(): ComposerLayout {
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (raw === "write" || raw === "split" || raw === "preview") return raw;
+  } catch {
+    // ignore
+  }
+  return "split";
+}
+
+/** 新規投稿の下書き。アプリを閉じても書きかけを失わないよう localStorage に保持する。 */
+function loadStoredDraft(): StoredDraft | null {
+  try {
+    const raw = window.localStorage.getItem(NEW_POST_DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredDraft>;
+    const body = typeof parsed.body === "string" ? parsed.body : "";
+    const tags = Array.isArray(parsed.tags) ? parsed.tags.filter((t) => typeof t === "string") : [];
+    if (!body.trim() && tags.length === 0) return null;
+    return { body, tags };
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredDraft(draft: StoredDraft) {
+  try {
+    if (!draft.body.trim() && draft.tags.length === 0) {
+      window.localStorage.removeItem(NEW_POST_DRAFT_STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(NEW_POST_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {
+    // ignore
+  }
+}
+
+function clearStoredDraft() {
+  try {
+    window.localStorage.removeItem(NEW_POST_DRAFT_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 function isImeComposingEvent(e: React.KeyboardEvent<HTMLTextAreaElement>): boolean {
   const nativeEvent = e.nativeEvent as KeyboardEvent & { isComposing?: boolean };
   return Boolean(e.isComposing || nativeEvent.isComposing || nativeEvent.keyCode === 229);
@@ -86,6 +142,8 @@ type Props = {
   onCancel?: () => void;
   onDelete?: () => void | Promise<void>;
   autoFocusEditor?: boolean;
+  /** 未保存の変更があるかを親へ通知する。ビュー切替や別エントリ選択時の確認に使う。 */
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 type ComposerLayout = "write" | "split" | "preview";
@@ -109,7 +167,8 @@ export function Composer({
   source,
   onCancel,
   onDelete,
-  autoFocusEditor
+  autoFocusEditor,
+  onDirtyChange
 }: Props) {
   const initialBodyValue = typeof initialBody === "string" ? initialBody : "";
   const [tags, setTags] = useState<string[]>([]);
@@ -121,7 +180,7 @@ export function Composer({
   const [isDirty, setIsDirty] = useState(false);
   const savedBodyRef = useRef<string>(initialBodyValue);
   const savedTagsRef = useRef<string>(JSON.stringify(Array.isArray(initialTags) ? initialTags : []));
-  const [layout, setLayout] = useState<ComposerLayout>("split");
+  const [layout, setLayout] = useState<ComposerLayout>(() => loadStoredLayout());
   const [previewHtml, setPreviewHtml] = useState<string>(() =>
     markdownToHtml(initialBodyValue || EMPTY_PREVIEW_SOURCE, { assetBaseUrl })
   );
@@ -134,6 +193,21 @@ export function Composer({
   const mermaidTimerRef = useRef<number | null>(null);
   const lastPreviewBodyRef = useRef<string>(initialBodyValue);
   const isComposingRef = useRef(false);
+  const draftSaveTimerRef = useRef<number | null>(null);
+  const tagsRef = useRef<string[]>([]);
+  tagsRef.current = tags;
+  const isNewPostDraft = mode === "create";
+  const isNewPostDraftRef = useRef(isNewPostDraft);
+  isNewPostDraftRef.current = isNewPostDraft;
+
+  function scheduleDraftSave() {
+    if (!isNewPostDraft) return;
+    if (draftSaveTimerRef.current !== null) window.clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = window.setTimeout(() => {
+      draftSaveTimerRef.current = null;
+      saveStoredDraft({ body: bodyRef.current, tags: tagsRef.current });
+    }, DRAFT_SAVE_DEBOUNCE_MS);
+  }
 
   function updateBody(nextBody: string) {
     bodyRef.current = nextBody;
@@ -144,6 +218,15 @@ export function Composer({
       setIsBodyEmpty(nextIsEmpty);
     }
     setIsDirty(nextBody !== savedBodyRef.current || JSON.stringify(tags) !== savedTagsRef.current);
+    scheduleDraftSave();
+  }
+
+  /** テキストと選択範囲をまとめて反映する（入力補助用）。 */
+  function applyEdit(editor: HTMLTextAreaElement, next: { value: string; selectionStart: number; selectionEnd: number }) {
+    editor.value = next.value;
+    updateBody(next.value);
+    schedulePreview(next.value);
+    editor.setSelectionRange(next.selectionStart, next.selectionEnd);
   }
 
   function cancelScheduledPreview() {
@@ -218,12 +301,18 @@ export function Composer({
   }
 
   useEffect(() => {
-    const nextBody = typeof initialBody === "string" ? initialBody : "";
-    const nextTags = Array.isArray(initialTags) ? initialTags : [];
-    savedBodyRef.current = nextBody;
-    savedTagsRef.current = JSON.stringify(nextTags);
+    let nextBody = typeof initialBody === "string" ? initialBody : "";
+    let nextTags = Array.isArray(initialTags) ? initialTags : [];
+    // 新規投稿で本文が空なら、前回書きかけの下書きを復元する。
+    const restored = isNewPostDraft && !nextBody.trim() && nextTags.length === 0 ? loadStoredDraft() : null;
+    if (restored) {
+      nextBody = restored.body;
+      nextTags = restored.tags;
+    }
+    savedBodyRef.current = restored ? "" : nextBody;
+    savedTagsRef.current = JSON.stringify(restored ? [] : nextTags);
     // 編集中に保存した直後は親から同じ本文が戻ってくる。エディタを書き換えるとカーソル位置が失われるので触らない。
-    if (editorRef.current && editorRef.current.value === nextBody && bodyRef.current === nextBody) {
+    if (!restored && editorRef.current && editorRef.current.value === nextBody && bodyRef.current === nextBody) {
       setTags(nextTags);
       setIsDirty(false);
       return;
@@ -235,12 +324,36 @@ export function Composer({
     renderPreviewNow(nextBody);
     setError("");
     setLastSavedAt(null);
-    setIsDirty(false);
+    setIsDirty(Boolean(restored));
   }, [draftKey, initialBody, initialTags]);
 
   useEffect(() => {
     setIsDirty(bodyRef.current !== savedBodyRef.current || JSON.stringify(tags) !== savedTagsRef.current);
+    scheduleDraftSave();
   }, [tags]);
+
+  // 新規投稿の下書きは自動保存されるので「未保存」としては親へ通知しない。
+  useEffect(() => {
+    onDirtyChange?.(isDirty && !isNewPostDraft);
+  }, [isDirty, isNewPostDraft, onDirtyChange]);
+
+  // ウィンドウを閉じる直前は debounce を待たずに下書きを書き出す。
+  useEffect(() => {
+    const flush = () => {
+      if (!isNewPostDraftRef.current) return;
+      saveStoredDraft({ body: bodyRef.current, tags: tagsRef.current });
+    };
+    window.addEventListener("beforeunload", flush);
+    return () => window.removeEventListener("beforeunload", flush);
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
+    } catch {
+      // ignore
+    }
+  }, [layout]);
 
   useEffect(() => {
     if (!autoFocusEditor) return;
@@ -255,6 +368,12 @@ export function Composer({
     return () => {
       cancelScheduledPreview();
       cancelScheduledMermaid();
+      if (draftSaveTimerRef.current !== null) {
+        window.clearTimeout(draftSaveTimerRef.current);
+        // アンマウント時は待たずに書き出す。
+        if (isNewPostDraftRef.current) saveStoredDraft({ body: bodyRef.current, tags: tagsRef.current });
+      }
+      onDirtyChange?.(false);
     };
   }, []);
 
@@ -281,6 +400,14 @@ export function Composer({
     if (currentBody.trim().length === 0 || submitting) return;
     setSubmitting(true);
     setError("");
+    // 保存前に下書きを消す（成功後の再描画で古い下書きが復元されるのを防ぐ）。失敗時は再保存する。
+    if (isNewPostDraft) {
+      if (draftSaveTimerRef.current !== null) {
+        window.clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+      clearStoredDraft();
+    }
     try {
       await onSubmit(currentBody, tags);
       if (mode === "create" || mode === "copy") {
@@ -288,6 +415,14 @@ export function Composer({
         updateBody("");
         if (editorRef.current) editorRef.current.value = "";
         renderPreviewNow("");
+        savedBodyRef.current = "";
+        savedTagsRef.current = JSON.stringify([]);
+        setIsDirty(false);
+        if (isNewPostDraft) {
+          if (draftSaveTimerRef.current !== null) window.clearTimeout(draftSaveTimerRef.current);
+          draftSaveTimerRef.current = null;
+          clearStoredDraft();
+        }
       } else {
         // 編集は保存後もそのまま続けられるようにフォーカスを維持し、保存済みであることを示す。
         savedBodyRef.current = currentBody;
@@ -297,6 +432,7 @@ export function Composer({
         editorRef.current?.focus();
       }
     } catch (e) {
+      if (isNewPostDraft) saveStoredDraft({ body: currentBody, tags });
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("No handler registered")) {
         setError("アプリを再起動してください（更新が反映されていない可能性があります）");
@@ -487,33 +623,71 @@ export function Composer({
                 setError(msg || "画像の保存に失敗しました");
               });
             }}
+            onDragOver={(e) => {
+              if (getDroppedImageFiles(e.dataTransfer.files).length === 0 && !Array.from(e.dataTransfer.types).includes("Files")) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={(e) => {
+              const files = getDroppedImageFiles(e.dataTransfer.files);
+              if (files.length === 0) return;
+              e.preventDefault();
+              setError("");
+              void (async () => {
+                for (const file of files) {
+                  await savePastedImage(file);
+                }
+              })().catch((err) => {
+                const msg = err instanceof Error ? err.message : String(err);
+                setError(msg || "画像の保存に失敗しました");
+              });
+            }}
             onKeyDown={(e) => {
               const isSubmit = (e.metaKey || e.ctrlKey) && e.key === "Enter";
               if (isSubmit) {
                 e.preventDefault();
                 void submit();
+                return;
               }
               if (isImeComposingEvent(e)) return;
-              if (e.key === "Tab" && !e.shiftKey) {
+
+              if (e.key === "Escape" && (mode === "edit" || mode === "copy") && onCancel) {
                 e.preventDefault();
+                setError("");
+                onCancel();
+                return;
+              }
 
-                const el = e.currentTarget;
-                const start = el.selectionStart ?? 0;
-                const end = el.selectionEnd ?? 0;
+              const el = e.currentTarget;
+              const start = el.selectionStart ?? 0;
+              const end = el.selectionEnd ?? 0;
+
+              // リスト・チェックボックス・番号付きリストを次行へ引き継ぐ。
+              if (e.key === "Enter" && !e.shiftKey && !e.altKey) {
+                const next = continueListOnEnter(el.value, start, end);
+                if (next) {
+                  e.preventDefault();
+                  applyEdit(el, next);
+                }
+                return;
+              }
+
+              if (e.key === "Tab") {
+                e.preventDefault();
+                if (e.shiftKey) {
+                  applyEdit(el, indentLines(el.value, start, end, "out"));
+                  return;
+                }
+                if (shouldIndentOnTab(el.value, start, end)) {
+                  applyEdit(el, indentLines(el.value, start, end, "in"));
+                  return;
+                }
                 const current = el.value;
-                const next = current.slice(0, start) + "\t" + current.slice(end);
-                el.value = next;
-                updateBody(next);
-                schedulePreview(next);
-
-                const nextPos = start + 1;
-                requestAnimationFrame(() => {
-                  editorRef.current?.focus();
-                  editorRef.current?.setSelectionRange(nextPos, nextPos);
-                });
+                const nextValue = current.slice(0, start) + "\t" + current.slice(end);
+                applyEdit(el, { value: nextValue, selectionStart: start + 1, selectionEnd: start + 1 });
               }
             }}
-            placeholder="今日のナレッジをMarkdownで入力..."
+            placeholder="今日のナレッジをMarkdownで入力... （画像はペーストまたはドラッグ&ドロップ）"
             spellCheck={false}
           />
         </div>

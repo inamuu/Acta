@@ -198,9 +198,11 @@ export type KnowledgeSiteResult = {
 
 export type SyncResult = {
   ok: boolean;
-  label: "Sync Success" | "Sync Error";
+  label: "Sync Success" | "Sync Error" | "Sync Disabled";
   detail: string;
   command: string;
+  /** 保存先が git 管理でないなど、同期そのものが無効なとき true。 */
+  disabled?: boolean;
 };
 
 export const ACTA_THEME_IDS = [

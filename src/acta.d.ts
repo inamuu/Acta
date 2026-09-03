@@ -73,6 +73,8 @@ declare global {
       openKnowledgeSite: () => Promise<{ opened: boolean; path: string; error?: string }>;
       syncPull: () => Promise<SyncResult>;
       syncBackup: () => Promise<SyncResult>;
+      /** 未保存の変更があるかをメインプロセスへ通知する。ウィンドウを閉じるときの確認に使う。 */
+      setUnsavedChanges?: (dirty: boolean) => void;
       onDataChanged?: (listener: () => void) => () => void;
     };
   }

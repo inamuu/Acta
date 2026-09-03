@@ -21,6 +21,7 @@ const KNOWLEDGE_STATE_FILE = "knowledge-index-state.json";
 const KNOWLEDGE_SITE_DIR = "wiki";
 const SYNC_SUCCESS = "Sync Success";
 const SYNC_ERROR = "Sync Error";
+const SYNC_DISABLED = "Sync Disabled";
 const DEFAULT_THEME = "default";
 const GITHUB_SEARCH_LIMIT = 1000;
 const GITHUB_UNCLASSIFIED_PROJECT_NAME = "未分類";
@@ -425,6 +426,26 @@ function buildSyncResult(ok, detail, command) {
     detail: String(detail ?? ""),
     command: String(command ?? "")
   };
+}
+
+/** 保存先が git リポジトリでないときの結果。エラーではなく「同期未設定」として扱う。 */
+function buildSyncDisabledResult(dataDir) {
+  return {
+    ok: true,
+    disabled: true,
+    label: SYNC_DISABLED,
+    detail: `${dataDir} は git リポジトリではないため同期を行いません。同期するには保存先で git init と remote 設定をしてください。`,
+    command: ""
+  };
+}
+
+async function isGitRepository(dir) {
+  try {
+    const stat = await fs.promises.stat(path.join(dir, ".git"));
+    return stat.isDirectory() || stat.isFile();
+  } catch {
+    return false;
+  }
 }
 
 function runGitCommand(args) {
@@ -1114,6 +1135,7 @@ async function generateKnowledgeSite() {
 
 async function syncPull() {
   await ensureDataDir();
+  if (!(await isGitRepository(getDataDir()))) return buildSyncDisabledResult(getDataDir());
   const res = await runGitCommand(["pull"]);
   if (res.code !== 0) {
     return buildSyncResult(false, res.stderr || res.stdout || "git pull に失敗しました", "git pull");
@@ -1123,6 +1145,7 @@ async function syncPull() {
 
 async function syncBackup() {
   await ensureDataDir();
+  if (!(await isGitRepository(getDataDir()))) return buildSyncDisabledResult(getDataDir());
 
   const addRes = await runGitCommand(["add", "."]);
   if (addRes.code !== 0) {
@@ -2483,6 +2506,8 @@ module.exports = {
     classifyGitHubItem,
     projectTaskStatusFromGitHubItem,
     githubTaskChanged,
-    resolveGhExecutable
+    resolveGhExecutable,
+    isGitRepository,
+    buildSyncDisabledResult
   }
 };

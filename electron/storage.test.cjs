@@ -306,3 +306,23 @@ test("a new today's ToDo includes InProgress tasks of every active project", () 
   assert.match(withMoved, /  - \[-\] Projects連携を実装する/);
   assert.match(withMoved, /- SRE対応依頼\n(?:.*\n)*  - \[x\] 完了したタスク/);
 });
+
+test("sync is reported as disabled when the data dir is not a git repository", async () => {
+  const os = require("node:os");
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "acta-sync-"));
+  try {
+    assert.equal(await _test.isGitRepository(dir), false);
+    fs.mkdirSync(path.join(dir, ".git"));
+    assert.equal(await _test.isGitRepository(dir), true);
+
+    const res = _test.buildSyncDisabledResult(dir);
+    assert.equal(res.ok, true);
+    assert.equal(res.disabled, true);
+    assert.equal(res.label, "Sync Disabled");
+    assert.match(res.detail, /git/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

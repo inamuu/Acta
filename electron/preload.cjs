@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld("acta", {
   openKnowledgeSite: () => ipcRenderer.invoke("acta:openKnowledgeSite"),
   syncPull: () => ipcRenderer.invoke("acta:syncPull"),
   syncBackup: () => ipcRenderer.invoke("acta:syncBackup"),
+  setUnsavedChanges: (dirty) => ipcRenderer.send("acta:setUnsavedChanges", Boolean(dirty)),
   onDataChanged: (listener) => {
     const handler = () => {
       if (typeof listener === "function") listener();

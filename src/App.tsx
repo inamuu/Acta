@@ -16,6 +16,7 @@ import { Composer } from "./components/Composer";
 import { SettingsModal } from "./components/SettingsModal";
 import { TagSidebar } from "./components/TagSidebar";
 import { installDragScroll } from "./lib/dragScroll";
+import { markdownToHtml } from "./lib/markdown";
 import { setTaskStateOnLine, summarizeTaskStates, type TaskState } from "./lib/taskList";
 
 type TagStat = { tag: string; count: number };
@@ -37,10 +38,16 @@ type DraftPost = {
   };
 };
 type SyncIndicatorState = {
-  kind: "idle" | "running" | "success" | "error";
-  label: "" | "Syncing..." | "Sync Success" | "Sync Error";
+  kind: "idle" | "running" | "success" | "error" | "disabled";
+  label: "" | "Syncing..." | "Sync Success" | "Sync Error" | "同期未設定";
   detail: string;
+  command?: string;
 };
+
+const UNSAVED_CHANGES_MESSAGE = "未保存の変更があります。破棄して移動しますか？";
+// Composer の初期タグは参照が変わると再初期化を招くので、空配列は固定インスタンスを使う。
+const EMPTY_TAGS: string[] = [];
+const DONE_RECENT_DAYS = 7;
 
 const BACKUP_SYNC_IDLE_DELAY_MS = 60_000;
 const BACKUP_SYNC_MAX_DELAY_MS = 5 * 60_000;
@@ -247,6 +254,14 @@ export function App() {
     detail: ""
   });
   const [linkedTargetEntryId, setLinkedTargetEntryId] = useState<string>("");
+  // エディタに未保存の変更があるか。別エントリ選択・ビュー切替・終了時の確認に使う。
+  const [composerDirty, setComposerDirty] = useState(false);
+  const [syncDisabled, setSyncDisabled] = useState(false);
+  const [syncDetailOpen, setSyncDetailOpen] = useState(false);
+  const [journalTagPickerOpen, setJournalTagPickerOpen] = useState(false);
+  const [journalTagQuery, setJournalTagQuery] = useState("");
+  const [showAllDone, setShowAllDone] = useState(false);
+  const [expandedKnowledgeId, setExpandedKnowledgeId] = useState("");
   const [limit, setLimit] = useState<number>(() => {
     try {
       const raw = localStorage.getItem("acta:limit");
@@ -271,18 +286,31 @@ export function App() {
 
   function applySyncResult(result: SyncResult) {
     const detail = String(result.detail ?? "").trim();
+    if (result.disabled) {
+      setSyncDisabled(true);
+      setSyncIndicator({
+        kind: "disabled",
+        label: "同期未設定",
+        detail,
+        command: result.command
+      });
+      return;
+    }
+    setSyncDisabled(false);
     if (result.ok) {
       setSyncIndicator({
         kind: "success",
         label: "Sync Success",
-        detail
+        detail,
+        command: result.command
       });
       return;
     }
     setSyncIndicator({
       kind: "error",
       label: "Sync Error",
-      detail
+      detail,
+      command: result.command
     });
   }
 
@@ -319,6 +347,8 @@ export function App() {
 
   function queueBackupSync(options?: { immediate?: boolean }) {
     if (!api) return;
+    // git 管理でない保存先では同期しない（起動時の pull で判定済み）。手動押下時のみ再判定のため通す。
+    if (syncDisabled && !options?.immediate) return;
 
     if (backupSyncTimerRef.current !== null) {
       window.clearTimeout(backupSyncTimerRef.current);
@@ -371,6 +401,33 @@ export function App() {
     const filtered = list.filter((project) => Boolean(project.archivedAtMs) === showArchivedProjects);
     const selected = filtered.find((project) => project.id === preferredId) || filtered[0] || null;
     setSelectedProjectId(selected?.id ?? "");
+  }
+
+  /** 未保存の変更があれば破棄してよいか確認する。なければ true。 */
+  function confirmDiscardEdits(): boolean {
+    if (!composerDirty) return true;
+    return window.confirm(UNSAVED_CHANGES_MESSAGE);
+  }
+
+  function switchView(next: ActiveView) {
+    if (next === activeView) return;
+    if (!confirmDiscardEdits()) return;
+    setActiveView(next);
+  }
+
+  function selectJournalEntry(entry: ActaEntry | null) {
+    if (editing?.id && entry?.id === editing.id) return;
+    if (!confirmDiscardEdits()) return;
+    setEditing(entry);
+    setDraft(null);
+    setAppError("");
+  }
+
+  function startNewJournalEntry() {
+    if (!confirmDiscardEdits()) return;
+    setEditing(null);
+    setDraft({ key: `new:${Date.now()}`, body: "", tags: [] });
+    setAppError("");
   }
 
   useEffect(() => {
@@ -466,6 +523,11 @@ export function App() {
     return api.onDataChanged(() => refreshFromDiskRef.current());
   }, [api]);
 
+  // ウィンドウを閉じるときの確認はメインプロセス側で行うので、未保存状態を通知しておく。
+  useEffect(() => {
+    api?.setUnsavedChanges?.(composerDirty);
+  }, [api, composerDirty]);
+
   useEffect(() => {
     try {
       localStorage.setItem("acta:limit", String(limit));
@@ -533,8 +595,17 @@ export function App() {
         const next = VIEW_ORDER[Number(key) - 1];
         if (next) {
           e.preventDefault();
-          setActiveView(next);
+          switchView(next);
         }
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && key === "n" && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        if (!confirmDiscardEdits()) return;
+        setActiveView("journal");
+        setEditing(null);
+        setDraft({ key: `new:${Date.now()}`, body: "", tags: [] });
+        setAppError("");
         return;
       }
       if ((e.ctrlKey || e.metaKey) && key === "f" && activeView === "journal") {
@@ -550,7 +621,7 @@ export function App() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeView]);
+  }, [activeView, composerDirty, editing]);
 
   useEffect(() => {
     const cleanups: Array<() => void> = [];
@@ -703,7 +774,28 @@ export function App() {
     });
     return copy.slice(0, 10).map((t) => t.tag);
   }, [tagStats]);
+  const journalPickerTags = useMemo(() => {
+    const q = journalTagQuery.trim().toLocaleLowerCase();
+    const list = q ? tagStats.filter((t) => t.tag.toLocaleLowerCase().includes(q)) : tagStats;
+    // 絞り込みでは使用回数の多いタグから並べる。
+    return [...list].sort((a, b) => (a.count !== b.count ? b.count - a.count : a.tag.localeCompare(b.tag, "ja")));
+  }, [journalTagQuery, tagStats]);
   const assetBaseUrl = "acta-asset:///";
+  const composerInitialTags = useMemo(() => editing?.tags ?? draft?.tags ?? EMPTY_TAGS, [editing, draft]);
+
+  /** ナレッジ一覧を上下キーで移動する。選択中が無ければ先頭を選ぶ。 */
+  function moveJournalSelection(delta: 1 | -1) {
+    if (filteredEntries.length === 0) return;
+    const currentIndex = editing ? filteredEntries.findIndex((entry) => entry.id === editing.id) : -1;
+    const nextIndex =
+      currentIndex < 0 ? (delta > 0 ? 0 : filteredEntries.length - 1) : Math.min(filteredEntries.length - 1, Math.max(0, currentIndex + delta));
+    const next = filteredEntries[nextIndex];
+    if (!next || next.id === editing?.id) return;
+    selectJournalEntry(next);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`journal-item-${next.id}`)?.scrollIntoView({ block: "nearest" });
+    });
+  }
 
   function clearTagFilter() {
     setSelectedTags([]);
@@ -766,6 +858,7 @@ export function App() {
       setAppError(`リンク先の投稿が見つかりません: ${normalizedId}`);
       return;
     }
+    if (target.id !== editing?.id && !confirmDiscardEdits()) return;
 
     setActiveView("journal");
     setEditing(target);
@@ -820,9 +913,21 @@ export function App() {
   }
 
   async function searchKnowledgeIndex(nextQuery = knowledgeQuery) {
+    if (!nextQuery.trim()) {
+      setKnowledgeStatus("検索語を入力してください");
+      return;
+    }
     setKnowledgeBusy(true);
-    setKnowledgeStatus("検索しています...");
+    setExpandedKnowledgeId("");
+    setKnowledgeStatus("インデックスを更新して検索しています...");
     try {
+      // 変更分だけをインデックスへ反映してから検索する。手動の「インデックス更新」を挟まなくてよい。
+      try {
+        const indexRes = await api.rebuildKnowledgeIndex();
+        setKnowledgeIndex(indexRes);
+      } catch {
+        // インデックス更新に失敗しても既存インデックスで検索は続ける。
+      }
       const res = await api.searchKnowledgeIndex({
         query: nextQuery,
         excludeTags: knowledgeExcludeTags.split(/[,、]/g),
@@ -1251,7 +1356,7 @@ export function App() {
               className={`appNavItem ${activeView === item.view ? "isActive" : ""}`}
               type="button"
               title={item.hint}
-              onClick={() => setActiveView(item.view)}
+              onClick={() => switchView(item.view)}
             >
               <span className="appNavIcon">{item.icon}</span>
               <span className="appNavText">{item.label}</span>
@@ -1273,11 +1378,8 @@ export function App() {
               <button
                 className="journalNewButton"
                 type="button"
-                onClick={() => {
-                  setEditing(null);
-                  setDraft({ key: `new:${Date.now()}`, body: "", tags: [] });
-                  setAppError("");
-                }}
+                title="新規ナレッジ (⌘N)"
+                onClick={() => startNewJournalEntry()}
               >
                 ＋ 新規
               </button>
@@ -1290,6 +1392,13 @@ export function App() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="ナレッジを検索 (⌘F)"
+                onKeyDown={(e) => {
+                  if (isImeComposingEvent(e)) return;
+                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                    e.preventDefault();
+                    moveJournalSelection(e.key === "ArrowDown" ? 1 : -1);
+                  }
+                }}
               />
               {query ? (
                 <button type="button" aria-label="検索をクリア" onClick={() => setQuery("")}>
@@ -1331,8 +1440,92 @@ export function App() {
               </button>
             </div>
 
+            <div className="journalTagFilter">
+              <div className="journalTagFilterHead">
+                <button
+                  className={`journalTagFilterToggle${journalTagPickerOpen ? " isOpen" : ""}`}
+                  type="button"
+                  onClick={() => setJournalTagPickerOpen((v) => !v)}
+                  title="タグで絞り込む"
+                >
+                  タグで絞り込む
+                  <span className="journalTagFilterCount">{tagStats.length}</span>
+                </button>
+                {selectedTags.length > 0 || untaggedOnly ? (
+                  <button className="journalTagFilterClear" type="button" onClick={() => clearTagFilter()}>
+                    解除
+                  </button>
+                ) : null}
+              </div>
+              {selectedTags.length > 0 || untaggedOnly ? (
+                <div className="journalActiveTags" aria-label="選択中のタグ">
+                  {untaggedOnly ? (
+                    <button className="tagPill isActive" type="button" onClick={() => toggleUntaggedFilter()} title="解除">
+                      タグなし ×
+                    </button>
+                  ) : null}
+                  {selectedTags.map((tag) => (
+                    <button
+                      className="tagPill isActive"
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTagFilter(tag)}
+                      title={`${tag} を解除`}
+                    >
+                      {tag} ×
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {journalTagPickerOpen ? (
+                <div className="journalTagPicker">
+                  <input
+                    className="journalTagPickerInput"
+                    value={journalTagQuery}
+                    onChange={(e) => setJournalTagQuery(e.target.value)}
+                    placeholder="タグ名で探す"
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setJournalTagQuery("");
+                    }}
+                  />
+                  <div className="journalTagPickerList">
+                    {untaggedCount > 0 && !journalTagQuery.trim() ? (
+                      <button
+                        className={`tagPill${untaggedOnly ? " isActive" : ""}`}
+                        type="button"
+                        onClick={() => toggleUntaggedFilter()}
+                      >
+                        タグなし <small>{untaggedCount}</small>
+                      </button>
+                    ) : null}
+                    {journalPickerTags.length === 0 ? (
+                      <span className="journalTagPickerEmpty">該当するタグがありません</span>
+                    ) : (
+                      journalPickerTags.map((t) => (
+                        <button
+                          className={`tagPill${selectedTags.includes(t.tag) ? " isActive" : ""}`}
+                          key={t.tag}
+                          type="button"
+                          onClick={() => toggleTagFilter(t.tag)}
+                        >
+                          {t.tag} <small>{t.count}</small>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
             <div className="journalListCount">{filteredEntries.length}件</div>
-            <div className="journalEntryList">
+            <div
+              className="journalEntryList"
+              onKeyDown={(e) => {
+                if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+                e.preventDefault();
+                moveJournalSelection(e.key === "ArrowDown" ? 1 : -1);
+              }}
+            >
               {loading ? (
                 <div className="journalListEmpty">読み込み中...</div>
               ) : filteredEntries.length === 0 ? (
@@ -1342,12 +1535,9 @@ export function App() {
                   <button
                     className={`journalEntryItem${editing?.id === entry.id ? " isActive" : ""}`}
                     key={entry.id}
+                    id={`journal-item-${entry.id}`}
                     type="button"
-                    onClick={() => {
-                      setEditing(entry);
-                      setDraft(null);
-                      setAppError("");
-                    }}
+                    onClick={() => selectJournalEntry(entry)}
                   >
                     <span className="journalEntryItemHead">
                       <strong>{makeEntryTitle(entry.body)}</strong>
@@ -1601,9 +1791,12 @@ export function App() {
                     {projectStatus ? <div className="inlineToast">{projectStatus}</div> : null}
                     <div className="kanbanBoard">
                       {(["Backlog", "InProgress", "Done"] as const).map((status) => {
-                        const visibleTasks = selectedProject.tasks.filter(
-                          (task) => task.status === status && (status !== "Done" || isRecentProjectTask(task))
-                        );
+                        const columnTasks = selectedProject.tasks.filter((task) => task.status === status);
+                        const visibleTasks =
+                          status === "Done" && !showAllDone
+                            ? columnTasks.filter((task) => isRecentProjectTask(task, DONE_RECENT_DAYS))
+                            : columnTasks;
+                        const hiddenDoneCount = status === "Done" ? columnTasks.length - visibleTasks.length : 0;
                         return (
                           <section
                             className={`kanbanColumn ${draggingTaskId ? "isDropReady" : ""}`}
@@ -1619,10 +1812,27 @@ export function App() {
                           >
                             <h3>
                               <span>{status}</span>
+                              {status === "Done" ? (
+                                <button
+                                  className={`kanbanDoneToggle${showAllDone ? " isActive" : ""}`}
+                                  type="button"
+                                  title={
+                                    showAllDone
+                                      ? `直近${DONE_RECENT_DAYS}日に完了したタスクだけを表示する`
+                                      : `完了したタスクをすべて表示する（非表示 ${hiddenDoneCount}件）`
+                                  }
+                                  onClick={() => setShowAllDone((v) => !v)}
+                                >
+                                  {showAllDone ? "すべて" : `直近${DONE_RECENT_DAYS}日`}
+                                  {!showAllDone && hiddenDoneCount > 0 ? <small>+{hiddenDoneCount}</small> : null}
+                                </button>
+                              ) : null}
                               <span className="kanbanCount">{visibleTasks.length}</span>
                             </h3>
                             {visibleTasks.length === 0 ? (
-                              <div className="kanbanEmpty">タスクなし</div>
+                              <div className="kanbanEmpty">
+                                {status === "Done" && hiddenDoneCount > 0 ? `直近${DONE_RECENT_DAYS}日の完了なし` : "タスクなし"}
+                              </div>
                             ) : (
                               visibleTasks.map((task) => (
                                 <div
@@ -1680,7 +1890,16 @@ export function App() {
                                     </div>
                                   ) : (
                                     <>
-                                      <div>{task.title}</div>
+                                      <div
+                                        className="kanbanCardTitle"
+                                        title={task.source !== "github" ? "ダブルクリックで名前を編集" : undefined}
+                                        onDoubleClick={() => {
+                                          if (task.source === "github") return;
+                                          startProjectTaskEdit(task.id, task.title);
+                                        }}
+                                      >
+                                        {task.title}
+                                      </div>
                                       {task.source === "github" ? (
                                         <div className="kanbanSourceMeta">
                                           <span>{task.sourceType === "PullRequest" ? "PR" : task.sourceType === "Issue" ? "Issue" : "Task"}</span>
@@ -1710,6 +1929,47 @@ export function App() {
                                         </div>
                                       ) : null}
                                       <div className="kanbanCardActions">
+                                        <span className="kanbanMoveActions" aria-label="ステータスを変更">
+                                          {status !== "Backlog" ? (
+                                            <button
+                                              className="ghostBtn"
+                                              type="button"
+                                              title="Backlogへ戻す"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                void moveProjectTask(task.id, "Backlog");
+                                              }}
+                                            >
+                                              ← Backlog
+                                            </button>
+                                          ) : null}
+                                          {status !== "InProgress" ? (
+                                            <button
+                                              className="ghostBtn"
+                                              type="button"
+                                              title="InProgressへ移動"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                void moveProjectTask(task.id, "InProgress");
+                                              }}
+                                            >
+                                              {status === "Backlog" ? "InProgress →" : "← InProgress"}
+                                            </button>
+                                          ) : null}
+                                          {status !== "Done" ? (
+                                            <button
+                                              className="ghostBtn"
+                                              type="button"
+                                              title="Doneへ移動"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                void moveProjectTask(task.id, "Done");
+                                              }}
+                                            >
+                                              Done →
+                                            </button>
+                                          ) : null}
+                                        </span>
                                         {task.source !== "github" ? (
                                           <>
                                             <button
@@ -1868,6 +2128,7 @@ export function App() {
                         isLinkedTarget={linkedTargetEntryId === e.id}
                         taskSummary={summarizeTaskStates(e.body)}
                         onEdit={(entry) => {
+                          if (!confirmDiscardEdits()) return;
                           setActiveView("journal");
                           setEditing(entry);
                           setDraft(null);
@@ -1942,10 +2203,12 @@ export function App() {
                 mode={editing ? "edit" : draft?.source ? "copy" : "create"}
                 draftKey={editing?.id ?? draft?.key ?? "create"}
                 initialBody={editing?.body ?? draft?.body ?? ""}
-                initialTags={editing?.tags ?? draft?.tags ?? []}
+                initialTags={composerInitialTags}
                 source={editing ? { id: editing.id, date: editing.date } : draft?.source}
                 autoFocusEditor={Boolean(editing || draft)}
+                onDirtyChange={setComposerDirty}
                 onCancel={() => {
+                  if (!confirmDiscardEdits()) return;
                   setEditing(null);
                   setDraft(null);
                 }}
@@ -1985,7 +2248,7 @@ export function App() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void searchKnowledgeIndex();
                   }}
-                  placeholder="SQLiteインデックスを検索 (Ctrl+F)"
+                  placeholder="全ナレッジを検索 (⌘F)　検索時にインデックスを自動更新"
                 />
                 <button
                   className="primaryActionBtn"
@@ -2034,7 +2297,7 @@ export function App() {
             </div>
 
             <div className="knowledgeStatus">
-              {knowledgeStatus || "インデックス更新後、全投稿を対象に検索できます。"}
+              {knowledgeStatus || "全投稿を対象に検索できます。インデックスは検索時に自動で更新されます。"}
               {knowledgeIndex ? (
                 <span>
                   {" "}
@@ -2048,18 +2311,33 @@ export function App() {
               {knowledgeResults.length === 0 ? (
                 <div className="empty">検索結果はまだありません</div>
               ) : (
-                knowledgeResults.map((item) => (
-                  <article className="knowledgeResult" key={item.id}>
+                knowledgeResults.map((item, index) => (
+                  <article
+                    className={`knowledgeResult${expandedKnowledgeId === item.id ? " isExpanded" : ""}`}
+                    key={item.id}
+                  >
                     <div className="knowledgeResultHead">
                       <button
                         className="knowledgeResultTitle"
                         type="button"
                         onClick={() => openLinkedEntry(item.id)}
-                        title="ナレッジで開く"
+                        title="ナレッジ画面で開いて編集"
                       >
+                        <span className="knowledgeRank">{index + 1}</span>
                         {item.title || `${item.date} のナレッジ`}
                       </button>
-                      <span className="knowledgeScore">score {item.score}</span>
+                      <div className="knowledgeResultActions">
+                        <button
+                          className="ghostBtn"
+                          type="button"
+                          onClick={() => setExpandedKnowledgeId((current) => (current === item.id ? "" : item.id))}
+                        >
+                          {expandedKnowledgeId === item.id ? "閉じる" : "全文を表示"}
+                        </button>
+                        <button className="ghostBtn" type="button" onClick={() => openLinkedEntry(item.id)}>
+                          編集
+                        </button>
+                      </div>
                     </div>
                     <div className="knowledgeResultMeta">
                       {item.created || item.date} / {item.id}
@@ -2072,6 +2350,7 @@ export function App() {
                             key={tag}
                             type="button"
                             onClick={() => {
+                              if (!confirmDiscardEdits()) return;
                               setActiveView("journal");
                               clearTagFilter();
                               toggleTagFilter(tag);
@@ -2082,7 +2361,14 @@ export function App() {
                         ))}
                       </div>
                     ) : null}
-                    <p className="knowledgeExcerpt">{makeExcerpt(item.body, knowledgeQuery)}</p>
+                    {expandedKnowledgeId === item.id ? (
+                      <div
+                        className="knowledgeFullBody md"
+                        dangerouslySetInnerHTML={{ __html: markdownToHtml(item.body, { assetBaseUrl }) }}
+                      />
+                    ) : (
+                      <p className="knowledgeExcerpt">{makeExcerpt(item.body, knowledgeQuery)}</p>
+                    )}
                     <div className="knowledgeSource">{item.sourceFile}</div>
                   </article>
                 ))
@@ -2094,13 +2380,48 @@ export function App() {
       </main>
 
       {syncIndicator.label ? (
-        <div
+        <button
           className={`syncStatus ${
-            syncIndicator.kind === "error" ? "isError" : syncIndicator.kind === "success" ? "isSuccess" : "isRunning"
-          }`}
-          title={syncIndicator.detail || syncIndicator.label}
+            syncIndicator.kind === "error"
+              ? "isError"
+              : syncIndicator.kind === "success"
+                ? "isSuccess"
+                : syncIndicator.kind === "disabled"
+                  ? "isDisabled"
+                  : "isRunning"
+          }${syncDetailOpen ? " isOpen" : ""}`}
+          type="button"
+          title={syncDetailOpen ? "詳細を閉じる" : "クリックで詳細を表示"}
+          aria-expanded={syncDetailOpen}
+          onClick={() => setSyncDetailOpen((v) => !v)}
         >
           {syncIndicator.label}
+        </button>
+      ) : null}
+
+      {syncDetailOpen && syncIndicator.label ? (
+        <div className="syncDetailPanel" role="dialog" aria-label="同期の詳細">
+          <div className="syncDetailHead">
+            <strong>{syncIndicator.label}</strong>
+            <button className="modalClose" type="button" onClick={() => setSyncDetailOpen(false)} title="閉じる">
+              ×
+            </button>
+          </div>
+          {syncIndicator.command ? <div className="syncDetailCommand">$ {syncIndicator.command}</div> : null}
+          <pre className="syncDetailBody">{syncIndicator.detail || "詳細はありません"}</pre>
+          <div className="syncDetailFoot">
+            <span>保存先: {dataDir}</span>
+            {syncIndicator.kind !== "running" ? (
+              <button
+                className="ghostBtn"
+                type="button"
+                disabled={syncBusy}
+                onClick={() => queueBackupSync({ immediate: true })}
+              >
+                {syncDisabled ? "再判定して同期" : "今すぐ同期"}
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -2108,7 +2429,7 @@ export function App() {
         className="settingsFab syncFab"
         type="button"
         onClick={() => queueBackupSync({ immediate: true })}
-        title="同期"
+        title={syncDisabled ? "保存先が git 管理ではないため同期は無効です（クリックで再判定）" : "同期"}
         disabled={syncBusy}
       >
         {syncBusy ? "同期中..." : "同期"}
@@ -2134,6 +2455,12 @@ export function App() {
               setAppError("");
               setSettingsOpen(false);
               await reload();
+              // 保存先が変わったので git 管理かどうかを含めて同期状態を判定し直す。
+              try {
+                applySyncResult(await api.syncPull());
+              } catch (err) {
+                applySyncError(err);
+              }
             } catch (e) {
               const msg = e instanceof Error ? e.message : String(e);
               setAppError(msg || "保存先の変更に失敗しました");
