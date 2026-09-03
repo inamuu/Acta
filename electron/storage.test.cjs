@@ -279,3 +279,30 @@ test("Electron resolves gh from PATH or Homebrew locations", () => {
   });
   assert.equal(fromHomebrew, "/opt/homebrew/bin/gh");
 });
+
+test("a new today's ToDo includes InProgress tasks of every active project", () => {
+  const projects = [
+    { name: "Acta", archivedAtMs: 0, tasks: [{ title: "Projects連携を実装する", status: "InProgress" }] },
+    { name: "旧案件", archivedAtMs: 1, tasks: [{ title: "アーカイブ済み", status: "InProgress" }] },
+    {
+      name: "SRE対応依頼",
+      archivedAtMs: 0,
+      tasks: [
+        { title: "Backlogのまま", status: "Backlog" },
+        { title: "SFTP接続元IP追加", status: "InProgress" }
+      ]
+    }
+  ];
+
+  const body = _test.buildNewTodayTodoBody(projects);
+  assert.match(body, /^# ToDo/);
+  assert.match(body, /- Acta\n  - \[-\] Projects連携を実装する/);
+  assert.match(body, /- SRE対応依頼\n  - \[-\] SFTP接続元IP追加/);
+  assert.doesNotMatch(body, /アーカイブ済み/);
+  assert.doesNotMatch(body, /Backlogのまま/);
+
+  // きっかけになったタスク（Doneへ移動）も、既存InProgressと一緒に反映される
+  const withMoved = _test.buildNewTodayTodoBody(projects, projects[2], [{ title: "完了したタスク", status: "Done" }]);
+  assert.match(withMoved, /  - \[-\] Projects連携を実装する/);
+  assert.match(withMoved, /- SRE対応依頼\n(?:.*\n)*  - \[x\] 完了したタスク/);
+});

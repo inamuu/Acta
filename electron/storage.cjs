@@ -2281,10 +2281,28 @@ async function findTodayTodoEntry() {
   return entries.find((entry) => entry.date === today && isTodoEntry(entry)) || null;
 }
 
-/** プロジェクト画面と同じ表示順のプロジェクト名一覧。 */
-async function listProjectNamesInDisplayOrder() {
-  const projects = await listProjects();
-  return projects.map((project) => project.name);
+/** 有効な（未アーカイブ）プロジェクトの InProgress タスクを、プロジェクト表示順のまま「新規ToDo」用のグループにまとめる。 */
+function collectActiveInProgressGroups(projects) {
+  return (projects || [])
+    .filter((project) => !project.archivedAtMs)
+    .map((project) => ({
+      project,
+      name: project.name,
+      tasks: project.tasks.filter((task) => task.status === "InProgress")
+    }))
+    .filter((group) => group.tasks.length > 0);
+}
+
+/**
+ * 今日のToDoを新規作成するときの本文。
+ * 有効プロジェクトの InProgress を全件入れたうえで、きっかけになったタスク（Done/Backlog へ移した直後など）も反映する。
+ */
+function buildNewTodayTodoBody(projects, project, tasks) {
+  const groups = collectActiveInProgressGroups(projects);
+  const body = buildTodoBodyFromProjectGroups(groups, todoHeading());
+  if (!project || !tasks?.length) return body;
+  const orderedNames = (projects || []).map((item) => item.name);
+  return upsertProjectTasksInTodoBody(body, project.name, tasks, orderedNames);
 }
 
 async function upsertProjectTasksToTodayTodo(project, tasks) {
@@ -2292,15 +2310,16 @@ async function upsertProjectTasksToTodayTodo(project, tasks) {
   if (!targetTasks.length) return null;
 
   const current = await findTodayTodoEntry();
+  const projects = await listProjects();
   if (!current) {
-    return addTodoEntry(buildTodoBodyFromProjectGroups([{ name: project.name, tasks: targetTasks }], todoHeading()));
+    return addTodoEntry(buildNewTodayTodoBody(projects, project, targetTasks));
   }
 
   const nextBody = upsertProjectTasksInTodoBody(
     current.body,
     project.name,
     targetTasks,
-    await listProjectNamesInDisplayOrder()
+    projects.map((item) => item.name)
   );
   if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
 
@@ -2370,24 +2389,11 @@ async function appendProjectInProgressToTodayTodo(payload) {
 
 async function appendActiveProjectsInProgressToTodayTodo() {
   const projects = await listProjects();
-  const groups = projects
-    .filter((project) => !project.archivedAtMs)
-    .map((project) => ({
-      project,
-      tasks: project.tasks.filter((task) => task.status === "InProgress")
-    }))
-    .filter((group) => group.tasks.length > 0);
+  const groups = collectActiveInProgressGroups(projects);
   if (groups.length === 0) throw new Error("InProgress のプロジェクトタスクがありません");
 
   const current = await findTodayTodoEntry();
-  if (!current) {
-    return addTodoEntry(
-      buildTodoBodyFromProjectGroups(
-        groups.map(({ project, tasks }) => ({ name: project.name, tasks })),
-        todoHeading()
-      )
-    );
-  }
+  if (!current) return addTodoEntry(buildNewTodayTodoBody(projects));
 
   const orderedNames = projects.map((project) => project.name);
   const nextBody = groups.reduce(
@@ -2404,15 +2410,10 @@ async function appendActiveProjectsInProgressToTodayTodo() {
 
 async function createTodoFromProjects() {
   const projects = await listProjects();
-  const groups = projects
-    .filter((project) => !project.archivedAtMs)
-    .map((project) => ({
-      name: project.name,
-      tasks: project.tasks.filter((task) => task.status === "InProgress")
-    }))
-    .filter((group) => group.tasks.length > 0);
-  if (groups.length === 0) throw new Error("InProgress のプロジェクトタスクがありません");
-  return addTodoEntry(buildTodoBodyFromProjectGroups(groups, todoHeading()));
+  if (collectActiveInProgressGroups(projects).length === 0) {
+    throw new Error("InProgress のプロジェクトタスクがありません");
+  }
+  return addTodoEntry(buildNewTodayTodoBody(projects));
 }
 
 /** 先頭のToDo見出しを今日の日付に差し替える（無ければ付ける）。 */
@@ -2472,6 +2473,7 @@ module.exports = {
   _test: {
     markerFromProjectTaskStatus,
     buildTodoBodyFromProjectGroups,
+    buildNewTodayTodoBody,
     upsertProjectTasksInTodoBody,
     reorderTodoGroupBlocks,
     removeProjectTasksFromTodoBody,

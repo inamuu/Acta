@@ -886,20 +886,27 @@ export function App() {
   async function createTodoFromProjects() {
     if (todoBusy) return;
     const today = formatDateYYYYMMDD(new Date());
-    if (entries.some((entry) => entry.date === today && isTodoEntry(entry))) {
-      const ok = window.confirm("今日のToDoはすでにあります。もう1件作成しますか？");
+    const hasTodayTodo = entries.some((entry) => entry.date === today && isTodoEntry(entry));
+    if (hasTodayTodo) {
+      const ok = window.confirm(
+        "今日のToDoはすでにあります。有効なプロジェクトのInProgressタスクを今日のToDoへ追記しますか？"
+      );
       if (!ok) return;
     }
 
     setTodoStatus("");
     setTodoBusy(true);
     try {
-      const entry = await api.createTodoFromProjects();
+      const entry = hasTodayTodo
+        ? await api.appendActiveProjectsInProgressToTodayTodo()
+        : await api.createTodoFromProjects();
       setTodoWeekOffset(0);
       mergeEntry(entry);
       await reload();
       queueBackupSync();
-      setTodoStatus(`${entry.date} のToDoを作成しました`);
+      setTodoStatus(
+        hasTodayTodo ? `${entry.date} のToDoへInProgressタスクを追記しました` : `${entry.date} のToDoを作成しました`
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setTodoStatus(msg || "ToDo作成に失敗しました");
@@ -1763,7 +1770,7 @@ export function App() {
                     className="primaryActionBtn"
                     type="button"
                     disabled={todoBusy}
-                    title="全プロジェクトのInProgressから今日のToDoを作成"
+                    title="有効プロジェクトのInProgressから今日のToDoを作成（今日のToDoがあれば追記）"
                     onClick={() => void createTodoFromProjects()}
                   >
                     {todoBusy ? "作成中..." : "新規ToDo"}
