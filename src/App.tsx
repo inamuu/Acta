@@ -23,7 +23,10 @@ type DateFilterMode = "week" | "day" | "all";
 type ActiveView = "workspace" | "journal" | "knowledge";
 
 const TODO_RAIL_STORAGE_KEY = "acta.todoRailOpen";
-const PROJECT_TODO_HEIGHT_STORAGE_KEY = "acta.projectTodoHeight";
+const PROJECT_TODO_RATIO_STORAGE_KEY = "acta.projectTodoRatio";
+const PROJECT_TODO_DEFAULT_RATIO = 0.5;
+const PROJECT_TODO_MIN_HEIGHT = 260;
+const PROJECT_TODO_MIN_LIST_HEIGHT = 220;
 type DraftPost = {
   key: string;
   body: string;
@@ -135,6 +138,14 @@ function sortEntriesNewestFirst(list: ActaEntry[]): ActaEntry[] {
   return [...list].sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
 }
 
+/** ToDoレールの高さを、一覧側の最低高さとレール側の最低高さの範囲に収める。 */
+function clampProjectTodoHeightFor(containerHeight: number, nextHeight: number): number {
+  const safeContainer = Number.isFinite(containerHeight) && containerHeight > 0 ? containerHeight : 720;
+  const maxHeight = Math.max(PROJECT_TODO_MIN_HEIGHT, safeContainer - PROJECT_TODO_MIN_LIST_HEIGHT);
+  const safeNext = Number.isFinite(nextHeight) ? nextHeight : safeContainer * PROJECT_TODO_DEFAULT_RATIO;
+  return Math.round(Math.min(maxHeight, Math.max(PROJECT_TODO_MIN_HEIGHT, safeNext)));
+}
+
 function isTodoEntry(entry: ActaEntry): boolean {
   return entry.tags.includes("ToDo") || /^#\s*todo\b/im.test(entry.body);
 }
@@ -213,10 +224,13 @@ export function App() {
   const [todoRailOpen, setTodoRailOpen] = useState<boolean>(
     () => window.localStorage.getItem(TODO_RAIL_STORAGE_KEY) !== "closed"
   );
-  const [projectTodoHeight, setProjectTodoHeight] = useState<number>(() => {
-    const stored = Number(window.localStorage.getItem(PROJECT_TODO_HEIGHT_STORAGE_KEY));
-    return Number.isFinite(stored) && stored >= 260 && stored <= 600 ? stored : 340;
+  // プロジェクト一覧とToDoレールの境界。ウィンドウサイズを変えても同じ割合の位置に追従するよう、比率で保持する。
+  const [projectTodoRatio, setProjectTodoRatio] = useState<number>(() => {
+    const stored = Number(window.localStorage.getItem(PROJECT_TODO_RATIO_STORAGE_KEY));
+    return Number.isFinite(stored) && stored > 0 && stored < 1 ? stored : PROJECT_TODO_DEFAULT_RATIO;
   });
+  const [workspaceHeight, setWorkspaceHeight] = useState<number>(() => window.innerHeight - 48);
+  const projectTodoHeight = clampProjectTodoHeightFor(workspaceHeight, projectTodoRatio * workspaceHeight);
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
   const [knowledgeExcludeTags, setKnowledgeExcludeTags] = useState("");
   const [knowledgeResults, setKnowledgeResults] = useState<KnowledgeSearchResultItem[]>([]);
@@ -465,8 +479,19 @@ export function App() {
   }, [todoRailOpen]);
 
   useEffect(() => {
-    window.localStorage.setItem(PROJECT_TODO_HEIGHT_STORAGE_KEY, String(projectTodoHeight));
-  }, [projectTodoHeight]);
+    window.localStorage.setItem(PROJECT_TODO_RATIO_STORAGE_KEY, String(projectTodoRatio));
+  }, [projectTodoRatio]);
+
+  // ワークスペースの高さを監視し、ウィンドウリサイズ時に境界の px 位置を再計算する。
+  useEffect(() => {
+    const container = workspaceAreaRef.current;
+    if (!container) return;
+    const update = () => setWorkspaceHeight(container.getBoundingClientRect().height);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [activeView]);
 
   useEffect(() => {
     const nextTheme = normalizeTheme(settings.theme);
@@ -1165,10 +1190,11 @@ export function App() {
     }
   }
 
-  function clampProjectTodoHeight(nextHeight: number): number {
-    const containerHeight = workspaceAreaRef.current?.getBoundingClientRect().height ?? 720;
-    const maxHeight = Math.max(260, containerHeight - 220);
-    return Math.round(Math.min(maxHeight, Math.max(260, nextHeight)));
+  /** ToDoレールの高さ(px)を比率に変換して保持する。比率は現在のワークスペース高さで clamp した値から求める。 */
+  function setProjectTodoHeightPx(nextHeight: number, containerHeight: number = workspaceHeight) {
+    const height = clampProjectTodoHeightFor(containerHeight, nextHeight);
+    if (containerHeight <= 0) return;
+    setProjectTodoRatio(height / containerHeight);
   }
 
   function beginProjectTodoResize(e: React.PointerEvent<HTMLDivElement>) {
@@ -1178,7 +1204,7 @@ export function App() {
     if (!container) return;
 
     const rect = container.getBoundingClientRect();
-    const resize = (clientY: number) => setProjectTodoHeight(clampProjectTodoHeight(rect.bottom - clientY));
+    const resize = (clientY: number) => setProjectTodoHeightPx(rect.bottom - clientY, rect.height);
     const onPointerMove = (event: PointerEvent) => resize(event.clientY);
     const onPointerUp = () => {
       window.removeEventListener("pointermove", onPointerMove);
@@ -1738,7 +1764,7 @@ export function App() {
                   if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
                   e.preventDefault();
                   const direction = e.key === "ArrowUp" ? 1 : -1;
-                  setProjectTodoHeight((height) => clampProjectTodoHeight(height + direction * 20));
+                  setProjectTodoHeightPx(projectTodoHeight + direction * 20);
                 }}
               >
                 <span aria-hidden="true" />
@@ -1928,7 +1954,8 @@ export function App() {
                   if (editing) {
                     const res = await api.updateEntry({ id: editing.id, body, tags });
                     if (!res?.updated) throw new Error("更新対象が見つかりませんでした");
-                    setEditing(null);
+                    // 更新後も編集を続けられるよう、編集状態は閉じずに保存済み内容へ差し替える。
+                    setEditing((prev) => (prev && prev.id === editing.id ? { ...prev, body, tags } : prev));
                     await reload();
                   } else {
                     const entry = await api.addEntry({ body, tags });

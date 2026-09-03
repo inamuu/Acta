@@ -90,6 +90,13 @@ type Props = {
 
 type ComposerLayout = "write" | "split" | "preview";
 
+function formatSavedAt(date: Date): string {
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
 export function Composer({
   onSubmit,
   assetBaseUrl,
@@ -109,6 +116,11 @@ export function Composer({
   const [submitting, setSubmitting] = useState(false);
   const [isBodyEmpty, setIsBodyEmpty] = useState(() => initialBodyValue.trim().length === 0);
   const [error, setError] = useState<string>("");
+  /** 編集モードで最後に保存した時刻と本文。保存直後の表示と「未保存の変更あり」の判定に使う。 */
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const savedBodyRef = useRef<string>(initialBodyValue);
+  const savedTagsRef = useRef<string>(JSON.stringify(Array.isArray(initialTags) ? initialTags : []));
   const [layout, setLayout] = useState<ComposerLayout>("split");
   const [previewHtml, setPreviewHtml] = useState<string>(() =>
     markdownToHtml(initialBodyValue || EMPTY_PREVIEW_SOURCE, { assetBaseUrl })
@@ -131,6 +143,7 @@ export function Composer({
       isBodyEmptyRef.current = nextIsEmpty;
       setIsBodyEmpty(nextIsEmpty);
     }
+    setIsDirty(nextBody !== savedBodyRef.current || JSON.stringify(tags) !== savedTagsRef.current);
   }
 
   function cancelScheduledPreview() {
@@ -206,13 +219,28 @@ export function Composer({
 
   useEffect(() => {
     const nextBody = typeof initialBody === "string" ? initialBody : "";
-    setTags(Array.isArray(initialTags) ? initialTags : []);
+    const nextTags = Array.isArray(initialTags) ? initialTags : [];
+    savedBodyRef.current = nextBody;
+    savedTagsRef.current = JSON.stringify(nextTags);
+    // 編集中に保存した直後は親から同じ本文が戻ってくる。エディタを書き換えるとカーソル位置が失われるので触らない。
+    if (editorRef.current && editorRef.current.value === nextBody && bodyRef.current === nextBody) {
+      setTags(nextTags);
+      setIsDirty(false);
+      return;
+    }
+    setTags(nextTags);
     updateBody(nextBody);
     isComposingRef.current = false;
     if (editorRef.current) editorRef.current.value = nextBody;
     renderPreviewNow(nextBody);
     setError("");
+    setLastSavedAt(null);
+    setIsDirty(false);
   }, [draftKey, initialBody, initialTags]);
+
+  useEffect(() => {
+    setIsDirty(bodyRef.current !== savedBodyRef.current || JSON.stringify(tags) !== savedTagsRef.current);
+  }, [tags]);
 
   useEffect(() => {
     if (!autoFocusEditor) return;
@@ -260,6 +288,13 @@ export function Composer({
         updateBody("");
         if (editorRef.current) editorRef.current.value = "";
         renderPreviewNow("");
+      } else {
+        // 編集は保存後もそのまま続けられるようにフォーカスを維持し、保存済みであることを示す。
+        savedBodyRef.current = currentBody;
+        savedTagsRef.current = JSON.stringify(tags);
+        setIsDirty(bodyRef.current !== currentBody);
+        setLastSavedAt(new Date());
+        editorRef.current?.focus();
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -518,7 +553,18 @@ export function Composer({
 
         <div className="composerFooter">
           <div className="composerFooterHint">
-            <span className="composerSaveState" aria-hidden="true" />
+            {mode === "edit" ? (
+              <span
+                className={`composerSaveStatus${isDirty ? " isDirty" : lastSavedAt ? " isSaved" : ""}`}
+                role="status"
+                aria-live="polite"
+              >
+                <span className="composerSaveState" aria-hidden="true" />
+                {isDirty ? "未保存の変更あり" : lastSavedAt ? `保存しました ${formatSavedAt(lastSavedAt)}` : "保存済み"}
+              </span>
+            ) : (
+              <span className="composerSaveState" aria-hidden="true" />
+            )}
             Markdown
             <span className="composerShortcut">⌘ ↵</span>
           </div>

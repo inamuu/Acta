@@ -4251,6 +4251,30 @@ html .sidebar .tagItem.isSelected .tagCount {
   background: #22a06b;
 }
 
+.composerSaveStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.composerSaveStatus.isSaved {
+  color: #157347;
+  background: rgba(34, 160, 107, 0.12);
+}
+
+.composerSaveStatus.isDirty {
+  color: #9a5b00;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.composerSaveStatus.isDirty .composerSaveState {
+  background: #f59e0b;
+}
+
 .composerShortcut {
   display: inline-flex;
   align-items: center;
@@ -5171,6 +5195,22 @@ html .sidebar .tagItem.isSelected .tagCount {
 .todoRail .commentActions .dangerGhostBtn {
   padding: 3px 8px;
   font-size: 11px;
+}
+
+/* レール内の操作ボタンは常時表示し、日付・進捗と上下中央で揃える */
+.todoRail .commentHeaderLine1,
+.todoRail .commentHeaderRight {
+  align-items: center;
+}
+
+.todoRail .commentHeaderMain {
+  justify-content: center;
+}
+
+.todoRail .commentActions {
+  opacity: 1;
+  flex: 1 1 100%;
+  justify-content: flex-start;
 }
 
 /* レール内は全件ToDoタグなのでタグ表示を省き、縦を稼ぐ */
