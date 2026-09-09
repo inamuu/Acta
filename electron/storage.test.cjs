@@ -313,9 +313,17 @@ test("sync is reported as disabled when the data dir is not a git repository", a
   const path = require("node:path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "acta-sync-"));
   try {
+    const { execFileSync } = require("node:child_process");
     assert.equal(await _test.isGitRepository(dir), false);
-    fs.mkdirSync(path.join(dir, ".git"));
+    assert.equal(await _test.isGitRepository(path.join(dir, "missing")), false);
+
+    execFileSync("git", ["init", "-q"], { cwd: dir });
     assert.equal(await _test.isGitRepository(dir), true);
+
+    // 保存先がリポジトリのサブディレクトリでも git 管理として扱う
+    const sub = path.join(dir, "Acta");
+    fs.mkdirSync(sub);
+    assert.equal(await _test.isGitRepository(sub), true);
 
     const res = _test.buildSyncDisabledResult(dir);
     assert.equal(res.ok, true);

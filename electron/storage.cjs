@@ -439,18 +439,24 @@ function buildSyncDisabledResult(dataDir) {
   };
 }
 
+/**
+ * 保存先が git 管理下かどうかを git 自身に判定させる。
+ * 保存先がリポジトリのサブディレクトリや worktree の場合も `.git` の有無だけでは判定できないため、
+ * `git rev-parse --is-inside-work-tree` の結果を使う。
+ */
 async function isGitRepository(dir) {
   try {
-    const stat = await fs.promises.stat(path.join(dir, ".git"));
-    return stat.isDirectory() || stat.isFile();
+    await fs.promises.access(dir);
   } catch {
     return false;
   }
+  const res = await runGitCommand(["rev-parse", "--is-inside-work-tree"], { cwd: dir });
+  return res.code === 0 && res.stdout.trim() === "true";
 }
 
-function runGitCommand(args) {
+function runGitCommand(args, options = {}) {
   return new Promise((resolve) => {
-    const dataDir = getDataDir();
+    const dataDir = options.cwd ?? getDataDir();
     let done = false;
     let stdout = "";
     let stderr = "";
