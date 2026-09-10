@@ -42,17 +42,19 @@ test("GitHub search results become Issue or PR tasks with stable metadata", () =
     title: "OIDC対応 #12",
     sourceType: "PullRequest",
     sourceUrl: "https://github.com/example/api/pull/12",
-    repository: "example/api"
+    repository: "example/api",
+    isDraft: false
   });
+  assert.equal(_test.githubSearchItemContent({ ...item, isDraft: true }).isDraft, true);
 });
 
 test("GitHub closes tasks but keeps Acta workflow state while they remain open", () => {
   assert.equal(_test.projectTaskStatusFromGitHubItem({ state: "closed", isPullRequest: true }, { status: "InProgress", sourceState: "open" }), "Done");
   assert.equal(_test.projectTaskStatusFromGitHubItem({ state: "open", isPullRequest: true }, { status: "Backlog", sourceState: "open" }), "Backlog");
-  assert.equal(_test.projectTaskStatusFromGitHubItem({ state: "open", isPullRequest: true }, null), "InProgress");
+  assert.equal(_test.projectTaskStatusFromGitHubItem({ state: "open", isPullRequest: true }, null), "Backlog");
   assert.equal(_test.projectTaskStatusFromGitHubItem({ state: "open", isPullRequest: false }, { status: "InProgress", sourceState: "open" }), "InProgress");
   assert.equal(_test.projectTaskStatusFromGitHubItem({ state: "open", isPullRequest: false }, { status: "Done", sourceState: "closed" }), "InProgress");
-  assert.equal(_test.projectTaskStatusFromGitHubItem({ state: "open", isPullRequest: false }, null), "InProgress");
+  assert.equal(_test.projectTaskStatusFromGitHubItem({ state: "open", isPullRequest: false }, null), "Backlog");
   assert.equal(_test.githubSourceState({ state: "merged" }), "closed");
   assert.equal(_test.githubSourceState({ state: "closed" }), "closed");
   assert.equal(_test.githubSourceState({ state: "open" }), "open");
@@ -242,26 +244,6 @@ test("existingOnly tasks only flip the marker of lines already in ToDo", () => {
     ["Acta", "その他"]
   );
   assert.equal(newGroup, body);
-});
-
-test("GitHub items are classified from existing Acta project task titles", () => {
-  const projects = [
-    { id: "aws-local", name: "AWSアカウント分割（local）", tasks: [
-      { title: "jm-local: sonicmoov 向け ECR pull 専用 IAM ユーザーを追加 #4263" }
-    ] },
-    { id: "other", name: "その他", tasks: [] }
-  ];
-  const related = _test.classifyGitHubItem({
-    title: "jm-local: sonicmoov MFA 自己管理ポリシーのデバイス名制限を緩和",
-    number: 4269,
-    repository: { nameWithOwner: "example/repo" }
-  }, projects);
-  assert.equal(related.project.id, "aws-local");
-  assert.equal(related.kind, "similarity");
-
-  const unrelated = _test.classifyGitHubItem({ title: "個人的な買い物", number: 1 }, projects);
-  assert.equal(unrelated.project.id, "other");
-  assert.equal(unrelated.kind, "other");
 });
 
 test("Electron resolves gh from PATH or Homebrew locations", () => {

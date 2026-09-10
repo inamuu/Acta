@@ -25,8 +25,6 @@ const SYNC_DISABLED = "Sync Disabled";
 const DEFAULT_THEME = "default";
 const GITHUB_SEARCH_LIMIT = 1000;
 const GITHUB_UNCLASSIFIED_PROJECT_NAME = "未分類";
-const GITHUB_OTHER_PROJECT_NAME = "その他";
-const GITHUB_CLASSIFICATION_THRESHOLD = 0.2;
 const ALLOWED_THEMES = new Set([
   "default",
   "dracula",
@@ -1795,75 +1793,22 @@ function githubSearchItemContent(item) {
   return {
     title: number > 0 ? `${rawTitle} #${number}` : rawTitle,
     sourceType: item?.isPullRequest ? "PullRequest" : "Issue",
+    isDraft: Boolean(item?.isDraft),
     sourceUrl: String(item?.url ?? "").trim(),
     repository
   };
 }
 
-function normalizeGitHubClassificationText(value) {
-  return String(value ?? "")
-    .toLocaleLowerCase("ja")
-    .replace(/#\d+/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, "");
-}
-
-function characterBigrams(value) {
-  const normalized = normalizeGitHubClassificationText(value);
-  const result = new Set();
-  for (let index = 0; index < normalized.length - 1; index += 1) {
-    result.add(normalized.slice(index, index + 2));
-  }
-  return result;
-}
-
-function githubTitleSimilarity(left, right) {
-  const leftGrams = characterBigrams(left);
-  const rightGrams = characterBigrams(right);
-  if (leftGrams.size === 0 || rightGrams.size === 0) return 0;
-  let overlap = 0;
-  for (const gram of leftGrams) {
-    if (rightGrams.has(gram)) overlap += 1;
-  }
-  return (2 * overlap) / (leftGrams.size + rightGrams.size);
-}
-
-function classifyGitHubItem(item, projects) {
-  const content = githubSearchItemContent(item);
-  const labels = Array.isArray(item?.labels)
-    ? item.labels.map((label) => String(label?.name ?? label ?? "").trim()).filter(Boolean)
-    : [];
-  const candidates = projects.filter(
-    (project) => project.name !== GITHUB_UNCLASSIFIED_PROJECT_NAME && project.name !== GITHUB_OTHER_PROJECT_NAME
-  );
-
-  for (const label of labels) {
-    const labelKey = normalizeGitHubClassificationText(label);
-    const exactProject = candidates.find((project) => normalizeGitHubClassificationText(project.name) === labelKey);
-    if (exactProject) return { project: exactProject, kind: "label", score: 1 };
-  }
-
-  let bestProject = null;
-  let bestScore = 0;
-  for (const project of candidates) {
-    for (const task of project.tasks || []) {
-      const score = githubTitleSimilarity(content.title, task.title);
-      if (score <= bestScore) continue;
-      bestProject = project;
-      bestScore = score;
-    }
-  }
-  if (bestProject && bestScore >= GITHUB_CLASSIFICATION_THRESHOLD) {
-    return { project: bestProject, kind: "similarity", score: bestScore };
-  }
-
-  const otherProject = projects.find((project) => project.name === GITHUB_OTHER_PROJECT_NAME) || null;
-  return { project: otherProject, kind: "other", score: bestScore };
-}
-
+/**
+ * GitHub由来タスクの状態。
+ * 新規取得分は Backlog に置き、プロジェクトへの振り分けと InProgress/Done への移動は利用者が行う。
+ * クローズ・マージ済みは Done。Acta 側で動かした状態は維持する。
+ */
 function projectTaskStatusFromGitHubItem(item, previousTask) {
   const sourceState = githubSourceState(item);
   if (sourceState === "closed") return "Done";
-  if (!previousTask || previousTask.sourceState === "closed") return "InProgress";
+  if (!previousTask) return "Backlog";
+  if (previousTask.sourceState === "closed") return "InProgress";
   return normalizeProjectTaskStatus(previousTask.status);
 }
 
@@ -1883,6 +1828,7 @@ function githubTaskChanged(previousTask, nextTask) {
 }
 
 async function syncGitHubItems() {
+  // 対象は自分が作成した Open な Issue と Pull Request（Draft PR も Open に含まれる）。
   const commonArgs = [
     "--author", "@me",
     "--include-prs",
@@ -1912,8 +1858,6 @@ async function syncGitHubItems() {
   let importedTasks = 0;
   let updatedTasks = 0;
   let unclassifiedItems = 0;
-  let automaticallyClassifiedItems = 0;
-  let otherItems = 0;
   const seenIds = new Set();
   // 同期でToDoへ反映するタスク（プロジェクトIDごと）
   const todoTasksByProjectId = new Map();
@@ -1943,29 +1887,16 @@ async function syncGitHubItems() {
       break;
     }
 
-    if (!targetProject || targetProject.name === GITHUB_UNCLASSIFIED_PROJECT_NAME) {
-      const classification = classifyGitHubItem(item, projects);
-      if (classification.project) {
-        if (targetProject && targetProject.id !== classification.project.id && previousTaskIndex >= 0) {
-          targetProject.tasks.splice(previousTaskIndex, 1);
-          touchedProjectIds.add(targetProject.id);
-          previousTaskIndex = -1;
-        }
-        targetProject = classification.project;
-        previousTaskIndex = targetProject.tasks.findIndex(
-          (task) => task.source === "github" && (task.id === githubItemId || task.sourceUrl === content.sourceUrl)
-        );
-        if (classification.kind === "other") otherItems += 1;
-        else automaticallyClassifiedItems += 1;
-      } else {
-        if (!unclassifiedProject) {
-          unclassifiedProject = await createProject({ name: GITHUB_UNCLASSIFIED_PROJECT_NAME });
-          projects.push(unclassifiedProject);
-        }
-        targetProject = unclassifiedProject;
-        unclassifiedItems += 1;
+    // 新規の項目は自動分類せず「未分類」へ置く。どのプロジェクトに属するかは利用者がカードから選ぶ。
+    // 一度どこかのプロジェクトへ振り分けた項目は、次回以降の同期でもそのプロジェクトに残る。
+    if (!targetProject) {
+      if (!unclassifiedProject) {
+        unclassifiedProject = await createProject({ name: GITHUB_UNCLASSIFIED_PROJECT_NAME });
+        projects.push(unclassifiedProject);
       }
+      targetProject = unclassifiedProject;
     }
+    if (targetProject.name === GITHUB_UNCLASSIFIED_PROJECT_NAME) unclassifiedItems += 1;
 
     const now = Date.now();
     const status = projectTaskStatusFromGitHubItem(item, previousTask);
@@ -2027,9 +1958,7 @@ async function syncGitHubItems() {
       `${items.length}件取得`,
       `新規${importedTasks}件`,
       `更新${updatedTasks}件`,
-      automaticallyClassifiedItems ? `自動分類${automaticallyClassifiedItems}件` : "",
-      otherItems ? `その他${otherItems}件` : "",
-      unclassifiedItems ? `要分類${unclassifiedItems}件` : ""
+      unclassifiedItems ? `未分類${unclassifiedItems}件（カードのプロジェクト選択で振り分け）` : ""
     ].filter(Boolean).join(" / "),
     syncedAtMs
   };
@@ -2520,8 +2449,6 @@ module.exports = {
     isTodoTrackedStatus,
     githubSearchItemContent,
     githubSourceState,
-    githubTitleSimilarity,
-    classifyGitHubItem,
     projectTaskStatusFromGitHubItem,
     githubTaskChanged,
     resolveGhExecutable,

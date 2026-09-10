@@ -8,7 +8,7 @@ GitHub issue 風の「コメント」UIで、Markdown を日次ファイルへ�
 - 画面上部の検索（`Ctrl+F` / `Cmd+F` でフォーカス）
 - 追記保存（テキスト/Markdown）
 - 既存投稿の編集/削除
-- 自分が作成したGitHub Issue・PRをActaのTaskへ同期
+- 自分が作成したGitHub Issue・PR（Draft PRも含む）をActaのTaskへ同期
 - 保存先フォルダの変更を監視して自動再読み込み（CLIやAIが直接書いたToDo・ナレッジもリロード不要で反映）
 - ToDoの大カテゴリ（プロジェクト名）はプロジェクト画面の並び順に追従（追記時も並べ替え。並び順未登録のプロジェクトは名前順で末尾）
 - プロジェクトのタスクを削除するとToDoの該当行も削除（空になった大カテゴリの見出しも削除）
@@ -25,11 +25,11 @@ GitHub issue 風の「コメント」UIで、Markdown を日次ファイルへ�
 
 ## GitHubのIssue・PRを同期する
 
-プロジェクト画面の「GitHub同期」を押すと、GitHub Projectsへの所属とは関係なく、自分が作成したOpenなIssue・Pull Requestを取得します。Closed・Mergedは同期対象外です。初回のみターミナルで`gh auth login`を実行してください。
+プロジェクト画面の「GitHub同期」を押すと、GitHub Projectsへの所属とは関係なく、自分が作成したOpenなIssue・Pull Requestを取得します（Draft PRも含みます）。Closed・Mergedは同期対象外です。初回のみターミナルで`gh auth login`を実行してください。
 
-新しい項目は、ラベルと既存のActaタスク名との類似度からActaプロジェクトへ自動分類されます。十分な関連がないものだけ「その他」へ入り、Actaプロジェクトが自動作成されることはありません。カード内のプロジェクト選択欄から所属を修正すると、次回以降の同期でもその所属が維持されます。
+新しい項目は自動分類せず、すべて「未分類」プロジェクトの`Backlog`に入ります（「未分類」は無ければ自動作成されます）。カード内のプロジェクト選択欄で所属プロジェクトを選び、カンバンで`InProgress`や`Done`へ動かしてください。一度振り分けた項目は、次回以降の同期でもそのプロジェクトと状態を維持します。
 
-Projectsの状態は`Backlog`、`InProgress`、`Done`です。同期したOpenなIssue・PRは`InProgress`に入ります（Acta側で状態を変えた項目はその状態を維持します）。同期の結果は今日のToDoにも反映され、新しい`InProgress`は追記、クローズ・マージ済みで消えた項目は既存行を完了マークへ更新します（今日のToDoが無い場合は何もしません）。GitHub由来の項目も、ToDoでは各Actaプロジェクトの通常タスクと同じ階層へ追加されます。GitHub由来のURLはプロジェクト画面でのみ表示し、ToDo本文には出力しません。
+Projectsの状態は`Backlog`、`InProgress`、`Done`です。ToDoに載るのは`InProgress`と`Done`のタスクだけで、`Backlog`へ戻したタスクはToDoから外れます。同期の結果も今日のToDoに反映され、`InProgress`のままGitHub側で更新された項目は追記、クローズ・マージ済みで消えた項目は既存行を完了マークへ更新します（今日のToDoが無い場合は何もしません）。GitHub由来の項目も、ToDoでは各Actaプロジェクトの通常タスクと同じ階層へ追加されます。GitHub由来のURLはプロジェクト画面でのみ表示し、ToDo本文には出力しません。
 
 ## 保存先
 既定: `~/Documents/Acta/YYYY-MM-DD.md`
