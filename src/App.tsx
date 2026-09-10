@@ -280,6 +280,9 @@ export function App() {
   const workspaceAreaRef = useRef<HTMLElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const syncQueueRef = useRef<Promise<void>>(Promise.resolve());
+  // 一覧読込の順序保証。ファイル監視由来の再読込が、操作直後の読込より遅れて返ってきて
+  // 古い一覧で上書きしないよう、最後に開始した読込の結果だけを反映する。
+  const entriesLoadSeqRef = useRef(0);
   const backupSyncTimerRef = useRef<number | null>(null);
   const backupSyncFirstQueuedAtRef = useRef<number | null>(null);
   const linkHighlightTimerRef = useRef<number | null>(null);
@@ -382,8 +385,10 @@ export function App() {
 
   async function reload(opts?: { keepError?: boolean }) {
     if (!api) return;
+    const seq = ++entriesLoadSeqRef.current;
     try {
       const list = await api.listEntries();
+      if (seq !== entriesLoadSeqRef.current) return;
       setEntries(list);
       if (!opts?.keepError) setAppError("");
     } catch (e) {
@@ -507,9 +512,11 @@ export function App() {
   const refreshFromDiskRef = useRef<() => void>(() => {});
   refreshFromDiskRef.current = () => {
     if (!api || loading) return;
+    const seq = ++entriesLoadSeqRef.current;
     void (async () => {
       try {
         const [list, projectList] = await Promise.all([api.listEntries(), api.listProjects()]);
+        if (seq !== entriesLoadSeqRef.current) return;
         setEntries(list);
         setProjects(projectList);
       } catch {
@@ -896,6 +903,8 @@ export function App() {
       setKnowledgeStatus(
         `更新完了: ${res.changedFiles}ファイル更新 / ${res.deletedFiles}ファイル削除 / ${res.totalEntries}件`
       );
+      // インデックスファイルも保存先の一部なので、更新したらそのまま commit & push する。
+      queueBackupSync({ immediate: true });
       if (knowledgeQuery.trim()) {
         const searchRes = await api.searchKnowledgeIndex({
           query: knowledgeQuery,
@@ -925,6 +934,7 @@ export function App() {
       try {
         const indexRes = await api.rebuildKnowledgeIndex();
         setKnowledgeIndex(indexRes);
+        if (indexRes.changedFiles > 0 || indexRes.deletedFiles > 0) queueBackupSync();
       } catch {
         // インデックス更新に失敗しても既存インデックスで検索は続ける。
       }

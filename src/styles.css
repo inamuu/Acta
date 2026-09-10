@@ -6972,3 +6972,81 @@ html .sidebar .tagItem.isSelected .tagCount {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------------------------------------------------------------------------
+   一覧のタグ絞り込み: ボタンと選択中タグを見やすくする
+   テーマ側の .tagPill 指定（!important）に負けないよう、選択状態も !important で上書きする。
+   --------------------------------------------------------------------------- */
+
+.journalTagFilterToggle {
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.1);
+  border-color: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.3);
+  color: var(--theme-text, var(--fg0));
+  font-size: 12px;
+  height: 28px;
+  padding: 0 12px;
+}
+
+.journalTagFilterToggle.isOpen,
+.journalTagFilterToggle:hover {
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.18);
+  border-color: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.5);
+  color: var(--theme-text, var(--fg0));
+}
+
+.journalTagFilterCount {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--theme-accent, var(--accent));
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.journalTagFilterClear {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--theme-accent-rgb, 37, 99, 235), 0.3);
+  background: var(--theme-surface, var(--bg1));
+}
+
+.journalTagFilterClear:hover {
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.12);
+}
+
+.journalTagPicker .tagPill,
+.journalActiveTags .tagPill {
+  color: var(--theme-text, var(--fg0)) !important;
+  background: var(--theme-surface, var(--bg1)) !important;
+  border-color: var(--theme-border, var(--border)) !important;
+}
+
+.journalTagPicker .tagPill small,
+.journalActiveTags .tagPill small {
+  color: var(--theme-text-muted, var(--muted));
+}
+
+.journalTagPicker .tagPill:hover,
+.journalActiveTags .tagPill:hover {
+  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.12) !important;
+  border-color: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.45) !important;
+}
+
+.journalTagPicker .tagPill.isActive,
+.journalActiveTags .tagPill.isActive {
+  background: var(--theme-accent, var(--accent)) !important;
+  border-color: var(--theme-accent, var(--accent)) !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+
+.journalTagPicker .tagPill.isActive small,
+.journalActiveTags .tagPill.isActive small {
+  color: rgba(255, 255, 255, 0.85);
+}

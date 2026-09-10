@@ -1723,9 +1723,20 @@ async function moveProjectTask(payload) {
   if (!changed) throw new Error("タスクが見つかりません");
   const written = await writeProject(project);
   if (!written.archivedAtMs && movedTask) {
-    await upsertProjectTasksToTodayTodo(written, [movedTask]);
+    if (isTodoTrackedStatus(status)) {
+      await upsertProjectTasksToTodayTodo(written, [movedTask]);
+    } else {
+      // Backlog へ戻したタスクは今日のToDoから外す（ToDoに載るのは InProgress / Done だけ）。
+      await removeProjectTasksFromTodayTodo(written, [movedTask]);
+    }
   }
   return written;
+}
+
+/** ToDoに載せる対象のステータスか。Backlog は載せない。 */
+function isTodoTrackedStatus(status) {
+  const normalized = normalizeProjectTaskStatus(status);
+  return normalized === "InProgress" || normalized === "Done";
 }
 
 async function reassignProjectTask(payload) {
@@ -2324,7 +2335,7 @@ function collectActiveInProgressGroups(projects) {
 
 /**
  * 今日のToDoを新規作成するときの本文。
- * 有効プロジェクトの InProgress を全件入れたうえで、きっかけになったタスク（Done/Backlog へ移した直後など）も反映する。
+ * 有効プロジェクトの InProgress を全件入れたうえで、きっかけになったタスク（Done へ移した直後など）も反映する。
  */
 function buildNewTodayTodoBody(projects, project, tasks) {
   const groups = collectActiveInProgressGroups(projects);
@@ -2335,7 +2346,7 @@ function buildNewTodayTodoBody(projects, project, tasks) {
 }
 
 async function upsertProjectTasksToTodayTodo(project, tasks) {
-  const targetTasks = (tasks || []).filter((task) => task?.title);
+  const targetTasks = (tasks || []).filter((task) => task?.title && isTodoTrackedStatus(task.status));
   if (!targetTasks.length) return null;
 
   const current = await findTodayTodoEntry();
@@ -2506,6 +2517,7 @@ module.exports = {
     upsertProjectTasksInTodoBody,
     reorderTodoGroupBlocks,
     removeProjectTasksFromTodoBody,
+    isTodoTrackedStatus,
     githubSearchItemContent,
     githubSourceState,
     githubTitleSimilarity,

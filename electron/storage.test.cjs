@@ -334,3 +334,16 @@ test("sync is reported as disabled when the data dir is not a git repository", a
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("only InProgress and Done tasks are tracked in ToDo", () => {
+  assert.equal(_test.isTodoTrackedStatus("InProgress"), true);
+  assert.equal(_test.isTodoTrackedStatus("Done"), true);
+  assert.equal(_test.isTodoTrackedStatus("Backlog"), false);
+  assert.equal(_test.isTodoTrackedStatus("Inbox"), false);
+});
+
+test("moving a task back to Backlog removes its ToDo line", () => {
+  const body = "# ToDo\n- Acta\n  - [-] 同期を直す\n  - [-] 別のタスク";
+  const nextBody = _test.removeProjectTasksFromTodoBody(body, "Acta", ["同期を直す"]);
+  assert.equal(nextBody, "# ToDo\n- Acta\n  - [-] 別のタスク");
+});
