@@ -1827,30 +1827,50 @@ function githubTaskChanged(previousTask, nextTask) {
     previousTask.sourceState !== nextTask.sourceState;
 }
 
-async function syncGitHubItems() {
-  // 対象は自分が作成した Open な Issue と Pull Request（Draft PR も Open に含まれる）。
+/** 自分が「作成した」または「アサインされた」Open な Issue・PR を取得して id で統合する。 */
+async function fetchGitHubItems() {
   const commonArgs = [
-    "--author", "@me",
     "--include-prs",
+    "--state", "open",
     "--sort", "updated",
     "--order", "desc",
     "--limit", String(GITHUB_SEARCH_LIMIT),
     "--json", "id,title,url,state,isPullRequest,number,repository,labels,createdAt,updatedAt,closedAt"
   ];
-  const result = await runGhCommand(["search", "issues", "--state", "open", ...commonArgs]);
-  if (result.code !== 0) {
-    const detail = result.stderr || result.stdout || "GitHubのIssue・PRを取得できませんでした";
-    if (/auth|login|token|credential/i.test(detail)) {
-      throw new Error("ghの認証が無効です。ターミナルで gh auth login を実行してください");
+  const queries = [
+    ["search", "issues", "--author", "@me", ...commonArgs],
+    ["search", "issues", "--assignee", "@me", ...commonArgs]
+  ];
+
+  const byId = new Map();
+  let complete = true;
+  for (const args of queries) {
+    const result = await runGhCommand(args);
+    if (result.code !== 0) {
+      const detail = result.stderr || result.stdout || "GitHubのIssue・PRを取得できませんでした";
+      if (/auth|login|token|credential/i.test(detail)) {
+        throw new Error("ghの認証が無効です。ターミナルで gh auth login を実行してください");
+      }
+      throw new Error(detail);
     }
-    throw new Error(detail);
+    const parsed = safeJsonParse(result.stdout);
+    if (!Array.isArray(parsed)) throw new Error("GitHubから取得したデータを読み取れませんでした");
+    if (parsed.length >= GITHUB_SEARCH_LIMIT) complete = false;
+    for (const item of parsed) {
+      const id = String(item?.id ?? "").trim();
+      if (id && !byId.has(id)) byId.set(id, item);
+    }
   }
 
-  const parsedItems = safeJsonParse(result.stdout);
-  if (!Array.isArray(parsedItems)) throw new Error("GitHubから取得したデータを読み取れませんでした");
-  const items = parsedItems.sort(
+  const items = Array.from(byId.values()).sort(
     (a, b) => Date.parse(String(b?.updatedAt ?? "")) - Date.parse(String(a?.updatedAt ?? ""))
   );
+  return { items, complete };
+}
+
+async function syncGitHubItems() {
+  // 対象は自分が作成した、または自分にアサインされた Open な Issue と Pull Request（Draft PR も含む）。
+  const { items, complete } = await fetchGitHubItems();
 
   const projects = await listProjects();
   let unclassifiedProject = projects.find((project) => project.name === GITHUB_UNCLASSIFIED_PROJECT_NAME) || null;
@@ -1929,7 +1949,8 @@ async function syncGitHubItems() {
     }
   }
 
-  if (items.length < GITHUB_SEARCH_LIMIT) {
+  // 取得が上限に達していない（全件そろっている）ときだけ、消えた項目をクローズ済みとして扱う
+  if (complete) {
     for (const project of projects) {
       const before = project.tasks.length;
       const removed = project.tasks.filter((task) => task.source === "github" && !seenIds.has(task.id));

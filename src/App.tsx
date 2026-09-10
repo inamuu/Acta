@@ -1612,7 +1612,7 @@ export function App() {
                     type="button"
                     disabled={githubSyncBusy}
                     onClick={() => void syncGitHubItems()}
-                    title="自分が作成したGitHub Issue・PR（Draft PRも含む）を同期"
+                    title="自分が作成・アサインされたGitHub Issue・PR（Draft PRも含む）を同期"
                   >
                     {githubSyncBusy ? "同期中..." : "GitHub同期"}
                   </button>
