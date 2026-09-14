@@ -200,6 +200,7 @@ export function App() {
   const [entries, setEntries] = useState<ActaEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [excludedTags, setExcludedTags] = useState<string[]>([]);
   const [untaggedOnly, setUntaggedOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<string>(() => formatDateYYYYMMDD(new Date()));
@@ -710,9 +711,12 @@ export function App() {
 
       if (untaggedOnly) {
         if (e.tags.length !== 0) return false;
-      } else if (selectedTags.length > 0) {
+      } else {
         for (const t of selectedTags) {
           if (!e.tags.includes(t)) return false;
+        }
+        for (const t of excludedTags) {
+          if (e.tags.includes(t)) return false;
         }
       }
 
@@ -725,7 +729,7 @@ export function App() {
         includesLoose(e.created, q)
       );
     });
-  }, [dateFilter, dateFilterMode, entries, query, selectedTags, untaggedOnly]);
+  }, [dateFilter, dateFilterMode, entries, excludedTags, query, selectedTags, untaggedOnly]);
 
   const visibleEntries = useMemo(() => {
     if (dateFilterMode !== "all") return filteredEntries;
@@ -806,17 +810,27 @@ export function App() {
 
   function clearTagFilter() {
     setSelectedTags([]);
+    setExcludedTags([]);
     setUntaggedOnly(false);
   }
 
   function toggleUntaggedFilter() {
     setSelectedTags([]);
+    setExcludedTags([]);
     setUntaggedOnly((v) => !v);
   }
 
   function toggleTagFilter(tag: string) {
     setUntaggedOnly(false);
+    setExcludedTags((prev) => prev.filter((t) => t !== tag));
     setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }
+
+  /** 除外タグの切り替え。含める側に入っていれば外す。 */
+  function toggleExcludedTagFilter(tag: string) {
+    setUntaggedOnly(false);
+    setSelectedTags((prev) => prev.filter((t) => t !== tag));
+    setExcludedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   }
 
   function highlightLinkedEntry(entryId: string) {
@@ -1461,13 +1475,13 @@ export function App() {
                   タグで絞り込む
                   <span className="journalTagFilterCount">{tagStats.length}</span>
                 </button>
-                {selectedTags.length > 0 || untaggedOnly ? (
+                {selectedTags.length > 0 || excludedTags.length > 0 || untaggedOnly ? (
                   <button className="journalTagFilterClear" type="button" onClick={() => clearTagFilter()}>
                     解除
                   </button>
                 ) : null}
               </div>
-              {selectedTags.length > 0 || untaggedOnly ? (
+              {selectedTags.length > 0 || excludedTags.length > 0 || untaggedOnly ? (
                 <div className="journalActiveTags" aria-label="選択中のタグ">
                   {untaggedOnly ? (
                     <button className="tagPill isActive" type="button" onClick={() => toggleUntaggedFilter()} title="解除">
@@ -1483,6 +1497,17 @@ export function App() {
                       title={`${tag} を解除`}
                     >
                       {tag} ×
+                    </button>
+                  ))}
+                  {excludedTags.map((tag) => (
+                    <button
+                      className="tagPill isExcluded"
+                      key={`ex-${tag}`}
+                      type="button"
+                      onClick={() => toggleExcludedTagFilter(tag)}
+                      title={`${tag} の除外を解除`}
+                    >
+                      除外 {tag} ×
                     </button>
                   ))}
                 </div>
@@ -1512,14 +1537,24 @@ export function App() {
                       <span className="journalTagPickerEmpty">該当するタグがありません</span>
                     ) : (
                       journalPickerTags.map((t) => (
-                        <button
-                          className={`tagPill${selectedTags.includes(t.tag) ? " isActive" : ""}`}
-                          key={t.tag}
-                          type="button"
-                          onClick={() => toggleTagFilter(t.tag)}
-                        >
-                          {t.tag} <small>{t.count}</small>
-                        </button>
+                        <span className="journalTagPickerItem" key={t.tag}>
+                          <button
+                            className={`tagPill${selectedTags.includes(t.tag) ? " isActive" : ""}${excludedTags.includes(t.tag) ? " isExcluded" : ""}`}
+                            type="button"
+                            onClick={() => toggleTagFilter(t.tag)}
+                          >
+                            {t.tag} <small>{t.count}</small>
+                          </button>
+                          <button
+                            className={`journalTagExclude${excludedTags.includes(t.tag) ? " isActive" : ""}`}
+                            type="button"
+                            onClick={() => toggleExcludedTagFilter(t.tag)}
+                            title={excludedTags.includes(t.tag) ? `${t.tag} の除外を解除` : `${t.tag} を除外`}
+                            aria-label={excludedTags.includes(t.tag) ? `${t.tag} の除外を解除` : `${t.tag} を除外`}
+                          >
+                            −
+                          </button>
+                        </span>
                       ))
                     )}
                   </div>

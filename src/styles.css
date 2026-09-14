@@ -6979,9 +6979,9 @@ html .sidebar .tagItem.isSelected .tagCount {
    --------------------------------------------------------------------------- */
 
 .journalTagFilterToggle {
-  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.1);
-  border-color: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.3);
-  color: var(--theme-text, var(--fg0));
+  background: var(--theme-accent, var(--accent));
+  border-color: var(--theme-accent, var(--accent));
+  color: #fff;
   font-size: 12px;
   height: 28px;
   padding: 0 12px;
@@ -6989,9 +6989,10 @@ html .sidebar .tagItem.isSelected .tagCount {
 
 .journalTagFilterToggle.isOpen,
 .journalTagFilterToggle:hover {
-  background: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.18);
-  border-color: rgba(var(--theme-accent-rgb, 37, 99, 235), 0.5);
-  color: var(--theme-text, var(--fg0));
+  background: var(--theme-accent, var(--accent));
+  border-color: var(--theme-accent, var(--accent));
+  color: #fff;
+  filter: brightness(1.1);
 }
 
 .journalTagFilterCount {
@@ -7002,7 +7003,7 @@ html .sidebar .tagItem.isSelected .tagCount {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--theme-accent, var(--accent));
+  background: rgba(255, 255, 255, 0.22);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
@@ -7048,5 +7049,54 @@ html .sidebar .tagItem.isSelected .tagCount {
 
 .journalTagPicker .tagPill.isActive small,
 .journalActiveTags .tagPill.isActive small {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ---------------------------------------------------------------------------
+   一覧のタグ絞り込み: 除外タグ
+   --------------------------------------------------------------------------- */
+
+.journalTagPickerItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.journalTagExclude {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--theme-border-soft, var(--borderSoft));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--theme-text-muted, var(--muted));
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.journalTagExclude:hover {
+  opacity: 1;
+  color: var(--theme-danger, #dc2626);
+  border-color: var(--theme-danger, #dc2626);
+}
+
+.journalTagExclude.isActive {
+  opacity: 1;
+  background: var(--theme-danger, #dc2626);
+  border-color: var(--theme-danger, #dc2626);
+  color: #fff;
+}
+
+.journalTagPicker .tagPill.isExcluded,
+.journalActiveTags .tagPill.isExcluded {
+  color: #fff !important;
+  background: var(--theme-danger, #dc2626) !important;
+  border-color: var(--theme-danger, #dc2626) !important;
+  text-decoration: line-through;
+}
+
+.journalTagPicker .tagPill.isExcluded small {
   color: rgba(255, 255, 255, 0.85);
 }
