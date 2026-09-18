@@ -1,6 +1,6 @@
 {
   "name": "acta",
-  "version": "0.2.29",
+  "version": "0.2.30",
   "private": true,
   "description": "Acta - GitHub issue style markdown log",
   "main": "electron/main.cjs",
@@ -20,15 +20,16 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
     "@types/react": "^18.2.57",
     "@types/react-dom": "^18.2.19",
-    "@vitejs/plugin-react": "^4.2.1",
+    "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
-    "electron": "^30.0.0",
-    "electron-builder": "^24.13.3",
+    "electron": "^44.4.1",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11",
+    "vite": "^8.3.0",
     "wait-on": "^7.2.0"
   },
   "build": {
@@ -49,5 +50,8 @@
         "dmg"
       ]
     }
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

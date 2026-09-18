@@ -21,7 +21,7 @@ type Props = {
 
 function isImeComposingEvent(e: React.KeyboardEvent<HTMLInputElement>): boolean {
   const nativeEvent = e.nativeEvent as KeyboardEvent & { isComposing?: boolean };
-  return Boolean(e.isComposing || nativeEvent.isComposing || nativeEvent.keyCode === 229);
+  return Boolean(nativeEvent.isComposing || nativeEvent.keyCode === 229);
 }
 
 function TagInputInner({ tags, onChangeTags, suggestions, popularSuggestions, onTabToNext }: Props) {
@@ -165,7 +165,7 @@ function TagInputInner({ tags, onChangeTags, suggestions, popularSuggestions, on
               return;
             }
             if (e.key === "Tab" && !e.shiftKey) {
-              e.preventDefault();
+              if (onTabToNext) e.preventDefault();
               commitCurrent();
               onTabToNext?.();
               return;
@@ -175,7 +175,8 @@ function TagInputInner({ tags, onChangeTags, suggestions, popularSuggestions, on
               return;
             }
           }}
-          placeholder=""
+          aria-label="タグを追加"
+          placeholder="タグを入力し Enter またはカンマで追加"
         />
       </div>
 

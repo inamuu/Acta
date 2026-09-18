@@ -123,7 +123,7 @@ function clearStoredDraft() {
 
 function isImeComposingEvent(e: React.KeyboardEvent<HTMLTextAreaElement>): boolean {
   const nativeEvent = e.nativeEvent as KeyboardEvent & { isComposing?: boolean };
-  return Boolean(e.isComposing || nativeEvent.isComposing || nativeEvent.keyCode === 229);
+  return Boolean(nativeEvent.isComposing || nativeEvent.keyCode === 229);
 }
 
 type Props = {

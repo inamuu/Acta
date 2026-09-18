@@ -3,6 +3,17 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const storage = require("./storage.cjs");
+const { resolveAssetPath, isTrustedSender } = require("./security.cjs");
+const trustedContents = new WeakMap();
+
+function handleTrusted(channel, handler) {
+  ipcMain.handle(channel, (event, ...args) => {
+    if (!isTrustedSender(event, trustedContents.get(event.sender))) {
+      throw new Error("信頼されていない画面からの操作を拒否しました");
+    }
+    return handler(event, ...args);
+  });
+}
 const iconPath = path.join(__dirname, "assets", "icon.png");
 
 protocol.registerSchemesAsPrivileged([
@@ -216,7 +227,9 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true,
+      webviewTag: false
     }
   });
 
@@ -231,7 +244,16 @@ function createWindow() {
     unsavedChangesByWebContents.delete(win.webContents.id);
   });
 
-  if (process.env.VITE_DEV_SERVER_URL) {
+  const entryUrl = !app.isPackaged && process.env.VITE_DEV_SERVER_URL
+    ? process.env.VITE_DEV_SERVER_URL
+    : pathToFileURL(path.join(__dirname, "..", "dist", "index.html")).href;
+  trustedContents.set(win.webContents, entryUrl);
+  win.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+  win.webContents.session.setPermissionCheckHandler(() => false);
+  win.webContents.on("will-attach-webview", (event) => event.preventDefault());
+  win.webContents.on("will-redirect", (event) => event.preventDefault());
+
+  if (!app.isPackaged && process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);
     win.webContents.openDevTools({ mode: "detach" });
   } else {
@@ -255,18 +277,14 @@ function createWindow() {
 }
 
 function registerAssetProtocol() {
-  protocol.handle("acta-asset", (request) => {
-    const url = new URL(request.url);
-    const rawRelativePath = decodeURIComponent(`${url.hostname}${url.pathname}`);
-    const dataDir = storage.getDataDir();
-    const filePath = path.normalize(path.join(dataDir, rawRelativePath));
-    const relative = path.relative(dataDir, filePath);
-
-    if (relative.startsWith("..") || path.isAbsolute(relative)) {
-      return new Response("Forbidden", { status: 403 });
+  protocol.handle("acta-asset", async (request) => {
+    try {
+      const filePath = await resolveAssetPath(storage.getDataDir(), request.url);
+      return await net.fetch(pathToFileURL(filePath).toString());
+    } catch (error) {
+      const status = error.code === "ENOENT" ? 404 : 403;
+      return new Response(status === 404 ? "Not found" : "Forbidden", { status });
     }
-
-    return net.fetch(pathToFileURL(filePath).toString());
   });
 }
 
@@ -277,10 +295,10 @@ app.whenReady().then(() => {
 
   registerAssetProtocol();
 
-  ipcMain.handle("acta:getDataDir", async () => storage.getDataDir());
-  ipcMain.handle("acta:getSettings", async () => storage.getSettings());
-  ipcMain.handle("acta:saveSettings", async (_event, payload) => storage.setSettings(payload));
-  ipcMain.handle("acta:chooseDataDir", async (event) => {
+  handleTrusted("acta:getDataDir", async () => storage.getDataDir());
+  handleTrusted("acta:getSettings", async () => storage.getSettings());
+  handleTrusted("acta:saveSettings", async (_event, payload) => storage.setSettings(payload));
+  handleTrusted("acta:chooseDataDir", async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     const res = await dialog.showOpenDialog(win, {
       title: "保存先フォルダを選択",
@@ -300,53 +318,54 @@ app.whenReady().then(() => {
     startDataDirWatcher();
     return { canceled: false, dataDir: storage.getDataDir() };
   });
-  ipcMain.handle("acta:listEntries", async () => storage.listEntries());
-  ipcMain.handle("acta:addEntry", async (_event, payload) => storage.addEntry(payload));
-  ipcMain.handle("acta:saveImage", async (_event, payload) => storage.saveImage(payload));
-  ipcMain.handle("acta:deleteEntry", async (_event, payload) => storage.deleteEntry(payload));
-  ipcMain.handle("acta:updateEntry", async (_event, payload) => storage.updateEntry(payload));
-  ipcMain.handle("acta:listProjects", async () => storage.listProjects());
-  ipcMain.handle("acta:setProjectOrder", async (_event, payload) => storage.setProjectOrder(payload));
-  ipcMain.handle("acta:createProject", async (_event, payload) => storage.createProject(payload));
-  ipcMain.handle("acta:saveProject", async (_event, payload) => storage.saveProject(payload));
-  ipcMain.handle("acta:addProjectTask", async (_event, payload) => storage.addProjectTask(payload));
-  ipcMain.handle("acta:moveProjectTask", async (_event, payload) => storage.moveProjectTask(payload));
-  ipcMain.handle("acta:reassignProjectTask", async (_event, payload) => storage.reassignProjectTask(payload));
-  ipcMain.handle("acta:renameProjectTask", async (_event, payload) => storage.renameProjectTask(payload));
-  ipcMain.handle("acta:deleteProjectTask", async (_event, payload) => storage.deleteProjectTask(payload));
-  ipcMain.handle("acta:setProjectArchived", async (_event, payload) => storage.setProjectArchived(payload));
-  ipcMain.handle("acta:renameProject", async (_event, payload) => storage.renameProject(payload));
-  ipcMain.handle("acta:deleteProject", async (_event, payload) => storage.deleteProject(payload));
-  ipcMain.handle("acta:setProjectIssueUrl", async (_event, payload) => storage.setProjectIssueUrl(payload));
-  ipcMain.handle("acta:addProjectKnowledgeEntry", async (_event, payload) => storage.addProjectKnowledgeEntry(payload));
-  ipcMain.handle("acta:updateProjectKnowledgeEntry", async (_event, payload) =>
+  handleTrusted("acta:listEntries", async () => storage.listEntries());
+  handleTrusted("acta:addEntry", async (_event, payload) => storage.addEntry(payload));
+  handleTrusted("acta:saveImage", async (_event, payload) => storage.saveImage(payload));
+  handleTrusted("acta:deleteEntry", async (_event, payload) => storage.deleteEntry(payload));
+  handleTrusted("acta:updateEntry", async (_event, payload) => storage.updateEntry(payload));
+  handleTrusted("acta:listProjects", async () => storage.listProjects());
+  handleTrusted("acta:setProjectOrder", async (_event, payload) => storage.setProjectOrder(payload));
+  handleTrusted("acta:createProject", async (_event, payload) => storage.createProject(payload));
+  handleTrusted("acta:saveProject", async (_event, payload) => storage.saveProject(payload));
+  handleTrusted("acta:addProjectTask", async (_event, payload) => storage.addProjectTask(payload));
+  handleTrusted("acta:moveProjectTask", async (_event, payload) => storage.moveProjectTask(payload));
+  handleTrusted("acta:reassignProjectTask", async (_event, payload) => storage.reassignProjectTask(payload));
+  handleTrusted("acta:renameProjectTask", async (_event, payload) => storage.renameProjectTask(payload));
+  handleTrusted("acta:deleteProjectTask", async (_event, payload) => storage.deleteProjectTask(payload));
+  handleTrusted("acta:setProjectArchived", async (_event, payload) => storage.setProjectArchived(payload));
+  handleTrusted("acta:renameProject", async (_event, payload) => storage.renameProject(payload));
+  handleTrusted("acta:deleteProject", async (_event, payload) => storage.deleteProject(payload));
+  handleTrusted("acta:setProjectIssueUrl", async (_event, payload) => storage.setProjectIssueUrl(payload));
+  handleTrusted("acta:addProjectKnowledgeEntry", async (_event, payload) => storage.addProjectKnowledgeEntry(payload));
+  handleTrusted("acta:updateProjectKnowledgeEntry", async (_event, payload) =>
     storage.updateProjectKnowledgeEntry(payload)
   );
-  ipcMain.handle("acta:deleteProjectKnowledgeEntry", async (_event, payload) =>
+  handleTrusted("acta:deleteProjectKnowledgeEntry", async (_event, payload) =>
     storage.deleteProjectKnowledgeEntry(payload)
   );
-  ipcMain.handle("acta:appendProjectInProgressToTodayTodo", async (_event, payload) =>
+  handleTrusted("acta:appendProjectInProgressToTodayTodo", async (_event, payload) =>
     storage.appendProjectInProgressToTodayTodo(payload)
   );
-  ipcMain.handle("acta:appendActiveProjectsInProgressToTodayTodo", async () =>
+  handleTrusted("acta:appendActiveProjectsInProgressToTodayTodo", async () =>
     storage.appendActiveProjectsInProgressToTodayTodo()
   );
-  ipcMain.handle("acta:createTodoFromProjects", async () => storage.createTodoFromProjects());
-  ipcMain.handle("acta:syncGitHubItems", async () => storage.syncGitHubItems());
-  ipcMain.handle("acta:copyPreviousTodo", async () => storage.copyPreviousTodo());
-  ipcMain.handle("acta:rebuildKnowledgeIndex", async () => storage.rebuildKnowledgeIndex());
-  ipcMain.handle("acta:searchKnowledgeIndex", async (_event, payload) => storage.searchKnowledgeIndex(payload));
-  ipcMain.handle("acta:generateKnowledgeSite", async () => storage.generateKnowledgeSite());
-  ipcMain.handle("acta:openKnowledgeSite", async () => {
+  handleTrusted("acta:createTodoFromProjects", async () => storage.createTodoFromProjects());
+  handleTrusted("acta:syncGitHubItems", async () => storage.syncGitHubItems());
+  handleTrusted("acta:copyPreviousTodo", async () => storage.copyPreviousTodo());
+  handleTrusted("acta:rebuildKnowledgeIndex", async () => storage.rebuildKnowledgeIndex());
+  handleTrusted("acta:searchKnowledgeIndex", async (_event, payload) => storage.searchKnowledgeIndex(payload));
+  handleTrusted("acta:generateKnowledgeSite", async () => storage.generateKnowledgeSite());
+  handleTrusted("acta:openKnowledgeSite", async () => {
     const sitePath = storage.getKnowledgeSitePath();
     const error = await shell.openPath(sitePath);
     return { opened: !error, path: sitePath, error: error || undefined };
   });
   ipcMain.on("acta:setUnsavedChanges", (event, dirty) => {
+    if (!isTrustedSender(event, trustedContents.get(event.sender))) return;
     unsavedChangesByWebContents.set(event.sender.id, Boolean(dirty));
   });
-  ipcMain.handle("acta:syncPull", async () => storage.syncPull());
-  ipcMain.handle("acta:syncBackup", async () => storage.syncBackup());
+  handleTrusted("acta:syncPull", async () => storage.syncPull());
+  handleTrusted("acta:syncBackup", async () => storage.syncBackup());
   createWindow();
   startDataDirWatcher();
 

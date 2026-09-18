@@ -7100,3 +7100,19 @@ html .sidebar .tagItem.isSelected .tagCount {
 .journalTagPicker .tagPill.isExcluded small {
   color: rgba(255, 255, 255, 0.85);
 }
+
+/* Settings stay readable with long folder names and keyboard navigation. */
+.settingValue {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.settingLabel { display: block; }
+.settingActions { flex-wrap: wrap; }
+.settingRow > button { flex-shrink: 0; }
+.modalHeader { position: sticky; top: 0; z-index: 1; }
+.modalCard :is(button, select):focus-visible {
+  outline: 2px solid var(--fg1);
+  outline-offset: 3px;
+}
+.tagInput { min-width: min(260px, 100%); }

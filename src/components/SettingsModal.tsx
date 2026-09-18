@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import type { ActaThemeId, SaveSettingsPayload } from "../../shared/types";
 
 const THEME_OPTIONS: Array<{ value: ActaThemeId; label: string }> = [
-  { value: "default", label: "default（現在のテーマ）" },
+  { value: "default", label: "default（標準）" },
   { value: "dracula", label: "dracula" },
   { value: "solarized-dark", label: "solarized dark" },
   { value: "solarized-light", label: "solarized light" },
@@ -22,13 +22,16 @@ type Props = {
 };
 
 export function SettingsModal({ dataDir, theme: themeProp, onChooseDataDir, onSaveSettings, onClose }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [theme, setTheme] = useState<ActaThemeId>(themeProp);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
+    return () => previous?.focus();
   }, []);
 
   useEffect(() => {
@@ -37,10 +40,29 @@ export function SettingsModal({ dataDir, theme: themeProp, onChooseDataDir, onSa
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        onClose();
+      }
+      if (e.key === "Tab") {
+        const controls = dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), select:not(:disabled), input:not(:disabled), [tabindex="0"]'
+        );
+        if (!controls?.length) return;
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (e.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || !dialogRef.current?.contains(document.activeElement))) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [onClose]);
 
   async function saveSettings() {
@@ -61,10 +83,10 @@ export function SettingsModal({ dataDir, theme: themeProp, onChooseDataDir, onSa
 
   return (
     <div className="modalOverlay" role="dialog" aria-modal="true" aria-label="設定" onMouseDown={() => onClose()}>
-      <div className="modalCard" onMouseDown={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="modalCard" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modalHeader">
           <div className="modalTitle">設定</div>
-          <button className="modalClose" ref={closeRef} type="button" onClick={() => onClose()} title="閉じる">
+          <button className="modalClose" ref={closeRef} type="button" onClick={() => onClose()} title="閉じる" aria-label="設定を閉じる">
             ×
           </button>
         </div>
@@ -81,8 +103,8 @@ export function SettingsModal({ dataDir, theme: themeProp, onChooseDataDir, onSa
           </div>
 
           <div className="settingBlock">
-            <div className="settingLabel">テーマ</div>
-            <select className="settingTextInput" value={theme} onChange={(e) => setTheme(e.target.value as ActaThemeId)}>
+            <label className="settingLabel" htmlFor="settings-theme">テーマ</label>
+            <select id="settings-theme" className="settingTextInput" value={theme} onChange={(e) => { setTheme(e.target.value as ActaThemeId); setSaveMessage(""); }}>
               {THEME_OPTIONS.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
@@ -91,10 +113,10 @@ export function SettingsModal({ dataDir, theme: themeProp, onChooseDataDir, onSa
             </select>
 
             <div className="settingActions">
-              <button className="primaryBtn" type="button" onClick={() => void saveSettings()} disabled={saving}>
-                {saving ? "保存中..." : "保存"}
+              <button className="primaryBtn" type="button" onClick={() => void saveSettings()} disabled={saving || theme === themeProp}>
+                {saving ? "保存中..." : "テーマを保存"}
               </button>
-              {saveMessage ? <div className="settingHint">{saveMessage}</div> : null}
+              <div className="settingHint" role="status" aria-live="polite">{saveMessage || (theme !== themeProp ? "テーマの変更は未保存です" : "")}</div>
             </div>
           </div>
 

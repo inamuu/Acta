@@ -40,6 +40,8 @@ Projectsの状態は`Backlog`、`InProgress`、`Done`です。ToDoに載るの�
 保存先はアプリ右上の「保存先 -> 変更」からフォルダを選択して切り替えできます。
 
 ## 開発
+Node.js 22.12 以上が必要です（推奨: Node.js 24）。
+
 ```sh
 npm install
 npm run dev

@@ -99,7 +99,7 @@ function addDays(d: Date, days: number): Date {
 
 function isImeComposingEvent(e: React.KeyboardEvent<HTMLInputElement>): boolean {
   const nativeEvent = e.nativeEvent as KeyboardEvent & { isComposing?: boolean };
-  return Boolean(e.isComposing || nativeEvent.isComposing || nativeEvent.keyCode === 229);
+  return Boolean(nativeEvent.isComposing || nativeEvent.keyCode === 229);
 }
 
 function lowerBound(list: string[], value: string): number {
@@ -195,6 +195,22 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
 
 export function App() {
   const api = window.acta;
+  if (!api) {
+    return (
+      <div className="noApi">
+        <div className="noApiCard">
+          <div className="noApiTitle">Electronで起動してください</div>
+          <div className="noApiBody">
+            `npm run dev` で起動すると、保存機能（ファイル書き込み）が有効になります。
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return <ActaApp api={api} />;
+}
+
+function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
 
   const [dataDir, setDataDir] = useState<string>("");
   const [entries, setEntries] = useState<ActaEntry[]>([]);
@@ -1345,19 +1361,6 @@ export function App() {
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp, { once: true });
     resize(e.clientY);
-  }
-
-  if (!api) {
-    return (
-      <div className="noApi">
-        <div className="noApiCard">
-          <div className="noApiTitle">Electronで起動してください</div>
-          <div className="noApiBody">
-            `npm run dev` で起動すると、保存機能（ファイル書き込み）が有効になります。
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (
