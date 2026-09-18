@@ -1370,6 +1370,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
       }`}
     >
       <header className="appHeader" title="ドラッグしてウィンドウを移動">
+        <div className="appBrand" aria-label="Acta"><span className="appBrandMark" aria-hidden="true">a</span>Acta</div>
         <nav className="appNav" aria-label="機能切り替え">
           {(
             [
@@ -1383,14 +1384,16 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
               className={`appNavItem ${activeView === item.view ? "isActive" : ""}`}
               type="button"
               title={item.hint}
+              aria-current={activeView === item.view ? "page" : undefined}
               onClick={() => switchView(item.view)}
             >
-              <span className="appNavIcon">{item.icon}</span>
+              <span className="appNavIcon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{item.view === "workspace" ? <><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16M15 4v16" /></> : item.view === "journal" ? <><path d="M5 3h11l3 3v15H5zM9 10h6M9 14h6" /></> : <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>}</svg></span>
               <span className="appNavText">{item.label}</span>
               {item.count === null ? null : <span className="appNavCount">{item.count}</span>}
             </button>
           ))}
         </nav>
+        <span className="appHeaderNote">考える、記録する、進める。</span>
       </header>
 
       {activeView === "workspace" ? null : (
@@ -1631,6 +1634,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
           >
             <section className="projectsArea">
               <aside className="projectList">
+                <div className="projectListHeading"><strong>ワークスペース</strong><span>{visibleProjects.length} プロジェクト</span></div>
                 <div className="projectCreate">
                   <input
                     className="projectInput"
@@ -1731,13 +1735,17 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                   <>
                     <div className="projectHeader">
                       <div>
+                        <div className="projectEyebrow">PROJECT OVERVIEW</div>
                         <h2>
                           {selectedProject.name}
                           {selectedProject.archivedAtMs ? <span className="projectArchivedBadge">Archived</span> : null}
                         </h2>
-                        <div className="projectPath" title={selectedProject.sourceDir}>
-                          {selectedProject.sourceDir}
+                        <div className="projectSummary">
+                          <span>{selectedProject.tasks.length} タスク</span>
+                          <span className="projectProgress" aria-hidden="true"><span style={{ width: `${selectedProject.tasks.length ? selectedProject.tasks.filter((task) => task.status === "Done").length / selectedProject.tasks.length * 100 : 0}%` }} /></span>
+                          <span>{selectedProject.tasks.filter((task) => task.status === "Done").length} 完了</span>
                         </div>
+                        {projectMetaOpen ? <div className="projectPath" title={selectedProject.sourceDir}>{selectedProject.sourceDir}</div> : null}
                         {projectMetaOpen ? (
                         <div className="projectInlineEditors">
                           <label className="projectInlineField">
@@ -1849,6 +1857,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                           <section
                             className={`kanbanColumn ${draggingTaskId ? "isDropReady" : ""}`}
                             key={status}
+                            data-status={status}
                             onDragOver={(e) => {
                               e.preventDefault();
                               e.dataTransfer.dropEffect = "move";
@@ -1859,7 +1868,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                             }}
                           >
                             <h3>
-                              <span>{status}</span>
+                              <span>{status === "InProgress" ? "In Progress" : status}</span>
                               {status === "Done" ? (
                                 <button
                                   className={`kanbanDoneToggle${showAllDone ? " isActive" : ""}`}
@@ -2427,6 +2436,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
 
       </main>
 
+      <footer className="appUtilityBar" aria-label="アプリの操作">
       {syncIndicator.label ? (
         <button
           className={`syncStatus ${
@@ -2486,6 +2496,8 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
       <button className="settingsFab" type="button" onClick={() => setSettingsOpen(true)} title="設定">
         設定
       </button>
+
+      </footer>
 
       {settingsOpen ? (
         <SettingsModal

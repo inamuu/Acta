@@ -1,0 +1,206 @@
+/* Current visual system. Loaded after legacy theme/layout rules so existing
+   themes retain their palettes while surfaces and controls share one language. */
+:root[data-acta-theme="default"] {
+  --theme-bg-color: #f7f8fa;
+  --theme-bg-gradient: none;
+  --theme-surface: #ffffff;
+  --theme-surface-alt: #f6f7f9;
+  --theme-surface-soft: #f0f2f5;
+  --theme-surface-soft-2: #e9edf0;
+  --theme-surface-selected: #e6f2ee;
+  --theme-text: #202b32;
+  --theme-text-subtle: #46545e;
+  --theme-text-muted: #687782;
+  --theme-border: #dbe1e5;
+  --theme-border-soft: #e7ebee;
+  --theme-border-strong: #cbd5db;
+  --theme-border-selected: #9dc7b8;
+  --theme-accent: #21745b;
+  --theme-accent2: #39846f;
+  --theme-accent-rgb: 33, 116, 91;
+  --theme-accent2-rgb: 57, 132, 111;
+  --theme-tag-bg: #eaf3ef;
+  --theme-tag-fg: #26634e;
+}
+[data-acta-theme] {
+  --slack-sidebar-text: var(--theme-text);
+  --slack-sidebar-muted: var(--theme-text-muted);
+  --slack-sidebar-accent: var(--theme-accent);
+  --slack-sidebar-active: var(--theme-surface-selected);
+  --slack-primary: var(--theme-accent);
+  --slack-primary-hover: var(--theme-accent2);
+  --slack-soft: var(--theme-surface-soft);
+  --slack-soft-hover: var(--theme-surface-selected);
+  --slack-soft-border: var(--theme-border-soft);
+  --slack-soft-text: var(--theme-text-subtle);
+  --slack-tag-bg: var(--theme-tag-bg);
+  --slack-tag-text: var(--theme-tag-fg);
+}
+[data-acta-theme] body,
+[data-acta-theme] .shell {
+  background: var(--theme-bg-color) !important;
+}
+[data-acta-theme] .shell .appHeader {
+  height: 64px;
+  gap: 32px;
+  background: var(--theme-surface) !important;
+  border-bottom: 1px solid var(--theme-border-soft) !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+}
+.appBrand { display: flex; align-items: center; gap: 9px; color: var(--theme-text); font-size: 20px; font-weight: 750; letter-spacing: -0.8px; }
+.appBrandMark { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 8px; background: var(--theme-accent); color: white; font-size: 18px; font-weight: 600; }
+.appHeaderNote { margin-left: auto; color: var(--theme-text-muted); font-size: 11px; letter-spacing: 0.06em; }
+[data-acta-theme] .shell .appNav { gap: 4px; }
+[data-acta-theme] .shell .appNavItem {
+  height: 36px; border-radius: 8px;
+  color: var(--theme-text-muted) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+[data-acta-theme] .shell .appNavItem :is(.appNavText, .appNavIcon) { color: inherit !important; -webkit-text-fill-color: currentColor !important; }
+[data-acta-theme] .shell .appNavItem:hover { background: var(--theme-surface-soft) !important; }
+[data-acta-theme] .shell .appNavItem.isActive { color: var(--theme-accent) !important; background: var(--theme-surface-selected) !important; }
+[data-acta-theme] .shell .appNavCount { color: inherit !important; background: var(--theme-surface-soft) !important; border: none !important; font-weight: 500; }
+.appNavIcon svg { width: 16px; height: 16px; display: block; }
+[data-acta-theme] .shell :is(.sidebar, .projectList, .todoRail) {
+  color: var(--theme-text) !important;
+  background: var(--theme-surface-alt) !important;
+  border-color: var(--theme-border-soft) !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+}
+[data-acta-theme] .shell :is(.main, .projectDetail, .composerArea, .knowledgeArea) { background: var(--theme-surface) !important; }
+.projectListHeading { display: flex; align-items: center; justify-content: space-between; padding: 6px 18px 18px; }
+.projectListHeading strong { color: var(--theme-text); font-size: 14px; font-weight: 650; }
+.projectListHeading span { color: var(--theme-text-muted); font-size: 11px; }
+[data-acta-theme] .shell .projectCreate { gap: 8px; }
+[data-acta-theme] .shell :is(input:not([type="checkbox"]), .settingTextInput, .projectTaskProjectSelect) {
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 8px;
+  box-shadow: none !important;
+}
+[data-acta-theme] .shell input::placeholder { color: var(--theme-text-muted) !important; -webkit-text-fill-color: var(--theme-text-muted) !important; opacity: 0.85; }
+[data-acta-theme] .shell :is(.primaryActionBtn, .primaryBtn, .journalNewButton) {
+  background: var(--theme-accent) !important;
+  border: 1px solid transparent !important;
+  color: #fff !important; -webkit-text-fill-color: #fff !important;
+  border-radius: 8px; box-shadow: none !important; font-weight: 600;
+  transform: none;
+}
+[data-acta-theme] .shell :is(.primaryActionBtn, .primaryBtn, .journalNewButton):hover:not(:disabled) { filter: brightness(1.08); }
+[data-acta-theme] .shell :is(.ghostBtn, .ghostLinkBtn, .segmentedBtn, .railToggleBtn, .settingsFab, .modalClose, .dangerGhostBtn) {
+  background: transparent !important; color: var(--theme-text-subtle) !important;
+  -webkit-text-fill-color: var(--theme-text-subtle) !important;
+  border: 1px solid var(--theme-border-soft) !important;
+  border-radius: 7px; box-shadow: none !important; transform: none;
+}
+[data-acta-theme] .shell :is(.ghostBtn, .ghostLinkBtn, .segmentedBtn, .railToggleBtn, .settingsFab, .modalClose):hover:not(:disabled) { background: var(--theme-surface-soft) !important; border-color: var(--theme-border) !important; }
+[data-acta-theme] .shell .dangerGhostBtn:hover:not(:disabled) { color: var(--theme-danger) !important; -webkit-text-fill-color: var(--theme-danger) !important; background: rgba(var(--theme-danger-rgb), 0.07) !important; }
+[data-acta-theme] .shell button:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+[data-acta-theme] .shell :is(.projectArchiveToggle, .journalListFilters, .segmented) { background: var(--theme-surface-soft) !important; border: none !important; border-radius: 8px; padding: 3px; box-shadow: none !important; }
+[data-acta-theme] .shell :is(.projectArchiveToggle .viewTab, .journalListFilters button) { color: var(--theme-text-muted) !important; -webkit-text-fill-color: currentColor !important; border-radius: 6px; }
+[data-acta-theme] .shell :is(.projectArchiveToggle .viewTab.isActive, .journalListFilters button.isActive, .segmentedBtn.isActive) { background: var(--theme-surface) !important; color: var(--theme-text) !important; -webkit-text-fill-color: currentColor !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; }
+[data-acta-theme] .shell :is(.projectNavItem, .journalEntryItem) { border: 1px solid transparent !important; border-radius: 9px; background: transparent !important; box-shadow: none !important; }
+[data-acta-theme] .shell :is(.projectNavItem:hover, .journalEntryItem:hover) { background: var(--theme-surface-soft) !important; }
+[data-acta-theme] .shell :is(.projectNavItem.isActive, .journalEntryItem.isActive) { background: var(--theme-surface-selected) !important; border-color: var(--theme-border-selected) !important; box-shadow: none !important; }
+[data-acta-theme] .shell .projectNavItem > span { color: var(--theme-text) !important; -webkit-text-fill-color: currentColor !important; font-weight: 600; }
+[data-acta-theme] .shell .projectNavItem > small { color: var(--theme-text-muted) !important; -webkit-text-fill-color: currentColor !important; }
+[data-acta-theme] .shell .projectDetail { padding: 28px; }
+[data-acta-theme] .shell .projectHeader { border-bottom: 1px solid var(--theme-border-soft); padding-bottom: 22px; margin-bottom: 20px; gap: 16px; }
+.projectEyebrow { color: var(--theme-accent); font-size: 10px; font-weight: 700; letter-spacing: 0.14em; margin-bottom: 8px; }
+[data-acta-theme] .shell .projectHeader h2 { font-size: 26px; font-weight: 700; letter-spacing: -0.8px; line-height: 1.35; }
+.projectSummary { margin-top: 10px; display: flex; align-items: center; gap: 12px; color: var(--theme-text-muted); font-size: 12px; }
+.projectProgress { width: 72px; height: 4px; border-radius: 9px; overflow: hidden; background: var(--theme-surface-soft-2); }
+.projectProgress span { display: block; height: 100%; background: var(--theme-accent); border-radius: inherit; }
+[data-acta-theme] .shell .projectHeaderActions { gap: 6px; }
+[data-acta-theme] .shell .projectTaskCreate { margin-bottom: 22px; gap: 10px; }
+[data-acta-theme] .shell .projectTaskCreate input { height: 40px; }
+[data-acta-theme] .shell .kanbanBoard { gap: 16px; grid-template-columns: repeat(3, minmax(200px, 1fr)); align-items: start; }
+[data-acta-theme] .shell .kanbanColumn { background: var(--theme-surface-alt) !important; border: 1px solid var(--theme-border-soft) !important; border-radius: 12px; padding: 12px; box-shadow: none !important; min-height: 200px; }
+[data-acta-theme] .shell .kanbanColumn h3 { margin: 0 0 14px; font-size: 12px; font-weight: 600; gap: 7px; }
+.kanbanColumn h3 > span:first-child { display: inline-flex; align-items: center; gap: 7px; }
+.kanbanColumn h3 > span:first-child::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--theme-text-muted); }
+.kanbanColumn[data-status="InProgress"] h3 > span:first-child::before { background: #d99b32; }
+.kanbanColumn[data-status="Done"] h3 > span:first-child::before { background: var(--theme-accent); }
+[data-acta-theme] .shell .kanbanCount { background: var(--theme-surface-soft-2) !important; color: var(--theme-text-muted) !important; font-size: 10px; }
+[data-acta-theme] .shell .kanbanCard { background: var(--theme-surface) !important; border: 1px solid var(--theme-border-soft) !important; border-radius: 9px; padding: 14px; margin-bottom: 9px; box-shadow: 0 2px 3px rgba(0,0,0,0.025) !important; }
+[data-acta-theme] .shell .kanbanCard:hover { border-color: var(--theme-border-selected) !important; box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important; transform: none; }
+[data-acta-theme] .shell .kanbanCardTitle { font-size: 13px; line-height: 1.7; font-weight: 550; }
+[data-acta-theme] .shell .kanbanCardActions { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--theme-border-soft); gap: 5px; }
+[data-acta-theme] .shell .kanbanCardActions button { font-size: 10px; padding: 3px 6px; min-height: 25px; border-color: transparent !important; }
+[data-acta-theme] .shell .kanbanMoveActions button { color: var(--theme-accent) !important; -webkit-text-fill-color: currentColor !important; }
+[data-acta-theme] .shell .todoRailHead { padding-top: 18px; }
+[data-acta-theme] .shell .todoRailMark { background: var(--theme-surface-selected) !important; color: var(--theme-accent) !important; border-radius: 7px; box-shadow: none !important; }
+[data-acta-theme] .shell :is(.todoRailBadge, .journalEntryTags span, .tagPill, .tagChip) { background: var(--theme-tag-bg) !important; color: var(--theme-tag-fg) !important; -webkit-text-fill-color: currentColor !important; border: none !important; box-shadow: none !important; border-radius: 5px; }
+[data-acta-theme] .shell .tagPill.isActive { background: var(--theme-accent) !important; color: white !important; }
+[data-acta-theme] .shell .tagPill.isExcluded { background: var(--theme-danger) !important; color: white !important; }
+[data-acta-theme] .shell :is(.commentCard, .knowledgeResult, .knowledgeResultCard) { background: var(--theme-surface) !important; border: 1px solid var(--theme-border-soft) !important; border-radius: 12px; box-shadow: none !important; }
+[data-acta-theme] .shell :is(.commentCard, .composer)::before { display: none; }
+[data-acta-theme] .shell :is(.commentHeader, .composerHeader, .paneHeader) { background: transparent !important; box-shadow: none !important; border-color: var(--theme-border-soft) !important; }
+[data-acta-theme] .shell .journalListHeader { padding-top: 24px; }
+[data-acta-theme] .shell .journalListEyebrow { color: var(--theme-accent) !important; -webkit-text-fill-color: currentColor !important; letter-spacing: 0.14em; font-size: 10px; }
+[data-acta-theme] .shell .journalListHeader h2 { color: var(--theme-text) !important; -webkit-text-fill-color: currentColor !important; font-size: 19px; }
+[data-acta-theme] .shell .journalEntryItem { margin-bottom: 6px; padding: 14px; }
+[data-acta-theme] .shell .journalEntryItem strong { font-weight: 600; color: var(--theme-text) !important; -webkit-text-fill-color: currentColor !important; }
+[data-acta-theme] .shell :is(.journalEntryExcerpt, .journalEntryItem time, .journalListCount) { color: var(--theme-text-muted) !important; -webkit-text-fill-color: currentColor !important; line-height: 1.7; }
+[data-acta-theme] .shell .journalTagFilterToggle { color: var(--theme-text-subtle); background: var(--theme-surface); border: 1px solid var(--theme-border); border-radius: 7px; }
+[data-acta-theme] .shell .journalTagFilterCount { color: var(--theme-text-muted); background: var(--theme-surface-soft); }
+[data-acta-theme] .shell :is(.composer, .composerWorkspace, .pane, .paneWrite, .panePreview) { background: var(--theme-surface) !important; border-color: var(--theme-border-soft) !important; box-shadow: none !important; }
+[data-acta-theme] .shell :is(.composerHeader, .composerTopline) { padding-top: 16px; padding-bottom: 16px; }
+[data-acta-theme] .shell .editor { line-height: 1.85; padding: 22px; }
+[data-acta-theme] .shell .preview { line-height: 1.85; }
+[data-acta-theme] .shell .empty { color: var(--theme-text-muted) !important; -webkit-text-fill-color: currentColor !important; line-height: 1.8; font-size: 12px; }
+[data-acta-theme] .shell .settingsFab { background: var(--theme-surface) !important; border-radius: 8px; height: 30px; font-size: 11px; }
+[data-acta-theme] .shell .syncStatus { border-radius: 6px; box-shadow: none !important; font-size: 10px; }
+[data-acta-theme] .shell .modalOverlay { align-items: center; justify-content: center; background: rgba(16, 26, 32, 0.3) !important; backdrop-filter: blur(5px); }
+[data-acta-theme] .shell .modalCard { width: min(560px, calc(100vw - 40px)); border-radius: 16px; border: 1px solid var(--theme-border-soft) !important; background: var(--theme-surface) !important; box-shadow: 0 24px 80px rgba(0,0,0,0.18) !important; }
+[data-acta-theme] .shell .modalHeader { padding: 20px 24px; background: var(--theme-surface) !important; }
+[data-acta-theme] .shell .modalBody { padding: 20px 24px 24px; gap: 20px; }
+[data-acta-theme] .shell .settingBlock { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0; }
+[data-acta-theme] .shell .settingValue { background: var(--theme-surface-alt) !important; border: 1px solid var(--theme-border-soft) !important; border-radius: 8px; padding: 12px; }
+[data-acta-theme] .shell :is(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--theme-accent) !important; outline-offset: 3px; }
+@media (max-width: 1100px) {
+  [data-acta-theme] .shell .projectDetail { padding: 20px; }
+  .appHeaderNote { display: none; }
+  [data-acta-theme] .shell .appHeader { gap: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-acta-theme] .shell * { animation: none !important; transition: none !important; }
+}
+
+/* A dedicated footer keeps global actions clear of the scrolling content. */
+[data-acta-theme] .shell { height: calc(100vh - 46px); max-height: calc(100vh - 46px); }
+.appUtilityBar { position: fixed; bottom: 0; left: 0; right: 0; height: 46px; z-index: 60; display: flex; align-items: center; gap: 8px; padding: 0 18px; background: var(--theme-surface); border-top: 1px solid var(--theme-border-soft); }
+[data-acta-theme] .shell .appUtilityBar :is(.settingsFab, .syncStatus) { position: static; margin: 0; }
+.appUtilityBar .syncFab { margin-left: auto !important; }
+[data-acta-theme] .shell .syncDetailPanel { bottom: 56px; }
+[data-acta-theme] .shell .projectHeader,
+[data-acta-theme] .shell .knowledgeToolbar { background: transparent !important; box-shadow: none !important; }
+[data-acta-theme] .shell .sidebar :is(.sideStat, .tagCount) { background: var(--theme-surface-soft) !important; border: 1px solid var(--theme-border-soft) !important; box-shadow: none !important; border-radius: 8px; }
+[data-acta-theme] .shell .sidebar :is(.tagGroupHeader, .tagItem) { background: transparent !important; border-color: transparent !important; box-shadow: none !important; border-radius: 8px; }
+[data-acta-theme] .shell .sidebar :is(.tagGroupHeader, .tagItem):hover,
+[data-acta-theme] .shell .sidebar .tagItem.isSelected { background: var(--theme-surface-selected) !important; }
+[data-acta-theme] .shell .sidebar :is(.tagGroupName, .tagName, .tagCount) { color: var(--theme-text-subtle) !important; -webkit-text-fill-color: currentColor !important; }
+[data-acta-theme] .shell .sidebar .tagGroupHeader::before { border-color: var(--theme-text-muted) !important; }
+[data-acta-theme] .shell .tagInputWrap { box-shadow: none !important; background: var(--theme-surface-alt) !important; border: 1px solid var(--theme-border-soft) !important; border-radius: 9px; }
+[data-acta-theme] .shell .composerModeMeta { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-acta-theme] .shell .journalEntryList { padding-right: 12px; padding-left: 12px; }
+[data-acta-theme] .shell .todoRail .commentBody h1 { font-size: 18px; }
+[data-acta-theme] { --action-text: var(--theme-bg-color); }
+[data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"] { --action-text: #fff; }
+[data-acta-theme] .shell :is(.primaryActionBtn, .primaryBtn, .journalNewButton) { color: var(--action-text) !important; -webkit-text-fill-color: var(--action-text) !important; }
+[data-acta-theme] .shell:not(.isWide) > .sidebar .tagSidebar :is(.tagGroupName, .tagName, .tagCount) {
+  color: var(--theme-text-subtle) !important;
+  -webkit-text-fill-color: var(--theme-text-subtle) !important;
+}
+@media (max-width: 1100px) {
+  [data-acta-theme] .shell .workspaceArea .kanbanBoard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+}
