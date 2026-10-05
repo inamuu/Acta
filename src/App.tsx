@@ -2458,7 +2458,19 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
       ) : null}
 
       {syncDetailOpen && syncIndicator.label ? (
-        <div className="syncDetailPanel" role="dialog" aria-label="同期の詳細">
+        <div
+          className={`syncDetailPanel ${
+            syncIndicator.kind === "error"
+              ? "isError"
+              : syncIndicator.kind === "success"
+                ? "isSuccess"
+                : syncIndicator.kind === "disabled"
+                  ? "isDisabled"
+                  : "isRunning"
+          }`}
+          role="dialog"
+          aria-label="同期の詳細"
+        >
           <div className="syncDetailHead">
             <strong>{syncIndicator.label}</strong>
             <button className="modalClose" type="button" onClick={() => setSyncDetailOpen(false)} title="閉じる">

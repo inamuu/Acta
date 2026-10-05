@@ -1137,51 +1137,147 @@ async function generateKnowledgeSite() {
   };
 }
 
+const SYNC_COMMIT_MESSAGE = "backup";
+
+async function getCurrentBranch(dir) {
+  const res = await runGitCommand(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: dir });
+  const name = res.code === 0 ? res.stdout.trim() : "";
+  return name && name !== "HEAD" ? name : "main";
+}
+
+/** upstream より先行しているコミット数。upstream 未設定などで判定できないときは null。 */
+async function countAheadOfUpstream(dir) {
+  const res = await runGitCommand(["rev-list", "--count", "@{u}..HEAD"], { cwd: dir });
+  if (res.code !== 0) return null;
+  const n = Number.parseInt(res.stdout.trim(), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * 作業ツリーの変更をすべてコミットする。
+ * Acta 以外（CLI や別の AI ツールなど）が保存先に作ったファイルも一緒に取り込み、
+ * 未コミットの変更が残ったまま pull / push が失敗しないようにする。
+ */
+async function commitAllLocalChanges(dir) {
+  const addRes = await runGitCommand(["add", "-A"], { cwd: dir });
+  if (addRes.code !== 0) {
+    return { error: buildSyncResult(false, addRes.stderr || addRes.stdout || "git add に失敗しました", "git add -A") };
+  }
+
+  const statusRes = await runGitCommand(["status", "--porcelain"], { cwd: dir });
+  if (statusRes.code !== 0) {
+    return {
+      error: buildSyncResult(
+        false,
+        statusRes.stderr || statusRes.stdout || "git status に失敗しました",
+        "git status --porcelain"
+      )
+    };
+  }
+
+  const changedFiles = statusRes.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean).length;
+  if (changedFiles === 0) return { committed: false, changedFiles: 0 };
+
+  const commitRes = await runGitCommand(["commit", "--no-gpg-sign", "-m", SYNC_COMMIT_MESSAGE], { cwd: dir });
+  if (commitRes.code !== 0) {
+    return {
+      error: buildSyncResult(
+        false,
+        commitRes.stderr || commitRes.stdout || "git commit に失敗しました",
+        `git commit --no-gpg-sign -m "${SYNC_COMMIT_MESSAGE}"`
+      )
+    };
+  }
+  return { committed: true, changedFiles };
+}
+
+/**
+ * リモートの変更を rebase で取り込む。
+ * 競合などで失敗したときは rebase を中断して元の状態に戻し、手作業での解決を促す。
+ */
+async function pullWithRebase(dir) {
+  const command = "git pull --rebase --autostash";
+  const res = await runGitCommand(["pull", "--rebase", "--autostash"], { cwd: dir });
+  if (res.code === 0) return { output: res.stdout };
+
+  await runGitCommand(["rebase", "--abort"], { cwd: dir });
+  const raw = res.stderr || res.stdout || "git pull に失敗しました";
+  const conflict = /CONFLICT|could not apply|Resolve all conflicts/i.test(raw);
+  const detail = conflict
+    ? `リモートの変更とローカルの変更が競合しました。ローカルのコミットは残っています。\n保存先で手動で git pull を実行し、競合を解決してください。\n\n${raw}`
+    : raw;
+  return { error: buildSyncResult(false, detail, command) };
+}
+
+async function pushToOrigin(dir) {
+  const branch = await getCurrentBranch(dir);
+  const command = `git push -u origin ${branch}`;
+  const res = await runGitCommand(["push", "-u", "origin", branch], { cwd: dir });
+  if (res.code !== 0) {
+    return { error: buildSyncResult(false, res.stderr || res.stdout || "git push に失敗しました", command) };
+  }
+  return { output: res.stdout || res.stderr, command };
+}
+
+function describeCommit(commitInfo) {
+  return commitInfo.committed ? `ローカルの変更 ${commitInfo.changedFiles} 件をコミットしました。` : "";
+}
+
+/**
+ * 起動時の同期。ローカルの未コミット変更を先にコミットしてから pull し、
+ * コミットした分（または以前 push できなかった分）があれば push まで行う。
+ */
+async function syncPullIn(dir) {
+  if (!(await isGitRepository(dir))) return buildSyncDisabledResult(dir);
+
+  const commitInfo = await commitAllLocalChanges(dir);
+  if (commitInfo.error) return commitInfo.error;
+
+  const pulled = await pullWithRebase(dir);
+  if (pulled.error) return pulled.error;
+
+  const ahead = await countAheadOfUpstream(dir);
+  const needsPush = commitInfo.committed || ahead === null || ahead > 0;
+  const notes = [describeCommit(commitInfo), pulled.output || "git pull 完了"].filter(Boolean);
+
+  if (!needsPush) return buildSyncResult(true, notes.join("\n"), "git pull --rebase --autostash");
+
+  const pushed = await pushToOrigin(dir);
+  if (pushed.error) return pushed.error;
+  notes.push(pushed.output || "git push 完了");
+  return buildSyncResult(true, notes.join("\n"), `git pull --rebase --autostash && ${pushed.command}`);
+}
+
+/**
+ * 保存後の同期。変更をコミットし、push が拒否されないよう先に pull してから push する。
+ */
+async function syncBackupIn(dir) {
+  if (!(await isGitRepository(dir))) return buildSyncDisabledResult(dir);
+
+  const commitInfo = await commitAllLocalChanges(dir);
+  if (commitInfo.error) return commitInfo.error;
+
+  const pulled = await pullWithRebase(dir);
+  if (pulled.error) return pulled.error;
+
+  const pushed = await pushToOrigin(dir);
+  if (pushed.error) return pushed.error;
+
+  const notes = [describeCommit(commitInfo), pushed.output || "git push 完了"].filter(Boolean);
+  return buildSyncResult(true, notes.join("\n"), pushed.command);
+}
+
 async function syncPull() {
   await ensureDataDir();
-  if (!(await isGitRepository(getDataDir()))) return buildSyncDisabledResult(getDataDir());
-  const res = await runGitCommand(["pull"]);
-  if (res.code !== 0) {
-    return buildSyncResult(false, res.stderr || res.stdout || "git pull に失敗しました", "git pull");
-  }
-  return buildSyncResult(true, res.stdout || "git pull 完了", "git pull");
+  return syncPullIn(getDataDir());
 }
 
 async function syncBackup() {
   await ensureDataDir();
-  if (!(await isGitRepository(getDataDir()))) return buildSyncDisabledResult(getDataDir());
-
-  const addRes = await runGitCommand(["add", "."]);
-  if (addRes.code !== 0) {
-    return buildSyncResult(false, addRes.stderr || addRes.stdout || "git add に失敗しました", "git add .");
-  }
-
-  const statusRes = await runGitCommand(["status", "--porcelain"]);
-  if (statusRes.code !== 0) {
-    return buildSyncResult(
-      false,
-      statusRes.stderr || statusRes.stdout || "git status に失敗しました",
-      "git status --porcelain"
-    );
-  }
-
-  if (statusRes.stdout.trim()) {
-    const commitRes = await runGitCommand(["commit", "--no-gpg-sign", "-m", "backup"]);
-    if (commitRes.code !== 0) {
-      return buildSyncResult(
-        false,
-        commitRes.stderr || commitRes.stdout || "git commit に失敗しました",
-        'git commit --no-gpg-sign -m "backup"'
-      );
-    }
-  }
-
-  const pushRes = await runGitCommand(["push", "-u", "origin", "main"]);
-  if (pushRes.code !== 0) {
-    return buildSyncResult(false, pushRes.stderr || pushRes.stdout || "git push に失敗しました", "git push -u origin main");
-  }
-
-  return buildSyncResult(true, pushRes.stdout || "git push 完了", "git push -u origin main");
+  return syncBackupIn(getDataDir());
 }
 
 function parseEntriesFromText(text, date, sourceFile) {
@@ -2461,6 +2557,8 @@ module.exports = {
   syncPull,
   syncBackup,
   _test: {
+    syncPullIn,
+    syncBackupIn,
     markerFromProjectTaskStatus,
     buildTodoBodyFromProjectGroups,
     buildNewTodayTodoBody,

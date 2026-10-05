@@ -173,6 +173,70 @@
 [data-acta-theme] .shell .appUtilityBar :is(.settingsFab, .syncStatus) { position: static; margin: 0; }
 .appUtilityBar .syncFab { margin-left: auto !important; }
 [data-acta-theme] .shell .syncDetailPanel { bottom: 56px; }
+
+/* 同期の詳細パネル
+   フッター (.appUtilityBar) 内では --theme-surface がレール用の半透明色に差し替わるため、
+   そのまま使うと背後の本文が透けて読めない。レールと同じ不透明な背景色を明示する。 */
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel {
+  width: min(560px, calc(100vw - 32px));
+  padding: 16px 18px;
+  border: 1px solid var(--rail-field-border) !important;
+  border-radius: 14px;
+  background: var(--rail-bg) !important;
+  color: var(--rail-text) !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.25) !important;
+}
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 14px 0 0 14px;
+  background: var(--rail-accent);
+}
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel.isError::before { background: #ff9b9b; }
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel.isRunning::before { background: #9fc9ff; }
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel.isDisabled::before { background: var(--rail-muted); }
+[data-acta-theme] .shell .appUtilityBar .syncDetailHead { margin-bottom: 10px; font-size: 14px; }
+[data-acta-theme] .shell .appUtilityBar .syncDetailHead strong { color: var(--rail-accent); font-weight: 700; letter-spacing: 0.02em; }
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel.isError .syncDetailHead strong { color: #ff9b9b; }
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel.isRunning .syncDetailHead strong { color: #9fc9ff; }
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel.isDisabled .syncDetailHead strong { color: var(--rail-text); }
+[data-acta-theme] .shell .appUtilityBar .syncDetailCommand {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--rail-muted) !important;
+  font-size: 11.5px;
+}
+[data-acta-theme] .shell .appUtilityBar .syncDetailBody {
+  max-height: 260px;
+  padding: 12px;
+  border: 1px solid var(--rail-line);
+  background: rgba(0, 0, 0, 0.34) !important;
+  color: var(--rail-text) !important;
+  font-size: 12px;
+  line-height: 1.6;
+}
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel.isError .syncDetailBody {
+  border-color: rgba(255, 155, 155, 0.35);
+  color: #ffd7d7 !important;
+}
+[data-acta-theme] .shell .appUtilityBar .syncDetailFoot { margin-top: 12px; color: var(--rail-muted) !important; }
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel :is(.modalClose, .ghostBtn) {
+  background: var(--rail-field) !important;
+  border: 1px solid var(--rail-field-border) !important;
+  color: var(--rail-text) !important;
+  backdrop-filter: none;
+  box-shadow: none !important;
+}
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel :is(.modalClose, .ghostBtn):hover:not(:disabled) {
+  background: var(--rail-active) !important;
+  transform: none;
+}
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel .modalClose { width: 28px; height: 28px; border-radius: 8px; font-size: 16px; line-height: 1; }
+[data-acta-theme] .shell .appUtilityBar .syncDetailPanel .ghostBtn { border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 600; }
 [data-acta-theme] .shell .projectHeader,
 [data-acta-theme] .shell .knowledgeToolbar { background: transparent !important; box-shadow: none !important; }
 [data-acta-theme] .shell .sidebar :is(.sideStat, .tagCount) { background: var(--theme-surface-soft) !important; border: 1px solid var(--theme-border-soft) !important; box-shadow: none !important; border-radius: 8px; }

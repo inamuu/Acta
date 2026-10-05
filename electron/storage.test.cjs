@@ -329,3 +329,80 @@ test("moving a task back to Backlog removes its ToDo line", () => {
   const nextBody = _test.removeProjectTasksFromTodoBody(body, "Acta", ["同期を直す"]);
   assert.equal(nextBody, "# ToDo\n- Acta\n  - [-] 別のタスク");
 });
+
+test("sync commits files created outside Acta and pushes them together", async () => {
+  const os = require("node:os");
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const { execFileSync } = require("node:child_process");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "acta-sync-flow-"));
+  const git = (cwd, ...args) => execFileSync("git", args, { cwd, stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
+  const setupUser = (cwd) => {
+    git(cwd, "config", "user.email", "acta@example.com");
+    git(cwd, "config", "user.name", "acta");
+    git(cwd, "config", "commit.gpgsign", "false");
+  };
+  try {
+    const remote = path.join(root, "remote.git");
+    const acta = path.join(root, "acta");
+    const other = path.join(root, "other");
+    git(root, "init", "-q", "--bare", "-b", "main", remote);
+
+    git(root, "clone", "-q", remote, acta);
+    setupUser(acta);
+    git(acta, "checkout", "-q", "-b", "main");
+    fs.writeFileSync(path.join(acta, "README.md"), "acta\n");
+    git(acta, "add", "-A");
+    git(acta, "commit", "-q", "-m", "init");
+    git(acta, "push", "-q", "-u", "origin", "main");
+
+    git(root, "clone", "-q", remote, other);
+    setupUser(other);
+
+    // 別ツールが Acta の保存先に未コミットのファイルを作った状態で、同時にリモートも進んでいる
+    fs.writeFileSync(path.join(acta, "by-other-ai.md"), "created by another tool\n");
+    fs.writeFileSync(path.join(other, "from-remote.md"), "pushed from another machine\n");
+    git(other, "add", "-A");
+    git(other, "commit", "-q", "-m", "remote change");
+    git(other, "push", "-q", "origin", "main");
+
+    const pullRes = await _test.syncPullIn(acta);
+    assert.equal(pullRes.ok, true, pullRes.detail);
+    assert.match(pullRes.detail, /1 件をコミット/);
+    assert.equal(git(acta, "status", "--porcelain"), "");
+    assert.ok(fs.existsSync(path.join(acta, "from-remote.md")));
+    assert.equal(git(acta, "rev-list", "--count", "origin/main..main"), "0");
+    assert.equal(git(remote, "cat-file", "-e", "main:by-other-ai.md"), "");
+
+    // バックアップ時も、push の前に pull してリモートの先行分を取り込む
+    git(other, "pull", "-q", "--rebase", "origin", "main");
+    fs.writeFileSync(path.join(other, "from-remote-2.md"), "second remote change\n");
+    git(other, "add", "-A");
+    git(other, "commit", "-q", "-m", "remote change 2");
+    git(other, "push", "-q", "origin", "main");
+    fs.writeFileSync(path.join(acta, "posts.md"), "written by acta\n");
+
+    const backupRes = await _test.syncBackupIn(acta);
+    assert.equal(backupRes.ok, true, backupRes.detail);
+    assert.ok(fs.existsSync(path.join(acta, "from-remote-2.md")));
+    assert.equal(git(acta, "rev-list", "--count", "origin/main..main"), "0");
+    assert.equal(git(remote, "cat-file", "-e", "main:posts.md"), "");
+
+    // 競合したときは rebase を中断してローカルのコミットを残し、エラーとして報告する
+    git(other, "pull", "-q", "--rebase", "origin", "main");
+    fs.writeFileSync(path.join(other, "posts.md"), "remote version\n");
+    git(other, "add", "-A");
+    git(other, "commit", "-q", "-m", "conflict");
+    git(other, "push", "-q", "origin", "main");
+    fs.writeFileSync(path.join(acta, "posts.md"), "local version\n");
+
+    const conflictRes = await _test.syncBackupIn(acta);
+    assert.equal(conflictRes.ok, false);
+    assert.match(conflictRes.detail, /競合/);
+    assert.equal(fs.readFileSync(path.join(acta, "posts.md"), "utf8"), "local version\n");
+    assert.equal(git(acta, "status", "--porcelain"), "");
+    assert.ok(!fs.existsSync(path.join(acta, ".git", "rebase-merge")));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
