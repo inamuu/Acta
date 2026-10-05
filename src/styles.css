@@ -7116,3 +7116,55 @@ html .sidebar .tagItem.isSelected .tagCount {
   outline-offset: 3px;
 }
 .tagInput { min-width: min(260px, 100%); }
+
+/* GitHub タスクの種別バッジ: Issue は緑、PR は紫で一目で区別する */
+.kanbanSourceMeta > .sourceTypeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px 1px 5px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.sourceTypeBadge svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
+.sourceTypeBadgeIssue {
+  color: #1a7f37;
+}
+
+.sourceTypeBadgePr {
+  color: #8250df;
+}
+
+/* ダーク系テーマでは明るめの色にしてコントラストを保つ */
+:is(
+    [data-acta-theme="dracula"],
+    [data-acta-theme="solarized-dark"],
+    [data-acta-theme="morokai"],
+    [data-acta-theme="tokyo-night"],
+    [data-acta-theme="nord"],
+    [data-acta-theme="gruvbox-dark"]
+  )
+  .sourceTypeBadgeIssue {
+  color: #3fb950;
+}
+
+:is(
+    [data-acta-theme="dracula"],
+    [data-acta-theme="solarized-dark"],
+    [data-acta-theme="morokai"],
+    [data-acta-theme="tokyo-night"],
+    [data-acta-theme="nord"],
+    [data-acta-theme="gruvbox-dark"]
+  )
+  .sourceTypeBadgePr {
+  color: #a371f7;
+}

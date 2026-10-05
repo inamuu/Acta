@@ -13,6 +13,7 @@ import type {
 } from "../shared/types";
 import { CommentCard } from "./components/CommentCard";
 import { Composer } from "./components/Composer";
+import { SourceTypeBadge } from "./components/SourceTypeBadge";
 import { SettingsModal } from "./components/SettingsModal";
 import { TagSidebar } from "./components/TagSidebar";
 import { installDragScroll } from "./lib/dragScroll";
@@ -1959,7 +1960,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                                       </div>
                                       {task.source === "github" ? (
                                         <div className="kanbanSourceMeta">
-                                          <span>{task.sourceType === "PullRequest" ? "PR" : task.sourceType === "Issue" ? "Issue" : "Task"}</span>
+                                          <SourceTypeBadge sourceType={task.sourceType} />
                                           {task.sourceUrl ? (
                                             <a href={task.sourceUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
                                               GitHubで開く
