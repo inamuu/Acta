@@ -132,6 +132,14 @@ function normalizeTheme(theme: string | undefined): ActaThemeId {
       return "nord";
     case "gruvbox-dark":
       return "gruvbox-dark";
+    case "github-light":
+      return "github-light";
+    case "gruvbox-light":
+      return "gruvbox-light";
+    case "catppuccin-latte":
+      return "catppuccin-latte";
+    case "tokyo-night-day":
+      return "tokyo-night-day";
     case "default":
     default:
       return "default";

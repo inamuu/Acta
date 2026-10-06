@@ -34,7 +34,11 @@ const ALLOWED_THEMES = new Set([
   "morokai-light",
   "tokyo-night",
   "nord",
-  "gruvbox-dark"
+  "gruvbox-dark",
+  "github-light",
+  "gruvbox-light",
+  "catppuccin-latte",
+  "tokyo-night-day"
 ]);
 
 function safeJsonParse(text) {

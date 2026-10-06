@@ -250,7 +250,7 @@
 [data-acta-theme] .shell .journalEntryList { padding-right: 12px; padding-left: 12px; }
 [data-acta-theme] .shell .todoRail .commentBody h1 { font-size: 18px; }
 [data-acta-theme] { --action-text: var(--theme-bg-color); }
-[data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"] { --action-text: #fff; }
+[data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"], [data-acta-theme="github-light"], [data-acta-theme="gruvbox-light"], [data-acta-theme="catppuccin-latte"], [data-acta-theme="tokyo-night-day"] { --action-text: #fff; }
 [data-acta-theme] .shell :is(.primaryActionBtn, .primaryBtn, .journalNewButton) { color: var(--action-text) !important; -webkit-text-fill-color: var(--action-text) !important; }
 [data-acta-theme] .shell:not(.isWide) > .sidebar .tagSidebar :is(.tagGroupName, .tagName, .tagCount) {
   color: var(--theme-text-subtle) !important;

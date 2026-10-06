@@ -10,7 +10,11 @@ const THEME_OPTIONS: Array<{ value: ActaThemeId; label: string }> = [
   { value: "morokai-light", label: "morokai light" },
   { value: "tokyo-night", label: "tokyo night" },
   { value: "nord", label: "nord" },
-  { value: "gruvbox-dark", label: "gruvbox dark" }
+  { value: "gruvbox-dark", label: "gruvbox dark" },
+  { value: "github-light", label: "github light" },
+  { value: "gruvbox-light", label: "gruvbox light" },
+  { value: "catppuccin-latte", label: "catppuccin latte" },
+  { value: "tokyo-night-day", label: "tokyo night day" }
 ];
 
 type Props = {

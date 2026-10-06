@@ -2839,6 +2839,170 @@ a:focus-visible {
   );
 }
 
+[data-acta-theme="github-light"] {
+  --theme-bg-color: #f6f8fa;
+  --theme-bg-gradient: linear-gradient(180deg, #f6f8fa 0%, #f3f5f8 52%, #eff2f5 100%);
+  --theme-surface: #ffffff;
+  --theme-surface-alt: #f6f8fa;
+  --theme-surface-soft: #eff2f5;
+  --theme-surface-soft-2: #e7ebef;
+  --theme-surface-selected: #ddeafc;
+  --theme-text: #1f2328;
+  --theme-text-subtle: #3d444d;
+  --theme-text-muted: #59636e;
+  --theme-border: #d1d9e0;
+  --theme-border-soft: #dfe4e9;
+  --theme-border-strong: #c3ccd5;
+  --theme-border-selected: #0969da;
+  --theme-accent: #0969da;
+  --theme-accent2: #8250df;
+  --theme-danger: #cf222e;
+  --theme-overlay: #1f2328;
+  --theme-tag-bg: #ddf4ff;
+  --theme-tag-fg: #0550ae;
+  --theme-sidebar-shell-a: rgba(9, 105, 218, 0.24);
+  --theme-sidebar-shell-b: rgba(130, 80, 223, 0.18);
+  --theme-sidebar-item-active-top: rgba(9, 105, 218, 0.34);
+  --theme-sidebar-item-active-bottom: rgba(130, 80, 223, 0.24);
+  --theme-accent-rgb: 9, 105, 218;
+  --theme-accent2-rgb: 130, 80, 223;
+  --theme-danger-rgb: 207, 34, 46;
+  --theme-shadow-rgb: 31, 35, 40;
+  --theme-shell-accent: rgba(9, 105, 218, 0.14);
+  --theme-shell-accent2: rgba(130, 80, 223, 0.1);
+  --theme-scroll-accent: rgba(9, 105, 218, 0.08);
+  --theme-scroll-accent2: rgba(130, 80, 223, 0.06);
+  --theme-card-border-gradient: linear-gradient(
+    135deg,
+    rgba(9, 105, 218, 0.32),
+    rgba(130, 80, 223, 0.24),
+    rgba(31, 35, 40, 0.12)
+  );
+}
+
+[data-acta-theme="gruvbox-light"] {
+  --theme-bg-color: #fbf1c7;
+  --theme-bg-gradient: linear-gradient(180deg, #fbf1c7 0%, #f7ebbd 52%, #f2e5b5 100%);
+  --theme-surface: #fdf6d8;
+  --theme-surface-alt: #f5ecc4;
+  --theme-surface-soft: #efe3b8;
+  --theme-surface-soft-2: #ebdbb2;
+  --theme-surface-selected: #e3d3a6;
+  --theme-text: #3c3836;
+  --theme-text-subtle: #504945;
+  --theme-text-muted: #665c54;
+  --theme-border: #d5c4a1;
+  --theme-border-soft: #e0d1aa;
+  --theme-border-strong: #bdae93;
+  --theme-border-selected: #076678;
+  --theme-accent: #076678;
+  --theme-accent2: #af3a03;
+  --theme-danger: #9d0006;
+  --theme-overlay: #282828;
+  --theme-tag-bg: #e6edd0;
+  --theme-tag-fg: #4c6b0d;
+  --theme-sidebar-shell-a: rgba(7, 102, 120, 0.24);
+  --theme-sidebar-shell-b: rgba(175, 58, 3, 0.18);
+  --theme-sidebar-item-active-top: rgba(7, 102, 120, 0.34);
+  --theme-sidebar-item-active-bottom: rgba(175, 58, 3, 0.24);
+  --theme-accent-rgb: 7, 102, 120;
+  --theme-accent2-rgb: 175, 58, 3;
+  --theme-danger-rgb: 157, 0, 6;
+  --theme-shadow-rgb: 60, 56, 54;
+  --theme-shell-accent: rgba(7, 102, 120, 0.14);
+  --theme-shell-accent2: rgba(175, 58, 3, 0.1);
+  --theme-scroll-accent: rgba(7, 102, 120, 0.08);
+  --theme-scroll-accent2: rgba(175, 58, 3, 0.06);
+  --theme-card-border-gradient: linear-gradient(
+    135deg,
+    rgba(7, 102, 120, 0.32),
+    rgba(175, 58, 3, 0.24),
+    rgba(60, 56, 54, 0.12)
+  );
+}
+
+[data-acta-theme="catppuccin-latte"] {
+  --theme-bg-color: #eff1f5;
+  --theme-bg-gradient: linear-gradient(180deg, #eff1f5 0%, #eaedf2 52%, #e6e9ef 100%);
+  --theme-surface: #fbfbfd;
+  --theme-surface-alt: #f3f4f8;
+  --theme-surface-soft: #e6e9ef;
+  --theme-surface-soft-2: #dce0e8;
+  --theme-surface-selected: #e3dcf8;
+  --theme-text: #4c4f69;
+  --theme-text-subtle: #5c5f77;
+  --theme-text-muted: #6c6f85;
+  --theme-border: #ccd0da;
+  --theme-border-soft: #dce0e8;
+  --theme-border-strong: #bcc0cc;
+  --theme-border-selected: #8839ef;
+  --theme-accent: #8839ef;
+  --theme-accent2: #1e66f5;
+  --theme-danger: #d20f39;
+  --theme-overlay: #4c4f69;
+  --theme-tag-bg: #ece3fd;
+  --theme-tag-fg: #6a24c4;
+  --theme-sidebar-shell-a: rgba(136, 57, 239, 0.24);
+  --theme-sidebar-shell-b: rgba(30, 102, 245, 0.18);
+  --theme-sidebar-item-active-top: rgba(136, 57, 239, 0.34);
+  --theme-sidebar-item-active-bottom: rgba(30, 102, 245, 0.24);
+  --theme-accent-rgb: 136, 57, 239;
+  --theme-accent2-rgb: 30, 102, 245;
+  --theme-danger-rgb: 210, 15, 57;
+  --theme-shadow-rgb: 76, 79, 105;
+  --theme-shell-accent: rgba(136, 57, 239, 0.14);
+  --theme-shell-accent2: rgba(30, 102, 245, 0.1);
+  --theme-scroll-accent: rgba(136, 57, 239, 0.08);
+  --theme-scroll-accent2: rgba(30, 102, 245, 0.06);
+  --theme-card-border-gradient: linear-gradient(
+    135deg,
+    rgba(136, 57, 239, 0.32),
+    rgba(30, 102, 245, 0.24),
+    rgba(76, 79, 105, 0.12)
+  );
+}
+
+[data-acta-theme="tokyo-night-day"] {
+  --theme-bg-color: #e1e2e7;
+  --theme-bg-gradient: linear-gradient(180deg, #e1e2e7 0%, #dcdde3 52%, #d8d9df 100%);
+  --theme-surface: #f2f2f5;
+  --theme-surface-alt: #e9e9ed;
+  --theme-surface-soft: #dfe0e6;
+  --theme-surface-soft-2: #d5d6dd;
+  --theme-surface-selected: #cfd8f2;
+  --theme-text: #343b58;
+  --theme-text-subtle: #3760bf;
+  --theme-text-muted: #5f6788;
+  --theme-border: #c4c8da;
+  --theme-border-soft: #d0d3e1;
+  --theme-border-strong: #b4b9cf;
+  --theme-border-selected: #2e7de9;
+  --theme-accent: #2e7de9;
+  --theme-accent2: #9854f1;
+  --theme-danger: #f52a65;
+  --theme-overlay: #343b58;
+  --theme-tag-bg: #dbe5f8;
+  --theme-tag-fg: #2959aa;
+  --theme-sidebar-shell-a: rgba(46, 125, 233, 0.24);
+  --theme-sidebar-shell-b: rgba(152, 84, 241, 0.18);
+  --theme-sidebar-item-active-top: rgba(46, 125, 233, 0.34);
+  --theme-sidebar-item-active-bottom: rgba(152, 84, 241, 0.24);
+  --theme-accent-rgb: 46, 125, 233;
+  --theme-accent2-rgb: 152, 84, 241;
+  --theme-danger-rgb: 245, 42, 101;
+  --theme-shadow-rgb: 52, 59, 88;
+  --theme-shell-accent: rgba(46, 125, 233, 0.14);
+  --theme-shell-accent2: rgba(152, 84, 241, 0.1);
+  --theme-scroll-accent: rgba(46, 125, 233, 0.08);
+  --theme-scroll-accent2: rgba(152, 84, 241, 0.06);
+  --theme-card-border-gradient: linear-gradient(
+    135deg,
+    rgba(46, 125, 233, 0.32),
+    rgba(152, 84, 241, 0.24),
+    rgba(52, 59, 88, 0.12)
+  );
+}
+
 [data-acta-theme="tokyo-night"] {
   --theme-bg-color: #1a1b26;
   --theme-bg-gradient: linear-gradient(180deg, #1a1b26 0%, #1d2030 52%, #202438 100%);
@@ -3497,13 +3661,13 @@ html .sidebar .tagItem.isSelected .tagCount {
 }
 
 /* Force flatter sidebar tags on light themes */
-:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"]) .sidebar .tagItem {
+:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"], [data-acta-theme="github-light"], [data-acta-theme="gruvbox-light"], [data-acta-theme="catppuccin-latte"], [data-acta-theme="tokyo-night-day"]) .sidebar .tagItem {
   background: rgba(15, 23, 42, 0.04) !important;
   border-color: rgba(15, 23, 42, 0.12) !important;
   color: var(--theme-text-subtle) !important;
 }
 
-:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"])
+:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"], [data-acta-theme="github-light"], [data-acta-theme="gruvbox-light"], [data-acta-theme="catppuccin-latte"], [data-acta-theme="tokyo-night-day"])
   .sidebar
   .tagItem:hover {
   background: rgba(var(--theme-accent-rgb), 0.1) !important;
@@ -3511,7 +3675,7 @@ html .sidebar .tagItem.isSelected .tagCount {
   color: var(--theme-text) !important;
 }
 
-:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"])
+:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"], [data-acta-theme="github-light"], [data-acta-theme="gruvbox-light"], [data-acta-theme="catppuccin-latte"], [data-acta-theme="tokyo-night-day"])
   .sidebar
   .tagItem.isSelected {
   background: rgba(var(--theme-accent-rgb), 0.16) !important;
@@ -3519,7 +3683,7 @@ html .sidebar .tagItem.isSelected .tagCount {
   color: var(--theme-text) !important;
 }
 
-:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"])
+:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"], [data-acta-theme="github-light"], [data-acta-theme="gruvbox-light"], [data-acta-theme="catppuccin-latte"], [data-acta-theme="tokyo-night-day"])
   :is(
       .viewTab,
       .viewTab:hover,
@@ -3561,7 +3725,7 @@ html .sidebar .tagItem.isSelected .tagCount {
 }
 
 /* Final semantic color layer: every screen follows the selected palette. */
-:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"]) {
+:is([data-acta-theme="default"], [data-acta-theme="solarized-light"], [data-acta-theme="morokai-light"], [data-acta-theme="github-light"], [data-acta-theme="gruvbox-light"], [data-acta-theme="catppuccin-latte"], [data-acta-theme="tokyo-night-day"]) {
   color-scheme: light;
 }
 
@@ -4478,6 +4642,22 @@ html .sidebar .tagItem.isSelected .tagCount {
 
 [data-acta-theme="morokai-light"] {
   --theme-on-accent: #fff5f9;
+}
+
+[data-acta-theme="github-light"] {
+  --theme-on-accent: #ffffff;
+}
+
+[data-acta-theme="gruvbox-light"] {
+  --theme-on-accent: #fbf1c7;
+}
+
+[data-acta-theme="catppuccin-latte"] {
+  --theme-on-accent: #ffffff;
+}
+
+[data-acta-theme="tokyo-night-day"] {
+  --theme-on-accent: #ffffff;
 }
 
 :is(
@@ -6389,6 +6569,86 @@ html .sidebar .tagItem.isSelected .tagCount {
   --slack-soft-text: #7d2450;
   --slack-tag-bg: #fbe2ee;
   --slack-tag-text: #8f1f4f;
+}
+
+[data-acta-theme="github-light"] {
+  --slack-header-start: #24292f;
+  --slack-header-end: #32383f;
+  --slack-sidebar-start: #2b3137;
+  --slack-sidebar-end: #1f2328;
+  --slack-sidebar-text: #f6f8fa;
+  --slack-sidebar-muted: #c5ccd3;
+  --slack-sidebar-accent: #54aeff;
+  --slack-sidebar-active: rgba(9, 105, 218, 0.3);
+  --slack-primary: #0969da;
+  --slack-primary-hover: #0858b8;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #eaf2fc;
+  --slack-soft-hover: #dbe9fa;
+  --slack-soft-border: #b6d3f5;
+  --slack-soft-text: #0b4a92;
+  --slack-tag-bg: #ddf4ff;
+  --slack-tag-text: #0550ae;
+}
+
+[data-acta-theme="gruvbox-light"] {
+  --slack-header-start: #3c3836;
+  --slack-header-end: #504945;
+  --slack-sidebar-start: #504945;
+  --slack-sidebar-end: #282828;
+  --slack-sidebar-text: #fbf1c7;
+  --slack-sidebar-muted: #d5c4a1;
+  --slack-sidebar-accent: #fabd2f;
+  --slack-sidebar-active: rgba(7, 102, 120, 0.3);
+  --slack-primary: #076678;
+  --slack-primary-hover: #055563;
+  --slack-primary-text: #fbf1c7;
+  --slack-soft: #eef0d2;
+  --slack-soft-hover: #e3e7c3;
+  --slack-soft-border: #c9cfa3;
+  --slack-soft-text: #3f5a10;
+  --slack-tag-bg: #e6edd0;
+  --slack-tag-text: #4c6b0d;
+}
+
+[data-acta-theme="catppuccin-latte"] {
+  --slack-header-start: #5c4a8a;
+  --slack-header-end: #7651b8;
+  --slack-sidebar-start: #5e4a91;
+  --slack-sidebar-end: #3b3556;
+  --slack-sidebar-text: #eff1f5;
+  --slack-sidebar-muted: #ccd0da;
+  --slack-sidebar-accent: #cba6f7;
+  --slack-sidebar-active: rgba(136, 57, 239, 0.3);
+  --slack-primary: #8839ef;
+  --slack-primary-hover: #7428d6;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #efe9fc;
+  --slack-soft-hover: #e4dbfa;
+  --slack-soft-border: #cbbdf2;
+  --slack-soft-text: #5a2aa0;
+  --slack-tag-bg: #ece3fd;
+  --slack-tag-text: #6a24c4;
+}
+
+[data-acta-theme="tokyo-night-day"] {
+  --slack-header-start: #2c3352;
+  --slack-header-end: #3a4370;
+  --slack-sidebar-start: #343c60;
+  --slack-sidebar-end: #1f2335;
+  --slack-sidebar-text: #e1e2e7;
+  --slack-sidebar-muted: #b4b9cf;
+  --slack-sidebar-accent: #7aa2f7;
+  --slack-sidebar-active: rgba(46, 125, 233, 0.3);
+  --slack-primary: #2e7de9;
+  --slack-primary-hover: #1f6ad6;
+  --slack-primary-text: #ffffff;
+  --slack-soft: #e3e9f7;
+  --slack-soft-hover: #d6e0f5;
+  --slack-soft-border: #b5c6ea;
+  --slack-soft-text: #2959aa;
+  --slack-tag-bg: #dbe5f8;
+  --slack-tag-text: #2959aa;
 }
 
 [data-acta-theme="tokyo-night"] {

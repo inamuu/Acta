@@ -214,7 +214,11 @@ export const ACTA_THEME_IDS = [
   "morokai-light",
   "tokyo-night",
   "nord",
-  "gruvbox-dark"
+  "gruvbox-dark",
+  "github-light",
+  "gruvbox-light",
+  "catppuccin-latte",
+  "tokyo-night-day"
 ] as const;
 
 export type ActaThemeId = (typeof ACTA_THEME_IDS)[number];
