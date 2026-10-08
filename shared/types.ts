@@ -233,6 +233,8 @@ export type GitHubSyncResult = {
   importedTasks: number;
   updatedTasks: number;
   unclassifiedItems: number;
+  /** 「未分類」プロジェクトのID。存在しなければ空文字 */
+  unclassifiedProjectId: string;
   detail: string;
   syncedAtMs: number;
 };

@@ -1135,7 +1135,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
     setProjectStatus("");
     try {
       const result = await api.syncGitHubItems();
-      await reloadProjects(selectedProjectId);
+      await reloadProjects(result.unclassifiedProjectId || selectedProjectId);
       await reload();
       queueBackupSync();
       setProjectStatus(`GitHub同期: ${result.detail}`);

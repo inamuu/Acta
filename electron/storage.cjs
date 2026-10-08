@@ -2075,6 +2075,7 @@ async function syncGitHubItems() {
     importedTasks,
     updatedTasks,
     unclassifiedItems,
+    unclassifiedProjectId: unclassifiedProject?.id || "",
     detail: [
       `${items.length}件取得`,
       `新規${importedTasks}件`,
