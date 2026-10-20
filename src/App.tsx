@@ -253,6 +253,8 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
   const [todoStatus, setTodoStatus] = useState("");
   const [todoBusy, setTodoBusy] = useState(false);
   const [todoWeekOffset, setTodoWeekOffset] = useState(0);
+  // 起動したまま日付をまたいでも「今日のToDo」が表示されるよう、今日の日付を状態で持って更新する。
+  const [todayDate, setTodayDate] = useState(() => formatDateYYYYMMDD(new Date()));
   // ToDoレールの開閉。狭いウィンドウでカンバンを広く使えるように閉じられる。
   const [todoRailOpen, setTodoRailOpen] = useState<boolean>(
     () => window.localStorage.getItem(TODO_RAIL_STORAGE_KEY) !== "closed"
@@ -608,6 +610,18 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
   }, [projects, selectedProjectId, showArchivedProjects]);
 
   useEffect(() => {
+    const refreshToday = () => setTodayDate(formatDateYYYYMMDD(new Date()));
+    const timer = window.setInterval(refreshToday, 60_000);
+    window.addEventListener("focus", refreshToday);
+    document.addEventListener("visibilitychange", refreshToday);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshToday);
+      document.removeEventListener("visibilitychange", refreshToday);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!todoStatus) return;
     const timer = window.setTimeout(() => setTodoStatus(""), 6000);
     return () => window.clearTimeout(timer);
@@ -763,14 +777,13 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
   }, [dateFilterMode, filteredEntries, limit]);
 
   const todoWeekRange = useMemo(() => {
-    const today = formatDateYYYYMMDD(new Date());
-    const endDate = addDays(new Date(`${today}T00:00:00`), todoWeekOffset * 7);
+    const endDate = addDays(new Date(`${todayDate}T00:00:00`), todoWeekOffset * 7);
     const startDate = addDays(endDate, -6);
     return {
       start: formatDateYYYYMMDD(startDate),
       end: formatDateYYYYMMDD(endDate)
     };
-  }, [todoWeekOffset]);
+  }, [todayDate, todoWeekOffset]);
 
   const todoEntries = useMemo(() => {
     return entries.filter(
@@ -1067,6 +1080,9 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
     const today = formatDateYYYYMMDD(new Date());
     const hasTodayTodo = entries.some((entry) => entry.date === today && isTodoEntry(entry));
     if (hasTodayTodo) {
+      // 既存の今日のToDoがレールに見えていない場合でも確認時に見えるようにする。
+      setTodayDate(today);
+      setTodoWeekOffset(0);
       const ok = window.confirm(
         "今日のToDoはすでにあります。有効なプロジェクトのInProgressタスクを今日のToDoへ追記しますか？"
       );
@@ -1172,6 +1188,11 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
       await api.moveProjectTask({ projectId: selectedProject.id, taskId, status });
       await reloadProjects(selectedProject.id);
       await reload();
+      // InProgress / Done への移動は今日のToDoへ反映（無ければ新規作成）されるので、今日の週へ戻して表示する。
+      if (status !== "Backlog") {
+        setTodayDate(formatDateYYYYMMDD(new Date()));
+        setTodoWeekOffset(0);
+      }
       queueBackupSync();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
