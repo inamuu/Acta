@@ -229,7 +229,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
   const [untaggedOnly, setUntaggedOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<string>(() => formatDateYYYYMMDD(new Date()));
-  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>("week");
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>("day");
   const [appError, setAppError] = useState<string>("");
   const [editing, setEditing] = useState<ActaEntry | null>(null);
   const [draft, setDraft] = useState<DraftPost | null>(null);
@@ -2290,7 +2290,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                     const entry = await api.addEntry({ body, tags });
                     setEntries((prev) => sortEntriesNewestFirst([entry, ...prev.filter((e) => e.id !== entry.id)]));
                     setDateFilter(entry.date);
-                    setDateFilterMode("week");
+                    setDateFilterMode("day");
                     setQuery("");
                     clearTagFilter();
                     setAppError("");
