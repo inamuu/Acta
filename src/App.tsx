@@ -247,6 +247,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
   const [projectTaskTitleDraft, setProjectTaskTitleDraft] = useState("");
   const [projectNameDraft, setProjectNameDraft] = useState("");
   const [projectIssueUrlDraft, setProjectIssueUrlDraft] = useState("");
+  const [projectGitHubProjectUrlDraft, setProjectGitHubProjectUrlDraft] = useState("");
   const [projectStatus, setProjectStatus] = useState("");
   const [projectMetaOpen, setProjectMetaOpen] = useState(false);
   const [projectTodoBusy, setProjectTodoBusy] = useState(false);
@@ -601,6 +602,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
     const selected = projects.find((project) => project.id === selectedProjectId);
     setProjectNameDraft(selected?.name ?? "");
     setProjectIssueUrlDraft(selected?.issueUrl ?? "");
+    setProjectGitHubProjectUrlDraft(selected?.githubProjectUrl ?? "");
   }, [projects, selectedProjectId]);
 
   useEffect(() => {
@@ -1302,6 +1304,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
       setDraft(null);
       setProjectNameDraft(project.name);
       setProjectIssueUrlDraft(project.issueUrl || "");
+      setProjectGitHubProjectUrlDraft(project.githubProjectUrl || "");
       await reload();
       await reloadProjects(project.id);
       queueBackupSync();
@@ -1342,6 +1345,27 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setProjectStatus(msg || "issueリンクの保存に失敗しました");
+    }
+  }
+
+  async function editProjectGitHubProjectUrl() {
+    if (!selectedProject) return;
+    const githubProjectUrl = projectGitHubProjectUrlDraft.trim();
+    if (githubProjectUrl === (selectedProject.githubProjectUrl || "")) return;
+    setProjectStatus("");
+    try {
+      const project = await api.setProjectGitHubProjectUrl({ projectId: selectedProject.id, githubProjectUrl });
+      setProjectGitHubProjectUrlDraft(project.githubProjectUrl || "");
+      await reloadProjects(project.id);
+      queueBackupSync();
+      setProjectStatus(
+        project.githubProjectUrl
+          ? "GitHub Projectを紐づけました。次回のGitHub同期で未分類から振り分けます"
+          : "GitHub Projectの紐づけを解除しました"
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "GitHub Projectの保存に失敗しました");
     }
   }
 
@@ -1819,6 +1843,28 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                           >
                             リンクを保存
                           </button>
+                          <label className="projectInlineField isWide">
+                            <span>GitHub Project</span>
+                            <input
+                              className="projectInlineInput"
+                              value={projectGitHubProjectUrlDraft}
+                              onChange={(e) => setProjectGitHubProjectUrlDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (isImeComposingEvent(e)) return;
+                                if (e.key === "Enter") void editProjectGitHubProjectUrl();
+                              }}
+                              placeholder="https://github.com/orgs/<org>/projects/<番号>"
+                              title="同期時、未分類のIssue・PRのうちこのGitHub Projectに属するものをこのプロジェクトへ振り分けます"
+                            />
+                          </label>
+                          <button
+                            className="ghostBtn"
+                            type="button"
+                            disabled={projectGitHubProjectUrlDraft.trim() === (selectedProject.githubProjectUrl || "")}
+                            onClick={() => void editProjectGitHubProjectUrl()}
+                          >
+                            Projectを保存
+                          </button>
                         </div>
                         ) : null}
                       </div>
@@ -1826,7 +1872,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                         <button
                           className={`ghostBtn${projectMetaOpen ? " isActive" : ""}`}
                           type="button"
-                          title="プロジェクト名・issueリンクを編集"
+                          title="プロジェクト名・issueリンク・GitHub Projectを編集"
                           onClick={() => setProjectMetaOpen((value) => !value)}
                         >
                           {projectMetaOpen ? "設定を閉じる" : "設定"}

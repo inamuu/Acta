@@ -336,6 +336,9 @@ app.whenReady().then(() => {
   handleTrusted("acta:renameProject", async (_event, payload) => storage.renameProject(payload));
   handleTrusted("acta:deleteProject", async (_event, payload) => storage.deleteProject(payload));
   handleTrusted("acta:setProjectIssueUrl", async (_event, payload) => storage.setProjectIssueUrl(payload));
+  handleTrusted("acta:setProjectGitHubProjectUrl", async (_event, payload) =>
+    storage.setProjectGitHubProjectUrl(payload)
+  );
   handleTrusted("acta:addProjectKnowledgeEntry", async (_event, payload) => storage.addProjectKnowledgeEntry(payload));
   handleTrusted("acta:updateProjectKnowledgeEntry", async (_event, payload) =>
     storage.updateProjectKnowledgeEntry(payload)

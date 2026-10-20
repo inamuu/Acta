@@ -28,6 +28,7 @@ import type {
   SaveProjectPayload,
   SetProjectArchivedPayload,
   SetProjectIssueUrlPayload,
+  SetProjectGitHubProjectUrlPayload,
   SyncResult,
   UpdateEntryPayload,
   UpdateEntryResult,
@@ -59,6 +60,7 @@ declare global {
       renameProject: (payload: RenameProjectPayload) => Promise<ActaProject>;
       deleteProject: (payload: DeleteProjectPayload) => Promise<DeleteProjectResult>;
       setProjectIssueUrl: (payload: SetProjectIssueUrlPayload) => Promise<ActaProject>;
+      setProjectGitHubProjectUrl: (payload: SetProjectGitHubProjectUrlPayload) => Promise<ActaProject>;
       addProjectKnowledgeEntry: (payload: AddProjectKnowledgePayload) => Promise<ActaProject>;
       updateProjectKnowledgeEntry: (payload: UpdateProjectKnowledgePayload) => Promise<ActaProject>;
       deleteProjectKnowledgeEntry: (payload: DeleteProjectKnowledgePayload) => Promise<ActaProject>;

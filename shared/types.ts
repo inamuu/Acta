@@ -71,6 +71,8 @@ export type ActaProject = {
   updatedAtMs: number;
   archivedAtMs: number;
   issueUrl: string;
+  /** 紐づける GitHub Project (v2) のURL。同期時に未分類の項目をこのプロジェクトへ振り分ける */
+  githubProjectUrl: string;
   tasks: ProjectTask[];
   knowledgeEntries: ActaEntry[];
   sourceDir: string;
@@ -151,6 +153,11 @@ export type DeleteProjectResult = {
 export type SetProjectIssueUrlPayload = {
   projectId: string;
   issueUrl: string;
+};
+
+export type SetProjectGitHubProjectUrlPayload = {
+  projectId: string;
+  githubProjectUrl: string;
 };
 
 export type KnowledgeIndexResult = {

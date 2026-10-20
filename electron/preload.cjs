@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld("acta", {
   renameProject: (payload) => ipcRenderer.invoke("acta:renameProject", payload),
   deleteProject: (payload) => ipcRenderer.invoke("acta:deleteProject", payload),
   setProjectIssueUrl: (payload) => ipcRenderer.invoke("acta:setProjectIssueUrl", payload),
+  setProjectGitHubProjectUrl: (payload) => ipcRenderer.invoke("acta:setProjectGitHubProjectUrl", payload),
   addProjectKnowledgeEntry: (payload) => ipcRenderer.invoke("acta:addProjectKnowledgeEntry", payload),
   updateProjectKnowledgeEntry: (payload) => ipcRenderer.invoke("acta:updateProjectKnowledgeEntry", payload),
   deleteProjectKnowledgeEntry: (payload) => ipcRenderer.invoke("acta:deleteProjectKnowledgeEntry", payload),

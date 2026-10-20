@@ -406,3 +406,16 @@ test("sync commits files created outside Acta and pushes them together", async (
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("GitHub Project URLs are normalized for matching synced items", () => {
+  assert.equal(
+    _test.normalizeGitHubProjectUrl("https://github.com/orgs/Medley-Inc/projects/292/views/1"),
+    "https://github.com/orgs/medley-inc/projects/292"
+  );
+  assert.equal(
+    _test.normalizeGitHubProjectUrl(" https://github.com/users/inamuu/projects/3 "),
+    "https://github.com/users/inamuu/projects/3"
+  );
+  assert.equal(_test.normalizeGitHubProjectUrl("https://github.com/medley-inc/job-medley/issues/1"), "");
+  assert.equal(_test.normalizeGitHubProjectUrl(""), "");
+});

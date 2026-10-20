@@ -281,6 +281,7 @@ function normalizeProject(parsed, dirName, sourceDir, knowledgeText) {
     updatedAtMs: Number(parsed?.updatedAtMs) || now,
     archivedAtMs: Number(parsed?.archivedAtMs) || 0,
     issueUrl: String(parsed?.issueUrl ?? "").trim(),
+    githubProjectUrl: normalizeGitHubProjectUrl(parsed?.githubProjectUrl),
     tasks,
     knowledgeEntries: parseProjectKnowledgeEntries(knowledgeText, knowledgePath),
     sourceDir
@@ -1617,6 +1618,7 @@ async function writeProject(project) {
     updatedAtMs: now,
     archivedAtMs: Number(project.archivedAtMs) || 0,
     issueUrl: String(project.issueUrl ?? "").trim(),
+    githubProjectUrl: normalizeGitHubProjectUrl(project.githubProjectUrl),
     tasks: (project.tasks || []).map(normalizeProjectTask).filter((task) => task.title)
   };
   await fs.promises.writeFile(path.join(sourceDir, PROJECT_FILE), JSON.stringify(next, null, 2), "utf8");
@@ -1721,6 +1723,7 @@ async function createProject(payload) {
     updatedAtMs: now,
     archivedAtMs: 0,
     issueUrl: "",
+    githubProjectUrl: "",
     tasks: [],
     knowledge: "",
     sourceDir: path.join(getProjectsDir(), dirName)
@@ -1782,6 +1785,30 @@ async function setProjectIssueUrl(payload) {
   return writeProject({
     ...project,
     issueUrl
+  });
+}
+
+/**
+ * GitHub Project (v2) のURLを比較用に正規化する。
+ * https://github.com/orgs/<org>/projects/<番号> または users/<user>/projects/<番号> 以外は空文字。
+ */
+function normalizeGitHubProjectUrl(value) {
+  const text = String(value ?? "").trim();
+  const match = text.match(/^https?:\/\/github\.com\/(orgs|users)\/([^/\s]+)\/projects\/(\d+)(?:[/?#].*)?$/i);
+  if (!match) return "";
+  return `https://github.com/${match[1].toLowerCase()}/${match[2].toLowerCase()}/projects/${match[3]}`;
+}
+
+async function setProjectGitHubProjectUrl(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const raw = String(payload?.githubProjectUrl ?? "").trim();
+  const githubProjectUrl = normalizeGitHubProjectUrl(raw);
+  if (raw && !githubProjectUrl) {
+    throw new Error("GitHub ProjectのURLは https://github.com/orgs/<org>/projects/<番号> の形式で指定してください");
+  }
+  return writeProject({
+    ...project,
+    githubProjectUrl
   });
 }
 
@@ -1968,6 +1995,35 @@ async function fetchGitHubItems() {
   return { items, complete };
 }
 
+/**
+ * Issue・PR（GraphQLのノードID）が所属する GitHub Project のURLを取得する。
+ * 返り値は ノードID → 正規化済みProject URL の配列。取得できなければ null。
+ */
+async function fetchGitHubProjectUrlsByItemId(itemIds) {
+  const result = new Map();
+  const ids = Array.from(new Set(itemIds.filter(Boolean)));
+  const projectItemsField = "projectItems(first: 20) { nodes { project { url } } }";
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const query = `query { nodes(ids: ${JSON.stringify(chunk)}) { id ` +
+      `... on Issue { ${projectItemsField} } ... on PullRequest { ${projectItemsField} } } }`;
+    const res = await runGhCommand(["api", "graphql", "-f", `query=${query}`]);
+    // 一部のノードが参照できないとエラー終了しつつ data も返るので、終了コードではなく data の有無で判定する。
+    const parsed = safeJsonParse(res.stdout);
+    const nodes = parsed?.data?.nodes;
+    if (!Array.isArray(nodes)) return null;
+    for (const node of nodes) {
+      const id = String(node?.id ?? "").trim();
+      if (!id) continue;
+      const urls = (node?.projectItems?.nodes || [])
+        .map((projectItem) => normalizeGitHubProjectUrl(projectItem?.project?.url))
+        .filter(Boolean);
+      result.set(id, urls);
+    }
+  }
+  return result;
+}
+
 async function syncGitHubItems() {
   // 対象は自分が作成した、または自分にアサインされた Open な Issue と Pull Request（Draft PR も含む）。
   const { items, complete } = await fetchGitHubItems();
@@ -1978,6 +2034,8 @@ async function syncGitHubItems() {
   let importedTasks = 0;
   let updatedTasks = 0;
   let unclassifiedItems = 0;
+  let projectLinkedItems = 0;
+  let projectLinkFailed = false;
   const seenIds = new Set();
   // 同期でToDoへ反映するタスク（プロジェクトIDごと）
   const todoTasksByProjectId = new Map();
@@ -1985,6 +2043,38 @@ async function syncGitHubItems() {
     const list = todoTasksByProjectId.get(projectId) || [];
     list.push(task);
     todoTasksByProjectId.set(projectId, list);
+  };
+
+  // GitHub Project が紐づいた Acta プロジェクト（未分類・アーカイブ済みは除く）
+  const projectByGitHubProjectUrl = new Map();
+  for (const project of projects) {
+    if (!project.githubProjectUrl || project.archivedAtMs) continue;
+    if (project.name === GITHUB_UNCLASSIFIED_PROJECT_NAME) continue;
+    if (!projectByGitHubProjectUrl.has(project.githubProjectUrl)) {
+      projectByGitHubProjectUrl.set(project.githubProjectUrl, project);
+    }
+  }
+  // 未分類に入る（入っている）項目だけ、所属する GitHub Project を問い合わせる
+  let githubProjectUrlsByItemId = new Map();
+  if (projectByGitHubProjectUrl.size > 0) {
+    const classifiedIds = new Set();
+    for (const project of projects) {
+      if (project.name === GITHUB_UNCLASSIFIED_PROJECT_NAME) continue;
+      for (const task of project.tasks) if (task.source === "github") classifiedIds.add(task.id);
+    }
+    const candidateIds = items.map((item) => String(item?.id ?? "").trim()).filter((id) => id && !classifiedIds.has(id));
+    if (candidateIds.length > 0) {
+      const fetched = await fetchGitHubProjectUrlsByItemId(candidateIds);
+      if (fetched) githubProjectUrlsByItemId = fetched;
+      else projectLinkFailed = true;
+    }
+  }
+  const findLinkedProject = (githubItemId) => {
+    for (const url of githubProjectUrlsByItemId.get(githubItemId) || []) {
+      const project = projectByGitHubProjectUrl.get(url);
+      if (project) return project;
+    }
+    return null;
   };
 
   for (const item of [...items].reverse()) {
@@ -2007,7 +2097,21 @@ async function syncGitHubItems() {
       break;
     }
 
-    // 新規の項目は自動分類せず「未分類」へ置く。どのプロジェクトに属するかは利用者がカードから選ぶ。
+    // 未分類の項目が GitHub Project を紐づけた Acta プロジェクトに属していれば、そちらへ振り分ける。
+    if (!targetProject || targetProject.name === GITHUB_UNCLASSIFIED_PROJECT_NAME) {
+      const linkedProject = findLinkedProject(githubItemId);
+      if (linkedProject) {
+        if (targetProject && previousTaskIndex >= 0) {
+          targetProject.tasks.splice(previousTaskIndex, 1);
+          touchedProjectIds.add(targetProject.id);
+        }
+        targetProject = linkedProject;
+        previousTaskIndex = -1;
+        projectLinkedItems += 1;
+      }
+    }
+
+    // それ以外の新規の項目は自動分類せず「未分類」へ置く。どのプロジェクトに属するかは利用者がカードから選ぶ。
     // 一度どこかのプロジェクトへ振り分けた項目は、次回以降の同期でもそのプロジェクトに残る。
     if (!targetProject) {
       if (!unclassifiedProject) {
@@ -2043,7 +2147,8 @@ async function syncGitHubItems() {
       }
     } else {
       targetProject.tasks.unshift(nextTask);
-      importedTasks += 1;
+      if (previousTask) updatedTasks += 1;
+      else importedTasks += 1;
       touchedProjectIds.add(targetProject.id);
       rememberTodoTask(targetProject.id, nextTask);
     }
@@ -2080,7 +2185,9 @@ async function syncGitHubItems() {
       `${items.length}件取得`,
       `新規${importedTasks}件`,
       `更新${updatedTasks}件`,
-      unclassifiedItems ? `未分類${unclassifiedItems}件（カードのプロジェクト選択で振り分け）` : ""
+      projectLinkedItems ? `GitHub Projectから振り分け${projectLinkedItems}件` : "",
+      unclassifiedItems ? `未分類${unclassifiedItems}件（カードのプロジェクト選択で振り分け）` : "",
+      projectLinkFailed ? "GitHub Projectの所属を取得できませんでした（gh auth refresh -s read:project を確認）" : ""
     ].filter(Boolean).join(" / "),
     syncedAtMs
   };
@@ -2542,6 +2649,7 @@ module.exports = {
   renameProject,
   deleteProject,
   setProjectIssueUrl,
+  setProjectGitHubProjectUrl,
   addProjectTask,
   moveProjectTask,
   reassignProjectTask,
@@ -2575,6 +2683,7 @@ module.exports = {
     githubSourceState,
     projectTaskStatusFromGitHubItem,
     githubTaskChanged,
+    normalizeGitHubProjectUrl,
     resolveGhExecutable,
     isGitRepository,
     buildSyncDisabledResult
