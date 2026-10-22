@@ -1498,6 +1498,24 @@ a:focus-visible {
   font-size: 11px;
 }
 
+.kanbanCard.isChild {
+  border-left: 3px solid var(--borderSoft);
+}
+
+.kanbanParentMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.kanbanParentSelect {
+  flex: 1;
+  max-width: none;
+}
+
 .kanbanCardActions .ghostBtn,
 .kanbanCardActions .dangerGhostBtn,
 .kanbanEditActions .ghostBtn {

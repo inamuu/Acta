@@ -19,6 +19,7 @@ import { TagSidebar } from "./components/TagSidebar";
 import { installDragScroll } from "./lib/dragScroll";
 import { markdownToHtml } from "./lib/markdown";
 import { setTaskStateOnLine, summarizeTaskStates, type TaskState } from "./lib/taskList";
+import { orderTasksAsTree, parentTaskCandidates } from "./lib/taskTree";
 
 type TagStat = { tag: string; count: number };
 type DateFilterMode = "week" | "day" | "all";
@@ -1221,6 +1222,22 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
     }
   }
 
+  async function setProjectTaskParent(taskId: string, parentId: string) {
+    if (!selectedProject) return;
+    setProjectStatus("");
+    try {
+      await api.setProjectTaskParent({ projectId: selectedProject.id, taskId, parentId });
+      await reloadProjects(selectedProject.id);
+      // 今日のToDoの並びも親子に合わせて変わるので再読み込みする。
+      await reload();
+      queueBackupSync();
+      setProjectStatus(parentId ? "親タスクを設定しました" : "親タスクを外しました");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setProjectStatus(msg || "親タスクの設定に失敗しました");
+    }
+  }
+
   function dropProjectTask(status: ProjectTaskStatus) {
     const taskId = draggingTaskId.trim();
     setDraggingTaskId("");
@@ -1967,10 +1984,11 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                                 {status === "Done" && hiddenDoneCount > 0 ? `直近${DONE_RECENT_DAYS}日の完了なし` : "タスクなし"}
                               </div>
                             ) : (
-                              visibleTasks.map((task) => (
+                              orderTasksAsTree(visibleTasks).map(({ task, depth }) => (
                                 <div
-                                  className={`kanbanCard ${draggingTaskId === task.id ? "isDragging" : ""}`}
+                                  className={`kanbanCard ${draggingTaskId === task.id ? "isDragging" : ""}${depth > 0 ? " isChild" : ""}`}
                                   key={task.id}
+                                  style={depth > 0 ? { marginLeft: Math.min(depth, 3) * 14 } : undefined}
                                   draggable={editingProjectTaskId !== task.id}
                                   onDragStart={(e) => {
                                     setDraggingTaskId(task.id);
@@ -2061,6 +2079,25 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                                           </select>
                                         </div>
                                       ) : null}
+                                      <label className="kanbanParentMeta" onClick={(e) => e.stopPropagation()}>
+                                        <span>親</span>
+                                        <select
+                                          className="kanbanProjectSelect kanbanParentSelect"
+                                          value={task.parentId || ""}
+                                          aria-label="親タスク"
+                                          onChange={(e) => {
+                                            e.stopPropagation();
+                                            void setProjectTaskParent(task.id, e.target.value);
+                                          }}
+                                        >
+                                          <option value="">なし</option>
+                                          {parentTaskCandidates(selectedProject.tasks, task).map((candidate) => (
+                                            <option key={candidate.id} value={candidate.id}>
+                                              {candidate.title}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
                                       <div className="kanbanCardActions">
                                         <span className="kanbanMoveActions" aria-label="ステータスを変更">
                                           {status !== "Backlog" ? (

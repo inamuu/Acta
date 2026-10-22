@@ -61,6 +61,8 @@ export type ProjectTask = {
   sourceType?: "Issue" | "PullRequest";
   repository?: string;
   sourceState?: "open" | "closed";
+  /** 親タスクのID（同じプロジェクトのタスク）。ToDoでは親の下に字下げして表示する */
+  parentId?: string;
 };
 
 export type ActaProject = {
@@ -109,6 +111,13 @@ export type RenameProjectTaskPayload = {
   projectId: string;
   taskId: string;
   title: string;
+};
+
+export type SetProjectTaskParentPayload = {
+  projectId: string;
+  taskId: string;
+  /** 空文字なら親を外す */
+  parentId: string;
 };
 
 export type DeleteProjectTaskPayload = {

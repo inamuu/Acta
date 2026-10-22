@@ -331,6 +331,7 @@ app.whenReady().then(() => {
   handleTrusted("acta:moveProjectTask", async (_event, payload) => storage.moveProjectTask(payload));
   handleTrusted("acta:reassignProjectTask", async (_event, payload) => storage.reassignProjectTask(payload));
   handleTrusted("acta:renameProjectTask", async (_event, payload) => storage.renameProjectTask(payload));
+  handleTrusted("acta:setProjectTaskParent", async (_event, payload) => storage.setProjectTaskParent(payload));
   handleTrusted("acta:deleteProjectTask", async (_event, payload) => storage.deleteProjectTask(payload));
   handleTrusted("acta:setProjectArchived", async (_event, payload) => storage.setProjectArchived(payload));
   handleTrusted("acta:renameProject", async (_event, payload) => storage.renameProject(payload));

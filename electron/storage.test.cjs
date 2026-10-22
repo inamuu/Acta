@@ -419,3 +419,134 @@ test("GitHub Project URLs are normalized for matching synced items", () => {
   assert.equal(_test.normalizeGitHubProjectUrl("https://github.com/medley-inc/job-medley/issues/1"), "");
   assert.equal(_test.normalizeGitHubProjectUrl(""), "");
 });
+
+test("child tasks are nested under their parent in a new ToDo", () => {
+  const body = _test.buildTodoBodyFromProjectGroups([
+    {
+      name: "Acta",
+      tasks: [
+        { id: "c", title: "孫 #3", status: "InProgress", parentId: "b" },
+        { id: "a", title: "親 #1", status: "InProgress" },
+        { id: "b", title: "子 #2", status: "InProgress", parentId: "a" },
+        { id: "d", title: "親がBacklog", status: "InProgress", parentId: "missing" }
+      ]
+    }
+  ], "ToDo");
+
+  assert.equal(
+    body,
+    [
+      "# ToDo",
+      "- Acta",
+      "  - [-] 親 #1",
+      "    - [-] 子 #2",
+      "      - [-] 孫 #3",
+      "  - [-] 親がBacklog"
+    ].join("\n")
+  );
+});
+
+const hierarchyProject = {
+  name: "Acta",
+  tasks: [
+    { id: "p", title: "親 #1", status: "InProgress" },
+    { id: "e", title: "既存の子 #2", status: "InProgress", parentId: "p" },
+    { id: "n", title: "新しい子 #5", status: "InProgress", parentId: "p" },
+    { id: "o", title: "別タスク", status: "InProgress" },
+    { id: "x", title: "親がToDoに無い子", status: "InProgress", parentId: "b" },
+    { id: "b", title: "Backlogの親", status: "Backlog" }
+  ]
+};
+
+test("a task appended to ToDo goes under its parent's children", () => {
+  const body = [
+    "# ToDo",
+    "- Acta",
+    "  - [-] 親 #1",
+    "    - [ ] 既存の子 #2",
+    "  - [-] 別タスク",
+    "- 他"
+  ].join("\n");
+  const nextBody = _test.upsertProjectTasksInTodoBody(
+    body,
+    "Acta",
+    [
+      { title: "新しい子 #5", status: "InProgress" },
+      { title: "親がToDoに無い子", status: "InProgress" }
+    ],
+    undefined,
+    _test.todoParentTitleMap(hierarchyProject)
+  );
+
+  assert.equal(
+    nextBody,
+    [
+      "# ToDo",
+      "- Acta",
+      "  - [-] 親 #1",
+      "    - [ ] 既存の子 #2",
+      "    - [-] 新しい子 #5",
+      "  - [-] 別タスク",
+      "  - [-] 親がToDoに無い子",
+      "- 他"
+    ].join("\n")
+  );
+});
+
+test("setting a parent moves the existing ToDo line with its sub lines", () => {
+  const lines = [
+    "# ToDo",
+    "- Acta",
+    "  - [-] 新しい子 #5",
+    "    - メモ",
+    "  - [-] 親 #1",
+    "  - [-] 別タスク"
+  ];
+  const next = _test.applyTodoHierarchyToLines(lines, "Acta", _test.todoParentTitleMap(hierarchyProject));
+
+  assert.deepEqual(next, [
+    "# ToDo",
+    "- Acta",
+    "  - [-] 親 #1",
+    "    - [-] 新しい子 #5",
+    "      - メモ",
+    "  - [-] 別タスク"
+  ]);
+});
+
+test("clearing a parent moves the ToDo line back to the top level", () => {
+  const lines = ["# ToDo", "- Acta", "  - [-] 親 #1", "    - [-] 別タスク", "  - [-] 最後"];
+  const next = _test.applyTodoHierarchyToLines(lines, "Acta", _test.todoParentTitleMap(hierarchyProject));
+
+  assert.deepEqual(next, ["# ToDo", "- Acta", "  - [-] 親 #1", "  - [-] 最後", "  - [-] 別タスク"]);
+});
+
+test("hand-written nesting under non-task lines is kept", () => {
+  const lines = ["# ToDo", "- Acta", "  - 打ち合わせ", "    - [-] 別タスク"];
+  const next = _test.applyTodoHierarchyToLines(lines, "Acta", _test.todoParentTitleMap(hierarchyProject));
+
+  assert.deepEqual(next, lines);
+});
+
+test("removing a parent line from ToDo lifts its children", () => {
+  const body = ["# ToDo", "- Acta", "  - [-] 親 #1", "    - [-] 子 #2", "      - [ ] 孫", "  - [-] 別"].join("\n");
+  const nextBody = _test.removeProjectTasksFromTodoBody(body, "Acta", ["親 #1"]);
+
+  assert.equal(nextBody, ["# ToDo", "- Acta", "  - [-] 子 #2", "    - [ ] 孫", "  - [-] 別"].join("\n"));
+});
+
+test("a descendant cannot become the parent", () => {
+  const tasks = [
+    { id: "a" },
+    { id: "b", parentId: "a" },
+    { id: "c", parentId: "b" }
+  ];
+  assert.equal(_test.isProjectTaskDescendant(tasks, "c", "a"), true);
+  assert.equal(_test.isProjectTaskDescendant(tasks, "a", "c"), false);
+});
+
+test("GitHub tasks are treated as changed when the parent changes", () => {
+  const task = { id: "a", title: "t", status: "Backlog", sourceUrl: "u", parentId: "p" };
+  assert.equal(_test.githubTaskChanged(task, { ...task }), false);
+  assert.equal(_test.githubTaskChanged(task, { ...task, parentId: "q" }), true);
+});

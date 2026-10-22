@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("acta", {
   moveProjectTask: (payload) => ipcRenderer.invoke("acta:moveProjectTask", payload),
   reassignProjectTask: (payload) => ipcRenderer.invoke("acta:reassignProjectTask", payload),
   renameProjectTask: (payload) => ipcRenderer.invoke("acta:renameProjectTask", payload),
+  setProjectTaskParent: (payload) => ipcRenderer.invoke("acta:setProjectTaskParent", payload),
   deleteProjectTask: (payload) => ipcRenderer.invoke("acta:deleteProjectTask", payload),
   setProjectArchived: (payload) => ipcRenderer.invoke("acta:setProjectArchived", payload),
   renameProject: (payload) => ipcRenderer.invoke("acta:renameProject", payload),

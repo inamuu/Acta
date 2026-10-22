@@ -28,6 +28,7 @@ import type {
   SaveProjectPayload,
   SetProjectArchivedPayload,
   SetProjectIssueUrlPayload,
+  SetProjectTaskParentPayload,
   SetProjectGitHubProjectUrlPayload,
   SyncResult,
   UpdateEntryPayload,
@@ -55,6 +56,7 @@ declare global {
       moveProjectTask: (payload: MoveProjectTaskPayload) => Promise<ActaProject>;
       reassignProjectTask: (payload: ReassignProjectTaskPayload) => Promise<ActaProject>;
       renameProjectTask: (payload: RenameProjectTaskPayload) => Promise<ActaProject>;
+      setProjectTaskParent: (payload: SetProjectTaskParentPayload) => Promise<ActaProject>;
       deleteProjectTask: (payload: DeleteProjectTaskPayload) => Promise<ActaProject>;
       setProjectArchived: (payload: SetProjectArchivedPayload) => Promise<ActaProject>;
       renameProject: (payload: RenameProjectPayload) => Promise<ActaProject>;

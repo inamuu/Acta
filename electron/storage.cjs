@@ -246,6 +246,7 @@ function normalizeProjectTask(task) {
     ? task.sourceType
     : undefined;
   const sourceState = ["open", "closed"].includes(task?.sourceState) ? task.sourceState : undefined;
+  const parentId = String(task?.parentId ?? "").trim();
   return {
     id,
     title,
@@ -257,7 +258,8 @@ function normalizeProjectTask(task) {
     sourceUrl: String(task?.sourceUrl ?? "").trim(),
     sourceType,
     repository: String(task?.repository ?? "").trim(),
-    sourceState
+    sourceState,
+    ...(parentId && parentId !== id ? { parentId } : {})
   };
 }
 
@@ -1877,8 +1879,10 @@ async function reassignProjectTask(payload) {
   if (!task) throw new Error("タスクが見つかりません");
   if (targetProject.tasks.some((item) => item.id === taskId)) throw new Error("移動先に同じタスクがあります");
 
-  sourceProject.tasks = sourceProject.tasks.filter((item) => item.id !== taskId);
-  targetProject.tasks.unshift({ ...task, updatedAtMs: Date.now() });
+  // 親子関係はプロジェクト内に限るので、移動するタスクの親と、それを親にしていた子の紐づけを外す
+  sourceProject.tasks = detachProjectTaskChildren(sourceProject.tasks.filter((item) => item.id !== taskId), taskId);
+  const { parentId: _parentId, ...movedTask } = task;
+  targetProject.tasks.unshift({ ...movedTask, updatedAtMs: Date.now() });
   await writeProject(sourceProject);
   return writeProject(targetProject);
 }
@@ -1900,13 +1904,63 @@ async function renameProjectTask(payload) {
   return writeProject(project);
 }
 
+/**
+ * タスクの親を設定する（parentId が空なら外す）。親は同じプロジェクトのタスクに限る。
+ * 今日のToDoにあるタスク行も親の下へ並べ直す。
+ */
+async function setProjectTaskParent(payload) {
+  const project = await getProjectById(payload?.projectId);
+  const taskId = String(payload?.taskId ?? "").trim();
+  const parentId = String(payload?.parentId ?? "").trim();
+  if (!taskId) throw new Error("taskId が不正です");
+  const task = project.tasks.find((item) => item.id === taskId);
+  if (!task) throw new Error("タスクが見つかりません");
+  if (parentId) {
+    if (parentId === taskId) throw new Error("自分自身は親にできません");
+    if (!project.tasks.some((item) => item.id === parentId)) throw new Error("親タスクが見つかりません");
+    if (isProjectTaskDescendant(project.tasks, parentId, taskId)) throw new Error("子孫のタスクは親にできません");
+  }
+  if ((task.parentId || "") === parentId) return project;
+
+  project.tasks = project.tasks.map((item) => {
+    if (item.id !== taskId) return item;
+    const { parentId: _previous, ...rest } = item;
+    return { ...rest, ...(parentId ? { parentId } : {}), updatedAtMs: Date.now() };
+  });
+  const written = await writeProject(project);
+  if (!written.archivedAtMs) await applyProjectHierarchyToTodayTodo(written);
+  return written;
+}
+
+/** candidateId のタスクが ancestorId のタスクの子孫か。 */
+function isProjectTaskDescendant(tasks, candidateId, ancestorId) {
+  const parentById = new Map(tasks.map((task) => [task.id, task.parentId || ""]));
+  const visited = new Set();
+  let current = parentById.get(candidateId) || "";
+  while (current && !visited.has(current)) {
+    if (current === ancestorId) return true;
+    visited.add(current);
+    current = parentById.get(current) || "";
+  }
+  return false;
+}
+
+/** 指定タスクを親にしている子タスクの親を外す。 */
+function detachProjectTaskChildren(tasks, parentId) {
+  return tasks.map((task) => {
+    if (task.parentId !== parentId) return task;
+    const { parentId: _previous, ...rest } = task;
+    return { ...rest, updatedAtMs: Date.now() };
+  });
+}
+
 async function deleteProjectTask(payload) {
   const project = await getProjectById(payload?.projectId);
   const taskId = String(payload?.taskId ?? "").trim();
   if (!taskId) throw new Error("taskId が不正です");
   const deletedTask = project.tasks.find((task) => task.id === taskId) || null;
   const before = project.tasks.length;
-  project.tasks = project.tasks.filter((task) => task.id !== taskId);
+  project.tasks = detachProjectTaskChildren(project.tasks.filter((task) => task.id !== taskId), taskId);
   if (project.tasks.length === before) throw new Error("タスクが見つかりません");
   const written = await writeProject(project);
   if (deletedTask) await removeProjectTasksFromTodayTodo(written, [deletedTask]);
@@ -1951,7 +2005,8 @@ function githubTaskChanged(previousTask, nextTask) {
     previousTask.sourceUrl !== nextTask.sourceUrl ||
     previousTask.sourceType !== nextTask.sourceType ||
     previousTask.repository !== nextTask.repository ||
-    previousTask.sourceState !== nextTask.sourceState;
+    previousTask.sourceState !== nextTask.sourceState ||
+    (previousTask.parentId || "") !== (nextTask.parentId || "");
 }
 
 /** 自分が「作成した」または「アサインされた」Open な Issue・PR を取得して id で統合する。 */
@@ -2135,7 +2190,9 @@ async function syncGitHubItems() {
       sourceUrl: content.sourceUrl,
       sourceType: content.sourceType,
       repository: content.repository,
-      sourceState: githubSourceState(item)
+      sourceState: githubSourceState(item),
+      // 親タスクは利用者が手動で設定するので、同期では前回の値を引き継ぐ
+      parentId: previousTask?.parentId
     });
 
     if (previousTaskIndex >= 0) {
@@ -2255,10 +2312,61 @@ function buildTodoBodyFromProjectGroups(groups, heading) {
 
 function todoLinesForProjectGroup(group) {
   const lines = [`- ${group.name}`];
-  for (const task of group.tasks) {
-    lines.push(`${TODO_NESTED_INDENT}- [${markerFromProjectTaskStatus(task.status)}] ${task.title}`);
+  for (const { task, depth } of orderTasksAsTree(group.tasks)) {
+    const indent = TODO_NESTED_INDENT.repeat(depth + 1);
+    lines.push(`${indent}- [${markerFromProjectTaskStatus(task.status)}] ${task.title}`);
   }
   return lines;
+}
+
+/**
+ * 親子関係（parentId）に沿ってタスクを並べる。親が同じ一覧に無いタスクは最上位に置く。
+ * 返り値は表示順の { task, depth } の配列（depth は最上位が 0）。
+ */
+function orderTasksAsTree(tasks) {
+  const list = tasks || [];
+  const ids = new Set(list.map((task) => task?.id).filter(Boolean));
+  const childrenByParentId = new Map();
+  const roots = [];
+  for (const task of list) {
+    const parentId = task?.parentId;
+    if (parentId && parentId !== task.id && ids.has(parentId)) {
+      const children = childrenByParentId.get(parentId) || [];
+      children.push(task);
+      childrenByParentId.set(parentId, children);
+    } else {
+      roots.push(task);
+    }
+  }
+
+  const ordered = [];
+  const visited = new Set();
+  const visit = (task, depth) => {
+    if (visited.has(task)) return;
+    visited.add(task);
+    ordered.push({ task, depth });
+    for (const child of childrenByParentId.get(task.id) || []) visit(child, depth + 1);
+  };
+  for (const task of roots) visit(task, 0);
+  // 親子が循環していて最上位から辿れないものは最上位に出す
+  for (const task of list) visit(task, 0);
+  return ordered;
+}
+
+/**
+ * ToDo上の親子関係（タスク名 → 親タスク名）。親が無いタスクは空文字。
+ * 親はタスクIDで持っているが、ToDo本文はタスク名でしか対応付けられないので名前に引き直す。
+ */
+function todoParentTitleMap(project) {
+  const tasks = project?.tasks || [];
+  const titleById = new Map(tasks.map((task) => [task.id, normalizeTodoTaskTitle(task.title)]));
+  const result = new Map();
+  for (const task of tasks) {
+    const title = normalizeTodoTaskTitle(task.title);
+    if (!title || result.has(title)) continue;
+    result.set(title, (task.parentId && titleById.get(task.parentId)) || "");
+  }
+  return result;
 }
 
 function markerFromProjectTaskStatus(status) {
@@ -2364,7 +2472,7 @@ function findProjectTodoGroup(lines, projectName) {
   return null;
 }
 
-function upsertProjectTasksInTodoBody(body, projectName, tasks, orderedProjectNames) {
+function upsertProjectTasksInTodoBody(body, projectName, tasks, orderedProjectNames, parentTitleByTitle) {
   const normalizedTasks = (tasks || [])
     .map((task) => ({
       title: normalizeTodoTaskTitle(task?.title),
@@ -2383,7 +2491,8 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks, orderedProjectNa
     if (newTasks.length === 0) return lines.join("\n").trimEnd();
     const base = lines.filter((line, index) => !(lines.length === 1 && index === 0 && line === ""));
     base.push(...todoLinesForProjectGroup({ name: projectName, tasks: newTasks }));
-    return reorderTodoGroupBlocks(base, orderedProjectNames).join("\n").trimEnd();
+    const nested = applyTodoHierarchyToLines(base, projectName, parentTitleByTitle);
+    return reorderTodoGroupBlocks(nested, orderedProjectNames).join("\n").trimEnd();
   }
 
   const titleToLine = new Map();
@@ -2419,7 +2528,108 @@ function upsertProjectTasksInTodoBody(body, projectName, tasks, orderedProjectNa
     );
   }
 
-  return reorderTodoGroupBlocks(lines, orderedProjectNames).join("\n").trimEnd();
+  const nested = applyTodoHierarchyToLines(lines, projectName, parentTitleByTitle);
+  return reorderTodoGroupBlocks(nested, orderedProjectNames).join("\n").trimEnd();
+}
+
+function todoLineIndent(line) {
+  return /^\s*/.exec(String(line ?? ""))[0];
+}
+
+/** 行の字下げを除いた先頭位置から、字下げが自分より深い行が続く範囲の終わり（子孫を含むブロックの終端）。 */
+function todoBlockEnd(lines, index, limit) {
+  const indentLength = todoLineIndent(lines[index]).length;
+  let end = index + 1;
+  while (end < limit) {
+    const line = lines[end] ?? "";
+    if (line.trim() && todoLineIndent(line).length <= indentLength) break;
+    end += 1;
+  }
+  return end;
+}
+
+function todoTaskTitleOfLine(line) {
+  const match = /^(\s*[-+*]\s*)\[([ xX\-\/rR])\](\s+)(.*?)\s*$/.exec(String(line ?? ""));
+  return match ? normalizeTodoTaskTitle(match[4]) : null;
+}
+
+/**
+ * 大カテゴリ内のタスク行を、設定された親子関係に合わせて並べ替える。
+ * 子タスクの行（とその下の行）を親タスクの行の下へ1段下げて移す。親が外れたタスクは最上位へ戻す。
+ * 親タスクの行がToDoに無い子、および利用者が手で書いたタスク以外の入れ子は動かさない。
+ */
+function applyTodoHierarchyToLines(lines, projectName, parentTitleByTitle) {
+  if (!parentTitleByTitle || parentTitleByTitle.size === 0) return lines;
+  let current = [...lines];
+
+  // 1回の移動ごとに位置を取り直す。循環などで収束しない場合に備えて回数を区切る。
+  for (let guard = 0; guard < current.length + 1; guard += 1) {
+    const group = findProjectTodoGroup(current, projectName);
+    if (!group) return current;
+
+    let move = null;
+    for (let i = group.start + 1; i < group.end && !move; i += 1) {
+      const title = todoTaskTitleOfLine(current[i]);
+      if (!title || !parentTitleByTitle.has(title)) continue;
+      const desiredParent = parentTitleByTitle.get(title);
+
+      // 今の親（自分より浅い直近の行）
+      const indentLength = todoLineIndent(current[i]).length;
+      let currentParentLine = group.start;
+      for (let j = i - 1; j > group.start; j -= 1) {
+        const line = current[j] ?? "";
+        if (line.trim() && todoLineIndent(line).length < indentLength) {
+          currentParentLine = j;
+          break;
+        }
+      }
+      const currentParent = currentParentLine === group.start ? "" : todoTaskTitleOfLine(current[currentParentLine]);
+      if (currentParent === desiredParent) continue;
+
+      const blockEnd = todoBlockEnd(current, i, group.end);
+      if (!desiredParent) {
+        // 親を外したタスク。プロジェクトのタスクの下にあるときだけ最上位へ戻す
+        if (currentParent && parentTitleByTitle.has(currentParent)) {
+          move = { from: i, to: blockEnd, parentLine: -1 };
+        }
+        continue;
+      }
+      const parentLine = findTodoTaskLine(current, group.start + 1, group.end, desiredParent);
+      // 親の行が無い、または親が自分の子孫にいる（循環）ときは動かさない
+      if (parentLine < 0 || (parentLine >= i && parentLine < blockEnd)) continue;
+      move = { from: i, to: blockEnd, parentLine };
+    }
+    if (!move) return current;
+
+    const block = current.slice(move.from, move.to);
+    const baseIndentLength = todoLineIndent(block[0]).length;
+    const rest = [...current.slice(0, move.from), ...current.slice(move.to)];
+    const restGroup = findProjectTodoGroup(rest, projectName);
+    let insertAt;
+    let newIndent;
+    if (move.parentLine >= 0) {
+      const parentLine = move.parentLine < move.from ? move.parentLine : move.parentLine - block.length;
+      insertAt = todoBlockEnd(rest, parentLine, restGroup.end);
+      newIndent = `${todoLineIndent(rest[parentLine])}${TODO_NESTED_INDENT}`;
+    } else {
+      insertAt = restGroup.end;
+      newIndent = TODO_NESTED_INDENT;
+    }
+    const reindented = block.map((line) =>
+      line.trim() ? `${newIndent}${line.slice(Math.min(baseIndentLength, todoLineIndent(line).length))}` : line
+    );
+    current = [...rest.slice(0, insertAt), ...reindented, ...rest.slice(insertAt)];
+  }
+  return current;
+}
+
+/** ToDo本文の [start, end) から指定タイトルのチェックボックス行を探す。無ければ -1。 */
+function findTodoTaskLine(lines, start, end, title) {
+  for (let i = Math.max(0, start); i < end; i += 1) {
+    const match = /^(\s*[-+*]\s*)\[([ xX\-\/rR])\](\s+)(.*?)\s*$/.exec(lines[i] ?? "");
+    if (match && normalizeTodoTaskTitle(match[4]) === title) return i;
+  }
+  return -1;
 }
 
 /** 削除されたタスク行をToDoから消す。空になった大カテゴリの見出しも消す。 */
@@ -2433,13 +2643,23 @@ function removeProjectTasksFromTodoBody(body, projectName, titles) {
   const group = findProjectTodoGroup(lines, projectName);
   if (!group) return lines.join("\n").trimEnd();
 
+  const groupLines = lines.slice(group.start + 1, group.end);
   const kept = [];
   let removed = 0;
-  for (let i = group.start + 1; i < group.end; i += 1) {
-    const line = lines[i] ?? "";
+  for (let i = 0; i < groupLines.length; i += 1) {
+    const line = groupLines[i] ?? "";
     const match = /^(\s*[-+*]\s*)\[([ xX\-\/rR])\](\s+)(.*?)\s*$/.exec(line);
     if (match && targets.has(normalizeTodoTaskTitle(match[4]))) {
       removed += 1;
+      // 消した行の下にある子の行は、消した行の深さまで字下げを戻す
+      const end = todoBlockEnd(groupLines, i, groupLines.length);
+      if (end > i + 1) {
+        const shift = todoLineIndent(groupLines[i + 1]).length - todoLineIndent(line).length;
+        for (let j = i + 1; j < end; j += 1) {
+          const child = groupLines[j] ?? "";
+          groupLines[j] = child.slice(Math.max(0, Math.min(shift, todoLineIndent(child).length)));
+        }
+      }
       continue;
     }
     kept.push(line);
@@ -2500,7 +2720,7 @@ function buildNewTodayTodoBody(projects, project, tasks) {
   const body = buildTodoBodyFromProjectGroups(groups, todoHeading());
   if (!project || !tasks?.length) return body;
   const orderedNames = (projects || []).map((item) => item.name);
-  return upsertProjectTasksInTodoBody(body, project.name, tasks, orderedNames);
+  return upsertProjectTasksInTodoBody(body, project.name, tasks, orderedNames, todoParentTitleMap(project));
 }
 
 async function upsertProjectTasksToTodayTodo(project, tasks) {
@@ -2517,7 +2737,8 @@ async function upsertProjectTasksToTodayTodo(project, tasks) {
     current.body,
     project.name,
     targetTasks,
-    projects.map((item) => item.name)
+    projects.map((item) => item.name),
+    todoParentTitleMap(project)
   );
   if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
 
@@ -2546,7 +2767,7 @@ async function reflectSyncedTasksToTodayTodo(projects, tasksByProjectId) {
       .filter((task) => task?.title && (task.status === "InProgress" || task.status === "Done"))
       .map((task) => ({ ...task, existingOnly: task.status === "Done" }));
     if (tasks.length === 0) continue;
-    nextBody = upsertProjectTasksInTodoBody(nextBody, project.name, tasks, orderedNames);
+    nextBody = upsertProjectTasksInTodoBody(nextBody, project.name, tasks, orderedNames, todoParentTitleMap(project));
   }
   if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
 
@@ -2554,6 +2775,20 @@ async function reflectSyncedTasksToTodayTodo(projects, tasksByProjectId) {
   const res = await updateEntry({ id: current.id, body: nextBody, tags });
   if (!res.updated) throw new Error("今日のToDo更新に失敗しました");
   return { ...current, body: nextBody, tags };
+}
+
+/** プロジェクトの親子関係を今日のToDoに反映する。ToDoが無ければ何もしない。 */
+async function applyProjectHierarchyToTodayTodo(project) {
+  const current = await findTodayTodoEntry();
+  if (!current) return null;
+
+  const lines = normalizeNewlines(String(current.body ?? "")).trimEnd().split("\n");
+  const nextBody = applyTodoHierarchyToLines(lines, project.name, todoParentTitleMap(project)).join("\n").trimEnd();
+  if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
+
+  const res = await updateEntry({ id: current.id, body: nextBody, tags: current.tags });
+  if (!res.updated) throw new Error("今日のToDo更新に失敗しました");
+  return { ...current, body: nextBody };
 }
 
 /** 削除・移動で不要になったタスクを今日のToDoから消す。ToDoが無ければ何もしない。 */
@@ -2595,7 +2830,8 @@ async function appendActiveProjectsInProgressToTodayTodo() {
 
   const orderedNames = projects.map((project) => project.name);
   const nextBody = groups.reduce(
-    (body, { project, tasks }) => upsertProjectTasksInTodoBody(body, project.name, tasks, orderedNames),
+    (body, { project, tasks }) =>
+      upsertProjectTasksInTodoBody(body, project.name, tasks, orderedNames, todoParentTitleMap(project)),
     current.body
   );
   if (nextBody === current.body.trimEnd()) return { ...current, body: nextBody };
@@ -2654,6 +2890,7 @@ module.exports = {
   moveProjectTask,
   reassignProjectTask,
   renameProjectTask,
+  setProjectTaskParent,
   deleteProjectTask,
   addProjectKnowledgeEntry,
   updateProjectKnowledgeEntry,
@@ -2676,6 +2913,11 @@ module.exports = {
     buildTodoBodyFromProjectGroups,
     buildNewTodayTodoBody,
     upsertProjectTasksInTodoBody,
+    orderTasksAsTree,
+    applyTodoHierarchyToLines,
+    todoParentTitleMap,
+    removeProjectTasksFromTodoBody,
+    isProjectTaskDescendant,
     reorderTodoGroupBlocks,
     removeProjectTasksFromTodoBody,
     isTodoTrackedStatus,
