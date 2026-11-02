@@ -550,3 +550,13 @@ test("GitHub tasks are treated as changed when the parent changes", () => {
   assert.equal(_test.githubTaskChanged(task, { ...task }), false);
   assert.equal(_test.githubTaskChanged(task, { ...task, parentId: "q" }), true);
 });
+
+test("unmerged closed PRs and not-planned issues are discarded, not completed", () => {
+  assert.equal(_test.isDiscardedGitHubNode({ id: "PR_1", state: "CLOSED" }), true);
+  assert.equal(_test.isDiscardedGitHubNode({ id: "PR_2", state: "MERGED" }), false);
+  assert.equal(_test.isDiscardedGitHubNode({ id: "I_1", state: "CLOSED", stateReason: "NOT_PLANNED" }), true);
+  assert.equal(_test.isDiscardedGitHubNode({ id: "I_2", state: "CLOSED", stateReason: "DUPLICATE" }), true);
+  assert.equal(_test.isDiscardedGitHubNode({ id: "I_3", state: "CLOSED", stateReason: "COMPLETED" }), false);
+  assert.equal(_test.isDiscardedGitHubNode({ id: "I_4", state: "CLOSED", stateReason: null }), false);
+  assert.equal(_test.isDiscardedGitHubNode({ id: "I_5", state: "OPEN", stateReason: null }), false);
+});

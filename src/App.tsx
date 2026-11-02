@@ -1273,9 +1273,11 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
     }
   }
 
-  async function deleteProjectTask(taskId: string, title: string) {
+  async function deleteProjectTask(taskId: string, title: string, openOnGitHub = false) {
     if (!selectedProject) return;
-    const ok = window.confirm(`タスク「${title}」を削除しますか？`);
+    // Open な GitHub 項目は次回の同期で再び取り込まれる。
+    const note = openOnGitHub ? "\nGitHub 上で Open のままなので、次回の同期で再び取り込まれます。" : "";
+    const ok = window.confirm(`タスク「${title}」を削除しますか？${note}`);
     if (!ok) return;
     setProjectStatus("");
     try {
@@ -2141,29 +2143,27 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                                           ) : null}
                                         </span>
                                         {task.source !== "github" ? (
-                                          <>
-                                            <button
-                                              className="ghostBtn"
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                startProjectTaskEdit(task.id, task.title);
-                                              }}
-                                            >
-                                              編集
-                                            </button>
-                                            <button
-                                              className="dangerGhostBtn"
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                void deleteProjectTask(task.id, task.title);
-                                              }}
-                                            >
-                                              削除
-                                            </button>
-                                          </>
+                                          <button
+                                            className="ghostBtn"
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              startProjectTaskEdit(task.id, task.title);
+                                            }}
+                                          >
+                                            編集
+                                          </button>
                                         ) : null}
+                                        <button
+                                          className="dangerGhostBtn"
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void deleteProjectTask(task.id, task.title, task.source === "github");
+                                          }}
+                                        >
+                                          削除
+                                        </button>
                                       </div>
                                     </>
                                   )}

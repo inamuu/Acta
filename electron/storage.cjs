@@ -2079,6 +2079,35 @@ async function fetchGitHubProjectUrlsByItemId(itemIds) {
   return result;
 }
 
+/**
+ * マージせずクローズした PR、Not planned / Duplicate でクローズした Issue のノードIDを返す。
+ * 取得できなかった項目は含めない（従来どおり完了扱いになる）。
+ */
+async function fetchDiscardedGitHubItemIds(itemIds) {
+  const result = new Set();
+  const ids = Array.from(new Set(itemIds.filter(Boolean)));
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const query = `query { nodes(ids: ${JSON.stringify(chunk)}) { id ` +
+      "... on Issue { state stateReason } ... on PullRequest { state } } }";
+    const res = await runGhCommand(["api", "graphql", "-f", `query=${query}`]);
+    const nodes = safeJsonParse(res.stdout)?.data?.nodes;
+    if (!Array.isArray(nodes)) continue;
+    for (const node of nodes) {
+      const id = String(node?.id ?? "").trim();
+      if (id && isDiscardedGitHubNode(node)) result.add(id);
+    }
+  }
+  return result;
+}
+
+function isDiscardedGitHubNode(node) {
+  if (node?.state !== "CLOSED") return false;
+  // PR は stateReason を持たないので、CLOSED（MERGED ではない）なら未マージでクローズ
+  if (!("stateReason" in node)) return true;
+  return node.stateReason === "NOT_PLANNED" || node.stateReason === "DUPLICATE";
+}
+
 async function syncGitHubItems() {
   // 対象は自分が作成した、または自分にアサインされた Open な Issue と Pull Request（Draft PR も含む）。
   const { items, complete } = await fetchGitHubItems();
@@ -2094,6 +2123,8 @@ async function syncGitHubItems() {
   const seenIds = new Set();
   // 同期でToDoへ反映するタスク（プロジェクトIDごと）
   const todoTasksByProjectId = new Map();
+  // 未完了のままクローズされ、ToDo から消すタスク（[project, tasks]）
+  const discardedTasksByProject = [];
   const rememberTodoTask = (projectId, task) => {
     const list = todoTasksByProjectId.get(projectId) || [];
     list.push(task);
@@ -2213,14 +2244,23 @@ async function syncGitHubItems() {
 
   // 取得が上限に達していない（全件そろっている）ときだけ、消えた項目をクローズ済みとして扱う
   if (complete) {
+    const vanishedIds = projects.flatMap((project) =>
+      project.tasks.filter((task) => task.source === "github" && !seenIds.has(task.id)).map((task) => task.id)
+    );
+    const discardedIds = vanishedIds.length > 0 ? await fetchDiscardedGitHubItemIds(vanishedIds) : new Set();
     for (const project of projects) {
       const before = project.tasks.length;
       const removed = project.tasks.filter((task) => task.source === "github" && !seenIds.has(task.id));
       project.tasks = project.tasks.filter((task) => task.source !== "github" || seenIds.has(task.id));
       if (project.tasks.length === before) continue;
       touchedProjectIds.add(project.id);
-      // クローズ・マージ済みでプロジェクトから消えた項目は、ToDo上では完了扱いにする
-      for (const task of removed) rememberTodoTask(project.id, { ...task, status: "Done" });
+      // マージ・完了でプロジェクトから消えた項目は ToDo 上で完了扱いにし、
+      // マージせずクローズした PR や Not planned の Issue は ToDo からも消す
+      const discarded = removed.filter((task) => discardedIds.has(task.id));
+      for (const task of removed) {
+        if (!discardedIds.has(task.id)) rememberTodoTask(project.id, { ...task, status: "Done" });
+      }
+      if (discarded.length > 0) discardedTasksByProject.push([project, discarded]);
     }
   }
 
@@ -2229,6 +2269,7 @@ async function syncGitHubItems() {
   }
 
   await reflectSyncedTasksToTodayTodo(projects, todoTasksByProjectId);
+  for (const [project, tasks] of discardedTasksByProject) await removeProjectTasksFromTodayTodo(project, tasks);
 
   const syncedAtMs = Date.now();
   return {
@@ -2925,6 +2966,7 @@ module.exports = {
     githubSourceState,
     projectTaskStatusFromGitHubItem,
     githubTaskChanged,
+    isDiscardedGitHubNode,
     normalizeGitHubProjectUrl,
     resolveGhExecutable,
     isGitRepository,
