@@ -4,6 +4,7 @@ import type {
   ActaEntry,
   ActaProject,
   ActaThemeId,
+  GitHubItem,
   ProjectTask,
   ProjectTaskStatus,
   KnowledgeIndexResult,
@@ -14,6 +15,7 @@ import type {
 import { CommentCard } from "./components/CommentCard";
 import { Composer } from "./components/Composer";
 import { SourceTypeBadge } from "./components/SourceTypeBadge";
+import { GitHubView } from "./components/GitHubView";
 import { SettingsModal } from "./components/SettingsModal";
 import { TagSidebar } from "./components/TagSidebar";
 import { installDragScroll } from "./lib/dragScroll";
@@ -23,7 +25,31 @@ import { orderTasksAsTree, parentTaskCandidates } from "./lib/taskTree";
 
 type TagStat = { tag: string; count: number };
 type DateFilterMode = "week" | "day" | "all";
-type ActiveView = "workspace" | "journal" | "knowledge";
+type ActiveView = "workspace" | "journal" | "knowledge" | "github";
+
+/** 起動中に GitHub の Issue・PR を自動同期する間隔 */
+const GITHUB_AUTO_SYNC_MINUTES = 10;
+/** GitHub タブで確認済みの Issue・PR の ID（新着バッジ用）。端末ごとに持てば十分なので localStorage に置く */
+const GITHUB_SEEN_STORAGE_KEY = "acta.githubSeenIds";
+
+function loadGithubSeenIds(): Set<string> | null {
+  try {
+    const raw = window.localStorage.getItem(GITHUB_SEEN_STORAGE_KEY);
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+  } catch {
+    return null;
+  }
+}
+
+function saveGithubSeenIds(ids: Set<string>) {
+  try {
+    window.localStorage.setItem(GITHUB_SEEN_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+  } catch {
+    // 保存できなくても次回起動時に新着が出るだけ
+  }
+}
 
 const TODO_RAIL_STORAGE_KEY = "acta.todoRailOpen";
 const PROJECT_TODO_RATIO_STORAGE_KEY = "acta.projectTodoRatio";
@@ -277,6 +303,13 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
   const [knowledgeSite, setKnowledgeSite] = useState<KnowledgeSiteResult | null>(null);
   const [settings, setSettings] = useState<ActaSettings>({ theme: "default" });
   const [githubSyncBusy, setGithubSyncBusy] = useState(false);
+  const [githubItems, setGithubItems] = useState<GitHubItem[]>([]);
+  const [githubSyncedAtMs, setGithubSyncedAtMs] = useState(0);
+  const [githubStatus, setGithubStatus] = useState("");
+  // null は「まだ一度も記録していない」状態。初回は既存の項目をすべて確認済みにして、新着が大量に出ないようにする
+  const [githubSeenIds, setGithubSeenIds] = useState<Set<string> | null>(() => loadGithubSeenIds());
+  // GitHub タブを開いている間だけ「NEW」を表示する項目
+  const [githubHighlightIds, setGithubHighlightIds] = useState<Set<string>>(() => new Set());
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncIndicator, setSyncIndicator] = useState<SyncIndicatorState>({
     kind: "idle",
@@ -316,6 +349,8 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
   const backupSyncTimerRef = useRef<number | null>(null);
   const backupSyncFirstQueuedAtRef = useRef<number | null>(null);
   const linkHighlightTimerRef = useRef<number | null>(null);
+  // 自動同期のタイマーから常に最新の関数（最新の state を参照する）を呼ぶための参照
+  const githubSyncRef = useRef<(options?: { auto?: boolean }) => Promise<void>>(async () => {});
 
   function applySyncResult(result: SyncResult) {
     const detail = String(result.detail ?? "").trim();
@@ -592,6 +627,20 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
     return () => observer.disconnect();
   }, [activeView]);
 
+  // 起動直後に前回の同期結果を表示し、その後は起動中ずっと一定間隔で GitHub を同期する。
+  useEffect(() => {
+    void loadGitHubItems();
+    const first = window.setTimeout(() => void githubSyncRef.current({ auto: true }), 5_000);
+    const timer = window.setInterval(
+      () => void githubSyncRef.current({ auto: true }),
+      GITHUB_AUTO_SYNC_MINUTES * 60_000
+    );
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
+  }, []);
+
   useEffect(() => {
     const nextTheme = normalizeTheme(settings.theme);
     document.documentElement.setAttribute("data-acta-theme", nextTheme);
@@ -637,7 +686,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
   }, [projectStatus]);
 
   useEffect(() => {
-    const VIEW_ORDER: ActiveView[] = ["workspace", "journal", "knowledge"];
+    const VIEW_ORDER: ActiveView[] = ["workspace", "journal", "knowledge", "github"];
 
     function onKeyDown(e: KeyboardEvent) {
       const key = e.key.toLowerCase();
@@ -805,6 +854,46 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
     () => projects.filter((project) => !project.archivedAtMs).length,
     [projects]
   );
+  // アーカイブしたプロジェクトに割り当て済みの Issue・PR は GitHub タブに出さない
+  const visibleGithubItems = useMemo(() => {
+    const archivedTaskIds = new Set(
+      projects.filter((project) => project.archivedAtMs).flatMap((project) => project.tasks.map((task) => task.id))
+    );
+    return githubItems.filter((item) => !archivedTaskIds.has(item.id));
+  }, [githubItems, projects]);
+
+  // 新着 = まだ確認しておらず、どのプロジェクトにも割り当てていない Issue・PR
+  const githubNewItemIds = useMemo(() => {
+    if (!githubSeenIds) return [];
+    const assignedIds = new Set(projects.flatMap((project) => project.tasks.map((task) => task.id)));
+    return visibleGithubItems
+      .filter((item) => !githubSeenIds.has(item.id) && !assignedIds.has(item.id))
+      .map((item) => item.id);
+  }, [githubSeenIds, projects, visibleGithubItems]);
+
+  useEffect(() => {
+    if (githubSeenIds !== null || githubItems.length === 0) return;
+    const initial = new Set(githubItems.map((item) => item.id));
+    saveGithubSeenIds(initial);
+    setGithubSeenIds(initial);
+  }, [githubItems, githubSeenIds]);
+
+  // GitHub タブを開いたら新着を確認済みにする（NEW 表示はタブを離れるまで残す）
+  useEffect(() => {
+    if (activeView !== "github") {
+      setGithubHighlightIds((prev) => (prev.size === 0 ? prev : new Set()));
+      return;
+    }
+    if (!githubSeenIds || githubNewItemIds.length === 0) return;
+    setGithubHighlightIds((prev) => new Set([...prev, ...githubNewItemIds]));
+    // 一覧から消えた ID は持ち続けない
+    const currentIds = new Set(githubItems.map((item) => item.id));
+    const next = new Set([...githubSeenIds].filter((id) => currentIds.has(id)));
+    for (const id of githubNewItemIds) next.add(id);
+    saveGithubSeenIds(next);
+    setGithubSeenIds(next);
+  }, [activeView, githubItems, githubNewItemIds, githubSeenIds]);
+
   const activeProjectTaskCount = useMemo(
     () =>
       projects.reduce(
@@ -1139,21 +1228,58 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
     }
   }
 
-  async function syncGitHubItems() {
-    if (githubSyncBusy) return;
+  async function loadGitHubItems() {
+    if (!api) return;
+    try {
+      const result = await api.getGitHubItems();
+      setGithubItems(result.items);
+      setGithubSyncedAtMs(result.syncedAtMs);
+    } catch {
+      // キャッシュが読めなくても次回の同期で作り直される
+    }
+  }
+
+  /** GitHub の Issue・PR を同期する。auto は起動中の定期同期（失敗してもステータス表示だけにとどめる）。 */
+  async function syncGitHubItems(options?: { auto?: boolean }) {
+    if (!api || githubSyncBusy) return;
     setGithubSyncBusy(true);
-    setProjectStatus("");
+    if (!options?.auto) setGithubStatus("");
     try {
       const result = await api.syncGitHubItems();
-      await reloadProjects(result.unclassifiedProjectId || selectedProjectId);
-      await reload();
-      queueBackupSync();
-      setProjectStatus(`GitHub同期: ${result.detail}`);
+      await loadGitHubItems();
+      // プロジェクトやToDoが変わったときだけ再読込する（定期同期で編集中の画面を乱さないため）
+      if (result.changedProjects > 0) {
+        await reloadProjects(selectedProjectId);
+        await reload();
+        queueBackupSync();
+      }
+      setGithubStatus(options?.auto && result.changedProjects === 0 ? "" : `GitHub同期: ${result.detail}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setProjectStatus(msg || "GitHubのIssue・PR同期に失敗しました");
+      setGithubStatus(msg || "GitHubのIssue・PR同期に失敗しました");
     } finally {
       setGithubSyncBusy(false);
+    }
+  }
+  githubSyncRef.current = syncGitHubItems;
+
+  /** GitHub タブから Issue・PR をプロジェクトへ割り当てる（空ならプロジェクトから外す）。 */
+  async function assignGitHubItem(itemId: string, projectId: string) {
+    if (!api) return;
+    if (!projectId) {
+      const ok = window.confirm("プロジェクトから外します。ToDoに載っている場合はToDoからも消えます。よろしいですか？");
+      if (!ok) return;
+    }
+    try {
+      await api.assignGitHubItemToProject({ itemId, projectId });
+      await reloadProjects(selectedProjectId);
+      await reload();
+      queueBackupSync();
+      const projectName = projects.find((project) => project.id === projectId)?.name;
+      setGithubStatus(projectName ? `${projectName} に割り当てました` : "プロジェクトから外しました");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setGithubStatus(msg || "プロジェクトへの割り当てに失敗しました");
     }
   }
 
@@ -1370,7 +1496,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
       queueBackupSync();
       setProjectStatus(
         project.githubProjectUrl
-          ? "GitHub Projectを紐づけました。次回のGitHub同期で未分類から振り分けます"
+          ? "GitHub Projectを紐づけました。次回のGitHub同期から、このGitHub Projectの項目を自動で割り当てます"
           : "GitHub Projectの紐づけを解除しました"
       );
     } catch (err) {
@@ -1429,7 +1555,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
 
   return (
     <div
-      className={`shell${activeView === "workspace" ? " isWide" : ""}${
+      className={`shell${activeView === "workspace" || activeView === "github" ? " isWide" : ""}${
         activeView === "journal" ? " isJournal" : ""
       }`}
     >
@@ -1438,9 +1564,10 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
         <nav className="appNav" aria-label="機能切り替え">
           {(
             [
-              { view: "workspace", icon: "▦", label: "プロジェクト", count: activeProjectTaskCount, hint: "⌘1" },
-              { view: "journal", icon: "◷", label: "ナレッジ", count: entries.length, hint: "⌘2" },
-              { view: "knowledge", icon: "⌕", label: "検索", count: null, hint: "⌘3" }
+              { view: "workspace", icon: "▦", label: "プロジェクト", count: activeProjectTaskCount, badge: 0, hint: "⌘1" },
+              { view: "journal", icon: "◷", label: "ナレッジ", count: entries.length, badge: 0, hint: "⌘2" },
+              { view: "knowledge", icon: "⌕", label: "検索", count: null, badge: 0, hint: "⌘3" },
+              { view: "github", icon: "", label: "GitHub", count: visibleGithubItems.length, badge: githubNewItemIds.length, hint: "⌘4" }
             ] as const
           ).map((item) => (
             <button
@@ -1451,16 +1578,21 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
               aria-current={activeView === item.view ? "page" : undefined}
               onClick={() => switchView(item.view)}
             >
-              <span className="appNavIcon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{item.view === "workspace" ? <><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16M15 4v16" /></> : item.view === "journal" ? <><path d="M5 3h11l3 3v15H5zM9 10h6M9 14h6" /></> : <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>}</svg></span>
+              <span className="appNavIcon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{item.view === "workspace" ? <><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16M15 4v16" /></> : item.view === "journal" ? <><path d="M5 3h11l3 3v15H5zM9 10h6M9 14h6" /></> : item.view === "github" ? <><circle cx="6" cy="5" r="2.2" /><circle cx="6" cy="19" r="2.2" /><circle cx="18" cy="12" r="2.2" /><path d="M6 7.2v9.6M8.2 5H12a4 4 0 0 1 4 4v.8" /></> : <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>}</svg></span>
               <span className="appNavText">{item.label}</span>
               {item.count === null ? null : <span className="appNavCount">{item.count}</span>}
+              {item.badge > 0 ? (
+                <span className="appNavBadge" title={`未割当の新着 ${item.badge}件`}>
+                  {item.badge}
+                </span>
+              ) : null}
             </button>
           ))}
         </nav>
         <span className="appHeaderNote">考える、記録する、進める。</span>
       </header>
 
-      {activeView === "workspace" ? null : (
+      {activeView === "workspace" || activeView === "github" ? null : (
       <aside className={`sidebar dragScroll${activeView === "journal" ? " journalListSidebar" : ""}`} ref={sidebarRef}>
         {activeView === "journal" ? (
           <div className="journalListPanel">
@@ -1713,15 +1845,6 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                   <button className="primaryActionBtn" type="button" onClick={() => void createProject()}>
                     作成
                   </button>
-                  <button
-                    className="ghostBtn"
-                    type="button"
-                    disabled={githubSyncBusy}
-                    onClick={() => void syncGitHubItems()}
-                    title="自分が作成・アサインされたGitHub Issue・PR（Draft PRも含む）を同期"
-                  >
-                    {githubSyncBusy ? "同期中..." : "GitHub同期"}
-                  </button>
                 </div>
                 <div className="projectArchiveToggle">
                   <button
@@ -1864,7 +1987,7 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                                 if (e.key === "Enter") void editProjectGitHubProjectUrl();
                               }}
                               placeholder="https://github.com/orgs/<org>/projects/<番号>"
-                              title="同期時、未分類のIssue・PRのうちこのGitHub Projectに属するものをこのプロジェクトへ振り分けます"
+                              title="同期時、プロジェクト未割当のIssue・PRのうちこのGitHub Projectに属するものをこのプロジェクトへ自動で割り当てます"
                             />
                           </label>
                           <button
@@ -2392,6 +2515,20 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                 }}
               />
             </section>
+        ) : null}
+
+        {activeView === "github" ? (
+          <GitHubView
+            items={visibleGithubItems}
+            newItemIds={githubHighlightIds}
+            syncedAtMs={githubSyncedAtMs}
+            syncBusy={githubSyncBusy}
+            status={githubStatus}
+            projects={projects}
+            autoSyncMinutes={GITHUB_AUTO_SYNC_MINUTES}
+            onSync={() => void syncGitHubItems()}
+            onAssign={(itemId, projectId) => void assignGitHubItem(itemId, projectId)}
+          />
         ) : null}
 
         {activeView === "knowledge" ? (

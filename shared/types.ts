@@ -73,7 +73,7 @@ export type ActaProject = {
   updatedAtMs: number;
   archivedAtMs: number;
   issueUrl: string;
-  /** 紐づける GitHub Project (v2) のURL。同期時に未分類の項目をこのプロジェクトへ振り分ける */
+  /** 紐づける GitHub Project (v2) のURL。同期時、このGitHub Projectに属するIssue・PRを自動でこのプロジェクトへ割り当てる */
   githubProjectUrl: string;
   tasks: ProjectTask[];
   knowledgeEntries: ActaEntry[];
@@ -248,11 +248,44 @@ export type GitHubSyncResult = {
   fetchedItems: number;
   importedTasks: number;
   updatedTasks: number;
-  unclassifiedItems: number;
-  /** 「未分類」プロジェクトのID。存在しなければ空文字 */
-  unclassifiedProjectId: string;
+  /** 同期で更新したプロジェクト数 */
+  changedProjects: number;
   detail: string;
   syncedAtMs: number;
+};
+
+/**
+ * 自分と Issue・PR の関係。GitHub タブの絞り込みに使う。
+ * 将来 Gitify の機能（通知）を取り込む場合は mention / comment などをここに足す想定。
+ */
+export type GitHubItemRelation = "author" | "assignee" | "review_requested";
+
+export type GitHubItem = {
+  /** GraphQL のノードID。プロジェクトに割り当てたタスクの id と同じ */
+  id: string;
+  number: number;
+  title: string;
+  url: string;
+  repository: string;
+  type: "Issue" | "PullRequest";
+  isDraft: boolean;
+  author: string;
+  labels: string[];
+  relations: GitHubItemRelation[];
+  createdAtMs: number;
+  updatedAtMs: number;
+};
+
+export type GitHubItemsResult = {
+  items: GitHubItem[];
+  /** 最後に同期した時刻。未同期なら 0 */
+  syncedAtMs: number;
+};
+
+export type AssignGitHubItemPayload = {
+  itemId: string;
+  /** 割り当て先のプロジェクトID。空ならプロジェクトから外す */
+  projectId: string;
 };
 
 export type SaveSettingsPayload = ActaSettings;
