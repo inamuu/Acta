@@ -18,7 +18,7 @@ import { SettingsModal } from "./components/SettingsModal";
 import { TagSidebar } from "./components/TagSidebar";
 import { installDragScroll } from "./lib/dragScroll";
 import { markdownToHtml } from "./lib/markdown";
-import { setTaskStateOnLine, summarizeTaskStates, type TaskState } from "./lib/taskList";
+import { setTaskStateOnLine, stripTaskCheckboxes, summarizeTaskStates, type TaskState } from "./lib/taskList";
 import { orderTasksAsTree, parentTaskCandidates } from "./lib/taskTree";
 
 type TagStat = { tag: string; count: number };
@@ -1033,15 +1033,6 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
     }
   }
 
-  async function copyEntryId(entry: ActaEntry) {
-    const copied = await copyTextToClipboard(entry.id);
-    if (!copied) {
-      setAppError("投稿IDのコピーに失敗しました");
-      return;
-    }
-    setAppError("");
-  }
-
   /** サイドの一覧をドラッグ&ドロップで並べ替える。並び順は設定に保存し、ToDo追記の順序にも使われる。 */
   async function reorderProjects(dragId: string, targetId: string) {
     if (!dragId || !targetId || dragId === targetId) return;
@@ -1064,9 +1055,9 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
     }
   }
 
-  /** 投稿本文をMarkdownのままクリップボードへ。 */
+  /** 投稿本文をMarkdownでクリップボードへ。チェックボックスは通常のリストに変換する。 */
   async function copyEntryMarkdown(entry: ActaEntry, notify?: (message: string) => void) {
-    const markdown = String(entry.body ?? "").trim();
+    const markdown = stripTaskCheckboxes(String(entry.body ?? "").trim());
     const copied = await copyTextToClipboard(markdown);
     if (!copied) {
       const message = "Markdownのコピーに失敗しました";
@@ -2302,9 +2293,6 @@ function ActaApp({ api }: { api: NonNullable<Window["acta"]> }) {
                           setActiveView("journal");
                           setEditing(entry);
                           setDraft(null);
-                        }}
-                        onCopyId={(entry) => {
-                          void copyEntryId(entry);
                         }}
                         onCopyMarkdown={(entry) => {
                           void copyEntryMarkdown(entry, setTodoStatus);

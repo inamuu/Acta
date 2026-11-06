@@ -16,7 +16,6 @@ type Props = {
   onClickTag?: (tag: string) => void;
   onEdit?: (entry: ActaEntry) => void;
   onCopy?: (entry: ActaEntry) => void;
-  onCopyId?: (entry: ActaEntry) => void;
   onCopyMarkdown?: (entry: ActaEntry) => void;
   onDelete?: (entry: ActaEntry) => void;
   onOpenLinkedEntry?: (entryId: string) => void;
@@ -69,7 +68,6 @@ export function CommentCard({
   onClickTag,
   onEdit,
   onCopy,
-  onCopyId,
   onCopyMarkdown,
   onDelete,
   onOpenLinkedEntry,
@@ -125,16 +123,6 @@ export function CommentCard({
                 {onCopy ? (
                   <button className="ghostBtn" type="button" onClick={() => onCopy(entry)} title="入力欄にコピー">
                     コピー
-                  </button>
-                ) : null}
-                {onCopyId ? (
-                  <button
-                    className="ghostBtn"
-                    type="button"
-                    onClick={() => onCopyId(entry)}
-                    title="投稿IDをコピー（リンクは [任意の文](#post:ID) 形式）"
-                  >
-                    IDコピー
                   </button>
                 ) : null}
                 {onCopyMarkdown ? (

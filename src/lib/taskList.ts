@@ -144,3 +144,13 @@ export function summarizeTaskStates(markdown: string): TaskSummary {
 export function setTaskCheckedOnLine(markdown: string, line0: number, checked: boolean): string | null {
   return setTaskStateOnLine(markdown, line0, checked ? "checked" : "unchecked");
 }
+
+const TASK_MARKER_RE = /^(\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s*)\[[ xX\-\/rR]\]\s+/;
+
+/** "- [ ] task" / "- [x] task" を "- task" に変換する（外部貼り付け用）。 */
+export function stripTaskCheckboxes(markdown: string): string {
+  return String(markdown ?? "")
+    .split(/(\r?\n)/)
+    .map((part) => part.replace(TASK_MARKER_RE, (_m, prefix: string) => `${prefix.trimEnd()} `))
+    .join("");
+}
