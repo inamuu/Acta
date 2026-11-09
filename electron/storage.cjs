@@ -2931,8 +2931,13 @@ async function removeProjectTasksFromTodayTodo(project, tasks) {
   return { ...current, body: nextBody };
 }
 
+/** サマリー系タグ。ToDo タグが混入していても ToDo としては扱わない。 */
+const SUMMARY_TAGS = ["Summary", "WeeklySummary"];
+
 function isTodoEntry(entry) {
-  if ((entry.tags || []).includes(TODO_TAG)) return true;
+  const tags = entry.tags || [];
+  if (tags.some((tag) => SUMMARY_TAGS.includes(tag))) return false;
+  if (tags.includes(TODO_TAG)) return true;
   return /^#\s*todo\b/im.test(String(entry.body ?? ""));
 }
 
