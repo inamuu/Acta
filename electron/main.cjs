@@ -355,10 +355,6 @@ app.whenReady().then(() => {
   );
   handleTrusted("acta:createTodoFromProjects", async () => storage.createTodoFromProjects());
   handleTrusted("acta:syncGitHubItems", async () => storage.syncGitHubItems());
-  handleTrusted("acta:getGitHubItems", async () => storage.getGitHubItems());
-  handleTrusted("acta:assignGitHubItemToProject", async (_event, payload) =>
-    storage.assignGitHubItemToProject(payload)
-  );
   handleTrusted("acta:copyPreviousTodo", async () => storage.copyPreviousTodo());
   handleTrusted("acta:rebuildKnowledgeIndex", async () => storage.rebuildKnowledgeIndex());
   handleTrusted("acta:searchKnowledgeIndex", async (_event, payload) => storage.searchKnowledgeIndex(payload));

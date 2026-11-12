@@ -18,8 +18,6 @@ import type {
   KnowledgeSearchResult,
   KnowledgeSiteResult,
   GitHubSyncResult,
-  GitHubItemsResult,
-  AssignGitHubItemPayload,
   MoveProjectTaskPayload,
   ReassignProjectTaskPayload,
   RenameProjectPayload,
@@ -72,8 +70,6 @@ declare global {
       appendActiveProjectsInProgressToTodayTodo: () => Promise<ActaEntry>;
       createTodoFromProjects: () => Promise<ActaEntry>;
       syncGitHubItems: () => Promise<GitHubSyncResult>;
-      getGitHubItems: () => Promise<GitHubItemsResult>;
-      assignGitHubItemToProject: (payload: AssignGitHubItemPayload) => Promise<ActaProject | null>;
       copyPreviousTodo: () => Promise<ActaEntry>;
       rebuildKnowledgeIndex: () => Promise<KnowledgeIndexResult>;
       searchKnowledgeIndex: (payload: KnowledgeSearchPayload) => Promise<KnowledgeSearchResult>;

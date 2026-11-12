@@ -250,42 +250,10 @@ export type GitHubSyncResult = {
   updatedTasks: number;
   /** 同期で更新したプロジェクト数 */
   changedProjects: number;
+  /** アサインされた項目を受け取る「GitHub」プロジェクトのID。存在しなければ空文字 */
+  inboxProjectId: string;
   detail: string;
   syncedAtMs: number;
-};
-
-/**
- * 自分と Issue・PR の関係。GitHub タブの絞り込みに使う。
- * 将来 Gitify の機能（通知）を取り込む場合は mention / comment などをここに足す想定。
- */
-export type GitHubItemRelation = "author" | "assignee" | "review_requested";
-
-export type GitHubItem = {
-  /** GraphQL のノードID。プロジェクトに割り当てたタスクの id と同じ */
-  id: string;
-  number: number;
-  title: string;
-  url: string;
-  repository: string;
-  type: "Issue" | "PullRequest";
-  isDraft: boolean;
-  author: string;
-  labels: string[];
-  relations: GitHubItemRelation[];
-  createdAtMs: number;
-  updatedAtMs: number;
-};
-
-export type GitHubItemsResult = {
-  items: GitHubItem[];
-  /** 最後に同期した時刻。未同期なら 0 */
-  syncedAtMs: number;
-};
-
-export type AssignGitHubItemPayload = {
-  itemId: string;
-  /** 割り当て先のプロジェクトID。空ならプロジェクトから外す */
-  projectId: string;
 };
 
 export type SaveSettingsPayload = ActaSettings;

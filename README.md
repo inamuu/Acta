@@ -26,9 +26,9 @@ GitHub issue 風の「コメント」UIで、Markdown を日次ファイルへ�
 
 ## GitHubのIssue・PRを同期する
 
-プロジェクト画面の「GitHub同期」を押すと、GitHub Projectsへの所属とは関係なく、自分が作成した、または自分にアサインされたOpenなIssue・Pull Requestを取得します（Draft PRも含みます）。Closed・Mergedは同期対象外です。初回のみターミナルで`gh auth login`を実行してください。
+プロジェクト画面の「GitHub同期」を押すと（起動中は10分ごとに自動でも実行）、自分にアサインされたOpenなIssue・Pull Requestを取得します（Draft PRも含みます）。Closed・Mergedは同期対象外です。初回のみターミナルで`gh auth login`を実行してください。
 
-新しい項目は自動分類せず、すべて「未分類」プロジェクトの`Backlog`に入ります（「未分類」は無ければ自動作成されます）。カード内のプロジェクト選択欄で所属プロジェクトを選び、カンバンで`InProgress`や`Done`へ動かしてください。一度振り分けた項目は、次回以降の同期でもそのプロジェクトと状態を維持します。
+新しい項目は「GitHub」プロジェクトの`Backlog`に入ります（「GitHub」は無ければ自動作成されます）。GitHub Projectを紐づけたプロジェクトがある場合、そのGitHub Projectに属する項目はそちらへ入ります。カード内のプロジェクト選択欄で所属プロジェクトを移し、カンバンで`InProgress`や`Done`へ動かしてください。一度振り分けた項目は、次回以降の同期でもそのプロジェクトと状態を維持します。
 
 Projectsの状態は`Backlog`、`InProgress`、`Done`です。ToDoに載るのは`InProgress`と`Done`のタスクだけで、`Backlog`へ戻したタスクはToDoから外れます。同期の結果も今日のToDoに反映され、`InProgress`のままGitHub側で更新された項目は追記、クローズ・マージ済みで消えた項目は既存行を完了マークへ更新します（今日のToDoが無い場合は何もしません）。GitHub由来の項目も、ToDoでは各Actaプロジェクトの通常タスクと同じ階層へ追加されます。GitHub由来のURLはプロジェクト画面でのみ表示し、ToDo本文には出力しません。
 

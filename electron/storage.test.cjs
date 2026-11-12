@@ -560,36 +560,3 @@ test("unmerged closed PRs and not-planned issues are discarded, not completed", 
   assert.equal(_test.isDiscardedGitHubNode({ id: "I_4", state: "CLOSED", stateReason: null }), false);
   assert.equal(_test.isDiscardedGitHubNode({ id: "I_5", state: "OPEN", stateReason: null }), false);
 });
-
-test("GitHub items are normalized for the GitHub tab and survive a cache round trip", () => {
-  const raw = {
-    id: "PR_9",
-    isPullRequest: true,
-    isDraft: true,
-    number: 9,
-    title: "レビュー依頼",
-    repository: { nameWithOwner: "example/web" },
-    url: "https://github.com/example/web/pull/9",
-    author: { login: "someone" },
-    labels: [{ name: "infra" }],
-    relations: ["review_requested", "unknown"],
-    createdAt: "2026-11-01T00:00:00Z",
-    updatedAt: "2026-11-02T00:00:00Z"
-  };
-  const item = _test.normalizeGitHubItem(raw);
-  assert.deepEqual(item, {
-    id: "PR_9",
-    number: 9,
-    title: "レビュー依頼",
-    url: "https://github.com/example/web/pull/9",
-    repository: "example/web",
-    type: "PullRequest",
-    isDraft: true,
-    author: "someone",
-    labels: ["infra"],
-    relations: ["review_requested"],
-    createdAtMs: Date.parse("2026-11-01T00:00:00Z"),
-    updatedAtMs: Date.parse("2026-11-02T00:00:00Z")
-  });
-  assert.deepEqual(_test.normalizeGitHubItem(item), item);
-});

@@ -24,8 +24,8 @@ const SYNC_ERROR = "Sync Error";
 const SYNC_DISABLED = "Sync Disabled";
 const DEFAULT_THEME = "default";
 const GITHUB_SEARCH_LIMIT = 1000;
-const GITHUB_CACHE_FILE = "github-items.json";
-const GITHUB_ITEM_RELATIONS = new Set(["author", "assignee", "review_requested"]);
+/** 自分にアサインされた Issue・PR を受け取るプロジェクト名 */
+const GITHUB_INBOX_PROJECT_NAME = "GitHub";
 const ALLOWED_THEMES = new Set([
   "default",
   "dracula",
@@ -2013,8 +2013,8 @@ function githubTaskChanged(previousTask, nextTask) {
 const GITHUB_ITEM_FIELDS = "id,title,url,state,isPullRequest,number,repository,labels,author,createdAt,updatedAt,closedAt";
 
 /**
- * 取得クエリ。relation は「自分との関係」で、GitHub タブの絞り込みに使う。
- * 将来 Gitify の通知（review_requested / mention など）を取り込むときも、この relation に追加する想定。
+ * 取得クエリ。relation は「自分との関係」。
+ * 新規にプロジェクトへ取り込むのは assignee の項目だけで、それ以外はプロジェクトに入っている既存タスクの最新化に使う。
  */
 const GITHUB_ITEM_QUERIES = [
   { relation: "author", args: ["search", "issues", "--author", "@me"], fields: GITHUB_ITEM_FIELDS },
@@ -2122,46 +2122,6 @@ function isDiscardedGitHubNode(node) {
   return node.stateReason === "NOT_PLANNED" || node.stateReason === "DUPLICATE";
 }
 
-/** gh の検索結果を GitHub タブ表示用の形にそろえる。 */
-function normalizeGitHubItem(item) {
-  const relations = Array.isArray(item?.relations)
-    ? item.relations.filter((relation) => GITHUB_ITEM_RELATIONS.has(relation))
-    : [];
-  return {
-    id: String(item?.id ?? "").trim(),
-    number: Math.max(0, Math.trunc(Number(item?.number) || 0)),
-    title: String(item?.title ?? "").trim(),
-    url: String(item?.url ?? "").trim(),
-    repository: String(item?.repository?.nameWithOwner ?? item?.repository?.name ?? item?.repository ?? "").trim(),
-    type: item?.isPullRequest || item?.type === "PullRequest" ? "PullRequest" : "Issue",
-    isDraft: Boolean(item?.isDraft),
-    author: String(item?.author?.login ?? item?.author ?? "").trim(),
-    labels: (Array.isArray(item?.labels) ? item.labels : [])
-      .map((label) => String(label?.name ?? label ?? "").trim())
-      .filter(Boolean),
-    relations,
-    createdAtMs: Number(item?.createdAtMs) || Date.parse(String(item?.createdAt ?? "")) || 0,
-    updatedAtMs: Number(item?.updatedAtMs) || Date.parse(String(item?.updatedAt ?? "")) || 0
-  };
-}
-
-function getGitHubCachePath() {
-  return path.join(app.getPath("userData"), GITHUB_CACHE_FILE);
-}
-
-/** 最後に同期した GitHub の Issue・PR 一覧（GitHub タブ用）。データリポジトリには含めず端末ローカルに置く。 */
-async function getGitHubItems() {
-  const parsed = safeJsonParse(await readTextFileIfExists(getGitHubCachePath()));
-  const items = Array.isArray(parsed?.items) ? parsed.items.map(normalizeGitHubItem).filter((item) => item.id) : [];
-  return { items, syncedAtMs: Number(parsed?.syncedAtMs) || 0 };
-}
-
-async function saveGitHubItems(items, syncedAtMs) {
-  const cachePath = getGitHubCachePath();
-  await fs.promises.mkdir(path.dirname(cachePath), { recursive: true });
-  await fs.promises.writeFile(cachePath, JSON.stringify({ syncedAtMs, items }, null, 2), "utf8");
-}
-
 function projectTaskFromGitHubItem(item, previousTask, now = Date.now()) {
   const content = githubSearchItemContent(item);
   const status = projectTaskStatusFromGitHubItem(item, previousTask);
@@ -2182,33 +2142,6 @@ function projectTaskFromGitHubItem(item, previousTask, now = Date.now()) {
   });
 }
 
-/**
- * GitHub タブから Issue・PR をプロジェクトへ割り当てる。
- * projectId が空なら、所属しているプロジェクトから外す（GitHub タブには残る）。
- */
-async function assignGitHubItemToProject(payload) {
-  const itemId = String(payload?.itemId ?? "").trim();
-  const projectId = String(payload?.projectId ?? "").trim();
-  if (!itemId) throw new Error("itemId が不正です");
-
-  const projects = await listProjects();
-  const current = projects.find((project) => project.tasks.some((task) => task.id === itemId)) || null;
-  if (current && current.id === projectId) return current;
-  if (current && projectId) {
-    return reassignProjectTask({ sourceProjectId: current.id, targetProjectId: projectId, taskId: itemId });
-  }
-  if (current) return deleteProjectTask({ projectId: current.id, taskId: itemId });
-  if (!projectId) return null;
-
-  const { items } = await getGitHubItems();
-  const item = items.find((candidate) => candidate.id === itemId);
-  if (!item) throw new Error("GitHubの項目が見つかりません。同期し直してください");
-  const project = await getProjectById(projectId);
-  const raw = { ...item, isPullRequest: item.type === "PullRequest", state: "open", createdAt: new Date(item.createdAtMs || Date.now()).toISOString() };
-  project.tasks.unshift(projectTaskFromGitHubItem(raw, null));
-  return writeProject(project);
-}
-
 let githubSyncPromise = null;
 
 /** 同時に走らせない（自動同期と手動同期が重なったら、実行中の結果を共有する）。 */
@@ -2222,13 +2155,16 @@ function syncGitHubItems() {
 }
 
 /**
- * GitHub の Issue・PR を取得して GitHub タブ用に保存し、プロジェクトに割り当て済みのタスクを最新化する。
- * 新しい項目はプロジェクトへ自動では入れない（GitHub Project を紐づけたプロジェクトだけ自動で割り当てる）。
+ * GitHub の Issue・PR を取得し、プロジェクトに入っているタスクを最新化する。
+ * 自分にアサインされた新しい項目は、GitHub Project を紐づけたプロジェクトがあればそこへ、
+ * なければ「GitHub」プロジェクトへ Backlog として追加する。
  */
 async function runGitHubSync() {
   const { items, complete } = await fetchGitHubItems();
 
   const projects = await listProjects();
+  let inboxProject =
+    projects.find((project) => project.name === GITHUB_INBOX_PROJECT_NAME && !project.archivedAtMs) || null;
   const touchedProjectIds = new Set();
   let importedTasks = 0;
   let updatedTasks = 0;
@@ -2259,13 +2195,12 @@ async function runGitHubSync() {
       projectByGitHubProjectUrl.set(project.githubProjectUrl, project);
     }
   }
-  // まだどのプロジェクトにも入っていない、自分が作成・アサインされた項目だけ所属 GitHub Project を問い合わせる。
-  // レビュー依頼だけの PR は自分の作業ではないので自動では割り当てない。
-  const isOwnWork = (item) => item.relations.some((relation) => relation === "author" || relation === "assignee");
+  // まだどのプロジェクトにも入っていない、自分にアサインされた項目だけ所属 GitHub Project を問い合わせる。
+  const isAssigned = (item) => item.relations.includes("assignee");
   let githubProjectUrlsByItemId = new Map();
   if (projectByGitHubProjectUrl.size > 0) {
     const candidateIds = items
-      .filter((item) => isOwnWork(item))
+      .filter((item) => isAssigned(item))
       .map((item) => String(item?.id ?? "").trim())
       .filter((id) => id && !assignedIds.has(id));
     if (candidateIds.length > 0) {
@@ -2303,9 +2238,17 @@ async function runGitHubSync() {
     }
 
     if (!targetProject) {
+      if (!isAssigned(item)) continue;
       targetProject = findLinkedProject(githubItemId);
-      if (!targetProject) continue;
-      projectLinkedItems += 1;
+      if (targetProject) {
+        projectLinkedItems += 1;
+      } else {
+        if (!inboxProject) {
+          inboxProject = await createProject({ name: GITHUB_INBOX_PROJECT_NAME });
+          projects.push(inboxProject);
+        }
+        targetProject = inboxProject;
+      }
     }
 
     const nextTask = projectTaskFromGitHubItem(item, previousTask);
@@ -2355,13 +2298,13 @@ async function runGitHubSync() {
   for (const [project, tasks] of discardedTasksByProject) await removeProjectTasksFromTodayTodo(project, tasks);
 
   const syncedAtMs = Date.now();
-  await saveGitHubItems(items.map(normalizeGitHubItem), syncedAtMs);
   return {
     ok: true,
     fetchedItems: items.length,
     importedTasks,
     updatedTasks,
     changedProjects: touchedProjectIds.size,
+    inboxProjectId: inboxProject?.id || "",
     detail: [
       `${items.length}件取得`,
       importedTasks ? `プロジェクトへ追加${importedTasks}件` : "",
@@ -3028,8 +2971,6 @@ module.exports = {
   appendActiveProjectsInProgressToTodayTodo,
   createTodoFromProjects,
   syncGitHubItems,
-  getGitHubItems,
-  assignGitHubItemToProject,
   copyPreviousTodo,
   rebuildKnowledgeIndex,
   searchKnowledgeIndex,
@@ -3053,7 +2994,6 @@ module.exports = {
     removeProjectTasksFromTodoBody,
     isTodoTrackedStatus,
     githubSearchItemContent,
-    normalizeGitHubItem,
     githubSourceState,
     projectTaskStatusFromGitHubItem,
     githubTaskChanged,
